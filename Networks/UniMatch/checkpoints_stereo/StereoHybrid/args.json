@@ -1,0 +1,66 @@
+{
+    "checkpoint_dir": "checkpoints_stereo/StereoHybrid",
+    "stage": "sceneflow",
+    "val_dataset": [
+        "kitti15"
+    ],
+    "max_disp": 400,
+    "img_height": 288,
+    "img_width": 512,
+    "padding_factor": 16,
+    "batch_size": 64,
+    "num_workers": 8,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "seed": 326,
+    "resume": "checkpoints_stereo/gmstereo-scale2-regrefine3-resumeflowthings-eth3dft-a807cb16.pth",
+    "strict_resume": false,
+    "no_resume_optimizer": false,
+    "resume_exclude_upsampler": false,
+    "task": "stereo",
+    "num_scales": 1,
+    "feature_channels": 128,
+    "upsample_factor": 8,
+    "num_head": 1,
+    "ffn_dim_expansion": 4,
+    "num_transformer_layers": 6,
+    "reg_refine": false,
+    "attn_type": "self_swin2d_cross_1d",
+    "attn_splits_list": [
+        2
+    ],
+    "corr_radius_list": [
+        -1
+    ],
+    "prop_radius_list": [
+        -1
+    ],
+    "num_reg_refine": 1,
+    "eval": false,
+    "inference_size": null,
+    "count_time": false,
+    "save_vis_disp": false,
+    "save_dir": null,
+    "middlebury_resolution": "F",
+    "submission": false,
+    "eth_submission_mode": "train",
+    "middlebury_submission_mode": "training",
+    "output_path": "output/result",
+    "summary_freq": 100,
+    "save_ckpt_freq": 1000,
+    "val_freq": 1000,
+    "save_latest_ckpt_freq": 1000,
+    "num_steps": 100000,
+    "distributed": false,
+    "local_rank": 0,
+    "launcher": "none",
+    "gpu_ids": 0,
+    "inference_dir": null,
+    "inference_dir_left": null,
+    "inference_dir_right": null,
+    "pred_bidir_disp": false,
+    "pred_right_disp": false,
+    "save_pfm_disp": false,
+    "debug": false
+}
+

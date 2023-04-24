@@ -1,0 +1,15 @@
+inference_size: [640, 960]
+#output_path: "/home/godeta/PycharmProjects/LYNRED/Stereo_matching/NeuralNetwork/UniMatch/output/result"
+#resume: "Networks/UniMatch/checkpoints_stereo/gmstereo-scale2-regrefine3-resumeflowthings-mixdata-train320x640-ft640x960-e4e291fd.pth"
+padding_factor: 32
+upsample_factor: 4
+num_scales: 2
+attn_type: self_swin2d_cross_swin1d
+attn_splits_list: [2, 8]
+corr_radius_list: [-1, 4]
+prop_radius_list: [-1, 1]
+reg_refine: True
+num_reg_refine: 3
+launcher: null
+half_resolution: False
+#max_disp: 150

@@ -1,0 +1,6 @@
+main_flow.py --inference_dir /home/godeta/PycharmProjects/LYNRED/Stereo_matching/NeuralNetwork/UniMatch/demo/flow-davis --resume pretrained/gmstereo-scale2-regrefine3-resumeflowthings-kitti15-04487ebf.pth --output_path output/test_flow --padding_factor 32 --upsample_factor 4 --num_scales 2 --attn_splits_list 2 8 --corr_radius_list -1 4 --prop_radius_list -1 1 --reg_refine --num_reg_refine 6 --print_info
+
+main_flow.py --inference_dir /home/godeta/PycharmProjects/LYNRED/Stereo_matching/NeuralNetwork/UniMatch/demo/flow-davis --resume pretrained/gmstereo-scale2-regrefine3-resumeflowthings-sceneflow-f724fee6.pth --output_path output/test_flow --padding_factor 32 --upsample_factor 4 --num_scales 2 --attn_splits_list 2 8 --corr_radius_list -1 4 --prop_radius_list -1 1 --reg_refine --num_reg_refine 3 --print_info
+
+main_flow.py --inference_dir /home/godeta/PycharmProjects/LYNRED/Stereo_matching/NeuralNetwork/UniMatch/demo/flow-davis --resume pretrained/gmflow-scale2-regrefine6-sintelft-6e39e2b9.pth --output_path output/test_flow --padding_factor 32 --upsample_factor 4 --num_scales 2 --attn_splits_list 2 8 --corr_radius_list -1 4 --prop_radius_list -1 1 --reg_refine --num_reg_refine 3 --print_info
+
