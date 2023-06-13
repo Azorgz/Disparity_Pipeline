@@ -67,7 +67,6 @@ def flow_warp(feature, flow, mask=False, padding_mode='zeros'):
     assert flow.size(1) == 2
 
     grid = coords_grid(b, h, w).to(flow.device) + flow  # [B, 2, H, W]
-
     return bilinear_sample(feature, grid, padding_mode=padding_mode,
                            return_mask=mask)
 

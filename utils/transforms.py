@@ -1,23 +1,35 @@
 from __future__ import division
 import torch
 import numpy as np
-from PIL import Image
 import torchvision.transforms.functional as F
 from torchvision.transforms.functional import hflip
 import torch.nn.functional as F1
-import random
-import cv2
+
+from utils.classes.Image import ImageCustom
 
 
 class Compose(object):
     def __init__(self, transforms: list, device):
         self.transforms = transforms
+        no_pad = True
+        no_resize = True
+        for t in self.transforms:
+            if isinstance(t, Resize):
+                no_resize = False
+            if isinstance(t, Pad):
+                no_pad = False
+        if not no_pad and not no_resize:
+            raise AttributeError("There cannot be a Resize AND a Padding for Pre-processing")
         self.device = device
 
     def __call__(self, sample):
+        if not isinstance(sample, F.Tensor):
+            sample_ = sample.copy()
+        else:
+            sample_ = torch.tensor(sample)
         for t in self.transforms:
-            sample = t(sample, self.device)
-        return sample
+            sample_ = t(sample_, self.device)
+        return sample_
 
 
 class ToTensor(object):
@@ -27,30 +39,166 @@ class ToTensor(object):
         self.no_normalize = no_normalize
 
     def __call__(self, sample, device, *args):
-        for key in sample.keys():
-            sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
-            if self.no_normalize:
-                sample[key] = torch.from_numpy(sample[key])
-            else:
-                sample[key] = torch.from_numpy(sample[key]) / 255.
-            sample[key] = sample[key].to(device).unsqueeze(0)
-        # sample["left"] = sample["left"].to(device).unsqueeze(0)
-        # sample["right"] = sample["right"].to(device).unsqueeze(0)
-
+        if isinstance(sample, dict):
+            for key in sample.keys():
+                sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
+                if self.no_normalize:
+                    sample[key] = torch.from_numpy(sample[key])
+                else:
+                    sample[key] = torch.from_numpy(sample[key]) / 255.
+                sample[key] = sample[key].to(device).unsqueeze(0)
+        else:
+            sample = np.transpose(sample, (2, 0, 1))
+            sample = torch.from_numpy(sample) / 255.
+            sample = sample.to(device).unsqueeze(0)
         return sample
+
+
+class ToFloatTensor(object):
+    """Convert numpy array to torch tensor and load it on the specified device"""
+
+    def __init__(self, no_normalize=False):
+        self.no_normalize = no_normalize
+
+    def __call__(self, sample, device, *args):
+        if isinstance(sample, dict):
+            for key in sample.keys():
+                sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
+                if self.no_normalize:
+                    sample[key] = torch.cuda.FloatTensor(sample[key])
+                else:
+                    sample[key] = torch.cuda.FloatTensor(sample[key] / 255.)
+                sample[key] = sample[key].to(device).unsqueeze(0)
+        else:
+            sample = np.transpose(sample, (2, 0, 1))
+            sample = torch.cuda.FloatTensor(sample / 255.)
+            sample = sample.to(device).unsqueeze(0)
+        return sample
+
+
+class ToNumpy(object):
+    """Convert torch tensor to a numpy array loading it from the specified device"""
+
+    def __init__(self, normalize=True, permute=True):
+        self.normalize = normalize
+        self.permute = permute
+
+    def __call__(self, sample, *args):
+        if isinstance(sample, dict):
+            for key in sample.keys():
+                if not isinstance(sample[key], np.ndarray or ImageCustom):
+                    if self.permute and len(sample[key].shape) == 3:
+                        sample[key] = sample[key].squeeze().permute(1, 2, 0)  # [C, H, W]
+                    if not self.normalize:
+                        sample[key] = sample[key].cpu().numpy()
+                    else:
+                        sample[key] = (sample[key].cpu().numpy() * 255).astype("uint8")
+        else:
+            if not isinstance(sample, np.ndarray or ImageCustom):
+                sample = sample.squeeze()
+                if self.permute and len(sample.shape) == 3:
+                    sample = sample.squeeze().permute(1, 2, 0)
+                sample = sample.cpu().numpy()
+            if self.normalize:
+                sample = (sample * 255).astype("uint8")
+        return sample
+
+class Pad:
+    def __init__(self, shape, keep_ratio=False):
+        self.keep_ratio = keep_ratio
+        self.shape = shape
+        self.pad = [0, 0, 0, 0]
+        self.inference_size = [0, 0]
+        self.ori_size = [0, 0]
+
+    def __call__(self, sample, device, *args):
+        _, _, h, w = sample['left'].shape
+        self.ori_size = [h, w]
+        if self.keep_ratio:
+            while h > self.shape[0] or w > self.shape[1]:
+                sample['left'] = F1.interpolate(sample['left'], size=[round(h * 0.5), round(w * 0.5)],
+                                                mode='bilinear',
+                                                align_corners=True)
+                sample['right'] = F1.interpolate(sample['right'], size=[round(h * 0.5), round(w * 0.5)],
+                                                 mode='bilinear',
+                                                 align_corners=True)
+                _, _, h, w = sample['left'].shape
+        else:
+            if h > self.shape[0] or w > self.shape[1]:
+                if h / self.shape[0] >= w / self.shape[1]:
+                    w = w * self.shape[0] / h
+                    h = self.shape[0]
+                else:
+                    h = h * self.shape[1] / w
+                    w = self.shape[1]
+                sample['left'] = F1.interpolate(sample['left'], size=[int(h), int(w)],
+                                                mode='bilinear',
+                                                align_corners=True)
+                sample['right'] = F1.interpolate(sample['right'], size=[int(h), int(w)],
+                                                 mode='bilinear',
+                                                 align_corners=True)
+        self.__pad__(int(h), int(w))
+        sample['left'] = F.pad(sample['left'], self.pad, fill=0, padding_mode='edge')
+        sample['right'] = F.pad(sample['right'], self.pad, fill=0, padding_mode='edge')
+        _, _, h, w = sample['left'].shape
+        self.inference_size = [h, w]
+        return sample
+
+    def __pad__(self, h: int, w: int):
+        """
+        The pad method modify the parameter pad of the Pad object to put a list :
+        [pad_left, pad_top, pad_right, pad_bottom]
+        :param h: Current height of the image
+        :param w: Current width of the image
+        :return: Nothing, modify the attribute "pad" of the object
+        """
+        pad_h = (self.shape[0] - h) / 2
+        t_pad = pad_h if pad_h % 1 == 0 else pad_h + 0.5
+        b_pad = pad_h if pad_h % 1 == 0 else pad_h - 0.5
+        pad_w = (self.shape[1] - w) / 2
+        l_pad = pad_w if pad_w % 1 == 0 else pad_w + 0.5
+        r_pad = pad_w if pad_w % 1 == 0 else pad_w - 0.5
+        self.pad = [int(l_pad), int(t_pad), int(r_pad), int(b_pad)]
+
+
+class Unpad:
+    def __init__(self, pad, ori_size):
+        self.pad = pad
+        self.ori_size = ori_size
+
+    def __call__(self, image, device, *args):
+        _, h, w = image.shape
+        image = F.crop(image,
+                       self.pad[1], self.pad[0],
+                       h - self.pad[1] - self.pad[3],
+                       w - self.pad[0] - self.pad[2])
+
+        im = F1.interpolate(image.unsqueeze(1), size=[self.ori_size[0], self.ori_size[1]],
+                            mode='bilinear',
+                            align_corners=True).squeeze(1)
+        return im * self.ori_size[1] / float(w)
 
 
 class Normalize(object):
     """Normalize image, with type tensor"""
 
-    def __init__(self, mean, std):
-        self.mean = mean
-        self.std = std
+    def __init__(self, mean=None, std=None):
+        if isinstance(mean, list):
+            self.mean = mean
+        else:
+            self.mean = [0, 0, 0]
+        if isinstance(mean, list):
+            self.std = std
+        else:
+            self.std = [0, 0, 0]
 
     def __call__(self, sample, *args):
 
-        norm_keys = ['left', 'right']
-
+        norm_keys = ['left', 'right', 'other']
+        if self.mean == [0, 0, 0]:
+            self.mean = torch.squeeze(sample['left']).mean(axis=[1, 2])
+        if self.std == [0, 0, 0]:
+            self.std = torch.squeeze(sample['left']).std(axis=[1, 2])
         for key in norm_keys:
             # Images have converted to tensor, with shape [C, H, W]
             for t, m, s in zip(sample[key], self.mean, self.std):
@@ -67,21 +215,40 @@ class Resize(object):
         self.inference_size = inference_size
 
     def __call__(self, sample, *args):
-
         if self.inference_size is None:
-            self.inference_size = [int(np.ceil(sample["left"].size(-2) / self.padding_factor)) * self.padding_factor,
-                                   int(np.ceil(sample["left"].size(-1) / self.padding_factor)) * self.padding_factor]
-
+            if self.padding_factor > 0:
+                self.inference_size = [
+                    int(np.ceil(sample["left"].size(-2) / self.padding_factor)) * self.padding_factor,
+                    int(np.ceil(sample["left"].size(-1) / self.padding_factor)) * self.padding_factor]
+            else:
+                pass
         self.ori_size = sample["left"].shape[-2:]
-        if self.inference_size[0] != self.ori_size[0] or self.inference_size[1] != self.ori_size[1]:
-            sample["left"] = F1.interpolate(sample["left"], size=self.inference_size,
-                                            mode='bilinear',
-                                            align_corners=True)
-            sample["right"] = F1.interpolate(sample["right"], size=self.inference_size,
-                                             mode='bilinear',
-                                             align_corners=True)
+        if self.inference_size is not None:
+            if self.inference_size[0] != self.ori_size[0] or self.inference_size[1] != self.ori_size[1]:
+                for key in sample.keys():
+                    sample[key] = F1.interpolate(sample[key], size=self.inference_size,
+                                                mode='bilinear',
+                                                align_corners=True)
 
+        else:
+            self.inference_size = self.ori_size
         return sample
+
+
+class Resize_disp(object):
+    """Resize Disparity image, with type tensor"""
+
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self, disp, device, *args):
+        _, h, w = disp.shape
+        if h != self.size[0] or w != self.size[1]:
+            # resize back
+            disp = F1.interpolate(disp.unsqueeze(1), size=self.size,
+                                  mode='bilinear',
+                                  align_corners=True).squeeze(1)  # [1, H, W]
+            return disp * self.size[1] / float(w)
 
 
 class DispSide(object):
@@ -99,6 +266,7 @@ class DispSide(object):
             sample["left"] = torch.cat((sample["left"], new_left), dim=0)
             sample["right"] = torch.cat((sample["right"], new_right), dim=0)
         return sample
+
 #
 #
 # class RandomCrop(object):

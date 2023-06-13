@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.transforms.functional import hflip
 
 from .backbone import CNNEncoder
 from .transformer import FeatureTransformer
@@ -70,7 +71,7 @@ class UniMatch(nn.Module):
 
         feature0, feature1 = [], []
 
-        for i in range(self.num_scales):#len(features)):
+        for i in range(self.num_scales):  # len(features)):
             feature = features[i]
             chunks = torch.chunk(feature, 2, 0)  # tuple
             feature0.append(chunks[0])
@@ -91,6 +92,10 @@ class UniMatch(nn.Module):
                                               is_depth=is_depth)
 
         return up_flow
+
+    def downsample_flow(self, flow, downsample_factor=8):
+        return F.interpolate(flow, scale_factor=1 / downsample_factor,
+                                      mode='bilinear', align_corners=True) * 1 / downsample_factor
 
     def forward(self, img0, img1,
                 attn_type=None,
@@ -318,7 +323,6 @@ class UniMatch(nn.Module):
 
                         net = torch.tanh(net)
                         inp = torch.relu(inp)
-
                         net, up_mask, residual_flow = self.refine(net, inp, correlation, flow.clone(),
                                                                   )
 
@@ -361,6 +365,117 @@ class UniMatch(nn.Module):
         if task == 'depth':
             for i in range(len(flow_preds)):
                 flow_preds[i] = 1. / flow_preds[i].squeeze(1)  # [B, H, W]
+
+        results_dict.update({'flow_preds': flow_preds})
+
+        return results_dict
+
+    def disp_refine(self, im, flow,
+                    num_reg_refine=1,
+                    attn_splits_list=None,
+                    corr_radius_list=None,
+                    prop_radius_list=None,
+                    attn_type=None,
+                    pred_bidir_flow=False):
+
+        flow_preds = []
+        results_dict = {}
+        # list of features, resolution low to high
+        im0 = im  # [B, C, H, W]
+        im1 = hflip(im)
+        feature0_list, feature1_list = self.extract_feature(im0, im1)  # list of features
+
+        assert len(attn_splits_list) == len(corr_radius_list) == len(prop_radius_list) == self.num_scales
+
+        for scale_idx in range(self.num_scales):
+            feature0, feature1 = feature0_list[scale_idx], feature1_list[scale_idx]
+
+            if pred_bidir_flow and scale_idx > 0:
+                # predicting bidirectional flow with refinement
+                feature0, feature1 = torch.cat((feature0, feature1), dim=0), torch.cat((feature1, feature0), dim=0)
+
+            feature0_ori, feature1_ori = feature0, feature1
+
+            upsample_factor = self.upsample_factor * (2 ** (self.num_scales - 1 - scale_idx))
+            downsample_factor = self.upsample_factor / (2 ** (scale_idx-1))
+            # if scale_idx > 0:
+            #     flow = F.interpolate(flow, scale_factor=2, mode='bilinear', align_corners=True) * 2
+
+            flow = flow.detach()
+            flow_ = self.downsample_flow(flow, downsample_factor=downsample_factor)
+            # construct flow vector for disparity
+            # flow here is actually disparity
+            zeros = torch.zeros_like(flow_)  # [B, 1, H, W]
+            # NOTE: reverse disp, disparity is positive
+            # breakpoint()
+            displace = torch.cat((-flow_, zeros), dim=1)  # [B, 2, H, W]
+
+
+            feature1 = flow_warp(feature1, displace)  # [B, C, H, W]
+
+            attn_splits = attn_splits_list[scale_idx]
+            corr_radius = corr_radius_list[scale_idx]
+            prop_radius = prop_radius_list[scale_idx]
+
+            # add position to features
+            feature0, feature1 = feature_add_position(feature0, feature1, attn_splits, self.feature_channels)
+
+            # Transformer
+
+            feature0, feature1 = self.transformer(feature0, feature1,
+                                                  attn_type=attn_type,
+                                                  attn_num_splits=attn_splits)
+
+
+            # flow propagation with self-attn
+            if pred_bidir_flow and scale_idx == 0:
+                feature0 = torch.cat((feature0, feature1), dim=0)  # [2*B, C, H, W] for propagation
+
+            flow_ = self.feature_flow_attn(feature0, flow_.detach(),
+                                          local_window_attn=prop_radius > 0,
+                                          local_window_radius=prop_radius,
+                                          )
+
+            # bilinear exclude the last one
+            if self.training and scale_idx < self.num_scales - 1:
+                flow_up = self.upsample_flow(flow_, feature0, bilinear=True,
+                                             upsample_factor=upsample_factor)
+                flow_preds.append(flow_up)
+
+            if scale_idx == self.num_scales - 1:
+                # task-specific local regression refinement
+                # supervise current flow
+                assert num_reg_refine > 0
+                for refine_iter_idx in range(num_reg_refine):
+                    flow_ = flow.detach()
+                    flow_ = self.downsample_flow(flow_, downsample_factor=4)
+                    zeros = torch.zeros_like(flow_)  # [B, 1, H, W]
+                    # NOTE: reverse disp, disparity is positive
+                    displace = torch.cat((-flow_, zeros), dim=1)  # [B, 2, H, W]
+                    correlation = local_correlation_with_flow(
+                        feature0_ori,
+                        feature1_ori,
+                        flow=displace,
+                        local_radius=4)  # [B, (2R+1)^2, H, W]
+
+                    proj = self.refine_proj(feature0)
+
+                    net, inp = torch.chunk(proj, chunks=2, dim=1)
+
+                    net = torch.tanh(net)
+                    inp = torch.relu(inp)
+                    net, up_mask, residual_flow = self.refine(net, inp, correlation, flow_.clone())
+                    flow_ = flow_ + residual_flow
+                    flow_ = flow_.clamp(min=0)  # positive
+
+                    if self.training or refine_iter_idx == num_reg_refine - 1:
+                        flow_up = upsample_flow_with_mask(flow_, up_mask, upsample_factor=self.upsample_factor,
+                                                          is_depth=False)
+
+                        flow_preds.append(flow_up)
+
+        for i in range(len(flow_preds)):
+            flow_preds[i] = flow_preds[i].squeeze(1)  # [B, H, W]
 
         results_dict.update({'flow_preds': flow_preds})
 

@@ -1,0 +1,9 @@
+path_checkpoint: Networks/ACVNet/pretrained_model/pretrained_model_sceneflow.ckpt
+inference_size: [480, 640]
+padding_factor: 0 #32
+maxdisp: 192
+attn_weights_only: False
+freeze_attn_weights: True
+launcher: null
+half_resolution: False
+mode: test
