@@ -6,21 +6,8 @@ import torch
 import argparse
 import numpy as np
 import os
-# from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
-# from dataloader.stereo.datasets import build_dataset
 from utils import misc
-
-# from utils.dist_utils import get_dist_info, init_dist, setup_for_distributed
-# from utils.visualization import disp_error_img, save_images
-# from loss.stereo_metric import d1_metric
-# from evaluate_stereo import inference_stereo    #(validate_things, validate_kitti15, validate_eth3d,
-                             # validate_middlebury, create_kitti_submission,
-                             # create_eth3d_submission,
-                             # create_middlebury_submission,
-                             # inference_stereo,
-                             # )
-# from unimatch.unimatch import UniMatch
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
@@ -28,7 +15,6 @@ IMAGENET_STD = [0.229, 0.224, 0.225]
 
 def get_args_parser():
     parser = argparse.ArgumentParser()
-
     # dataset
     parser.add_argument('--checkpoint_dir', default='checkpoints_stereo/StereoHybrid', type=str,
                         help='where to save the training log and models')

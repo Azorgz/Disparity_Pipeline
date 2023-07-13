@@ -136,10 +136,10 @@ class ConfigPipe(dict):
         self["network"] = {}
         self["network"]["name"] = config["name"]
         if self["network"]["name"] == "unimatch":
-            from Networks.UniMatch.parser import get_args_parser
-            parser = get_args_parser()
+            from Networks.UniMatch.parser import get_args_parser_disparity
+            parser = get_args_parser_disparity()
             args = configure_parser(parser,
-                                    path_config='Networks/UniMatch/config_unimatch.yml',
+                                    path_config='Networks/UniMatch/config_unimatch_disparity.yml',
                                     dict_vars=self["dataset"])
             self["network"]["network_args"] = args
         elif self["network"]["name"] == "acvNet":

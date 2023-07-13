@@ -1,7 +1,7 @@
 import argparse
 
 
-def get_args_parser():
+def get_args_parser_disparity():
     parser = argparse.ArgumentParser()
 
     # dataset
@@ -57,27 +57,6 @@ def get_args_parser():
     parser.add_argument('--num_reg_refine', default=1, type=int,
                         help='number of additional local regression refinement')
 
-    # evaluation
-    parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--inference_size', default=None, type=int, nargs='+')
-    parser.add_argument('--count_time', action='store_true')
-    parser.add_argument('--save_vis_disp', action='store_true')
-    parser.add_argument('--save_dir', default=None, type=str)
-    parser.add_argument('--middlebury_resolution', default='F', choices=['Q', 'H', 'F'])
-
-    # submission
-    parser.add_argument('--submission', action='store_true')
-    parser.add_argument('--eth_submission_mode', default='train', type=str, choices=['train', 'test'])
-    parser.add_argument('--middlebury_submission_mode', default='training', type=str, choices=['training', 'test'])
-    parser.add_argument('--output_path', default='output/result', type=str)
-
-    # log
-    parser.add_argument('--summary_freq', default=100, type=int, help='Summary frequency to tensorboard (iterations)')
-    parser.add_argument('--save_ckpt_freq', default=1000, type=int, help='Save checkpoint frequency (steps)')
-    parser.add_argument('--val_freq', default=1000, type=int, help='validation frequency in terms of training steps')
-    parser.add_argument('--save_latest_ckpt_freq', default=1000, type=int)
-    parser.add_argument('--num_steps', default=100000, type=int)
-
     # distributed training
     parser.add_argument('--distributed', action='store_true')
     parser.add_argument('--local_rank', type=int, default=0)
@@ -94,6 +73,72 @@ def get_args_parser():
                         help='predict right disparity')
     parser.add_argument('--save_pfm_disp', action='store_true',
                         help='save predicted disparity as .pfm format')
+
+    parser.add_argument('--debug', action='store_true')
+
+    return parser
+
+
+def get_args_parser_depth():
+    parser = argparse.ArgumentParser()
+
+    # dataset
+    parser.add_argument('--checkpoint_dir', default='tmp', type=str,
+                        help='where to save the training log and models')
+    parser.add_argument('--dataset', default='scannet', type=str,
+                        help='training stage on different datasets')
+    parser.add_argument('--val_dataset', default=['scannet'], type=str, nargs='+',
+                        help='validation datasets')
+    parser.add_argument('--image_size', default=[480, 640], type=int, nargs='+',
+                        help='image size for training')
+    parser.add_argument('--padding_factor', default=16, type=int,
+                        help='the input should be divisible by padding_factor, otherwise do padding or resizing')
+
+    # resume pretrained model or resume training
+    parser.add_argument('--resume', default=None, type=str)
+    parser.add_argument('--strict_resume', action='store_true')
+    parser.add_argument('--no_resume_optimizer', action='store_true')
+
+    # model: learnable parameters
+    parser.add_argument('--task', default='depth', type=str)
+    parser.add_argument('--num_scales', default=1, type=int,
+                        help='feature scales: 1/8 or 1/8 + 1/4')
+    parser.add_argument('--feature_channels', default=128, type=int)
+    parser.add_argument('--upsample_factor', default=8, type=int)
+    parser.add_argument('--num_head', default=1, type=int)
+    parser.add_argument('--ffn_dim_expansion', default=4, type=int)
+    parser.add_argument('--num_transformer_layers', default=6, type=int)
+    parser.add_argument('--reg_refine', action='store_true',
+                        help='optional task-specific local regression refinement')
+
+    # model: parameter-free
+    parser.add_argument('--attn_type', default='swin', type=str,
+                        help='attention function')
+    parser.add_argument('--attn_splits_list', default=[2], type=int, nargs='+',
+                        help='number of splits in attention')
+    parser.add_argument('--min_depth', default=0.5, type=float,
+                        help='min depth for plane-sweep stereo')
+    parser.add_argument('--max_depth', default=10, type=float,
+                        help='max depth for plane-sweep stereo')
+    parser.add_argument('--num_depth_candidates', default=64, type=int)
+    parser.add_argument('--prop_radius_list', default=[-1], type=int, nargs='+',
+                        help='self-attention radius for propagation, -1 indicates global attention')
+    parser.add_argument('--num_reg_refine', default=1, type=int,
+                        help='number of additional local regression refinement')
+
+    # inference
+    parser.add_argument('--inference_dir', default=None, type=str)
+    parser.add_argument('--inference_size', default=None, type=int, nargs='+')
+    parser.add_argument('--output_path', default='output', type=str,
+                        help='where to save the prediction results')
+    parser.add_argument('--depth_from_argmax', action='store_true')
+    parser.add_argument('--pred_bidir_depth', action='store_true')
+
+    # distributed training
+    parser.add_argument('--distributed', action='store_true')
+    parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--launcher', default='none', type=str)
+    parser.add_argument('--gpu_ids', default=0, type=int, nargs='+')
 
     parser.add_argument('--debug', action='store_true')
 

@@ -1,11 +1,18 @@
 from __future__ import division
+
+import warnings
+
+import kornia
 import torch
 import numpy as np
 import torchvision.transforms.functional as F
+from torch import Tensor
 from torchvision.transforms.functional import hflip
 import torch.nn.functional as F1
-
 from utils.classes.Image import ImageCustom
+import inspect
+from types import FrameType
+from typing import cast, Union
 
 
 class Compose(object):
@@ -193,7 +200,6 @@ class Normalize(object):
             self.std = [0, 0, 0]
 
     def __call__(self, sample, *args):
-
         norm_keys = ['left', 'right', 'other']
         if self.mean == [0, 0, 0]:
             self.mean = torch.squeeze(sample['left']).mean(axis=[1, 2])
@@ -203,7 +209,6 @@ class Normalize(object):
             # Images have converted to tensor, with shape [C, H, W]
             for t, m, s in zip(sample[key], self.mean, self.std):
                 t.sub_(m).div_(s)
-
         return sample
 
 
@@ -227,12 +232,28 @@ class Resize(object):
             if self.inference_size[0] != self.ori_size[0] or self.inference_size[1] != self.ori_size[1]:
                 for key in sample.keys():
                     sample[key] = F1.interpolate(sample[key], size=self.inference_size,
-                                                mode='bilinear',
-                                                align_corners=True)
+                                                 mode='bilinear',
+                                                 align_corners=True)
 
         else:
             self.inference_size = self.ori_size
         return sample
+
+
+class Resize_depth(object):
+    """Resize Disparity image, with type tensor"""
+
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self, depth, device, *args):
+        h, w = depth.shape[-2:]
+        if h != self.size[0] or w != self.size[1]:
+            # resize back
+            return F1.interpolate(depth.unsqueeze(1), size=self.size,
+                                  mode='bilinear',
+                                  align_corners=True).squeeze(1)  # [1, H, W]
+
 
 
 class Resize_disp(object):
@@ -242,7 +263,7 @@ class Resize_disp(object):
         self.size = size
 
     def __call__(self, disp, device, *args):
-        _, h, w = disp.shape
+        h, w = disp.shape[-2:]
         if h != self.size[0] or w != self.size[1]:
             # resize back
             disp = F1.interpolate(disp.unsqueeze(1), size=self.size,

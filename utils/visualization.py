@@ -11,10 +11,43 @@ from matplotlib.cm import get_cmap
 import matplotlib as mpl
 import matplotlib.cm as cm
 import cv2 as cv
+from kornia.geometry import compute_correspond_epilines
+from utils.classes import ImageTensor
+from utils.manipulation_tools import drawlines
 
 from utils.classes import ImageCustom
 
 convert_alpha_number = {55: 7, 56: 8, 57: 9, 52: 4, 53: 5, 54: 6, 49: 1, 50: 2, 51: 3, 48: 0}
+
+
+def show_epipolar(im_src, im_dst, F_mat, pts_src, pts_dst) -> None:
+    """
+    Draw the epipolar lines one both image.
+    :param im_src: image source of F_mat
+    :param im_dst: image destination of F_mat
+    :param F_mat: Fundamental matrix going from im_src to im_dst
+    :param args: **
+    :param pts_src: Optional pts src to draw them as well
+    :param pts_dst: Optional pts dst to draw them as well
+    :param kwargs:
+    :return:
+    """
+    epipolar_lines_dst = compute_correspond_epilines(pts_src, F_mat).squeeze().cpu().numpy()
+    epipolar_lines_src = compute_correspond_epilines(pts_dst, F_mat[0].transpose(-2, -1)).squeeze().cpu().numpy()
+    if im_src.im_type == 'RGB':
+        im_src_w_line = im_src.opencv()
+    else:
+        im_src_w_line = im_src.RGB(cmap='gray').opencv()
+    if im_dst.im_type == 'RGB':
+        im_dst_w_line = im_dst.opencv()
+    else:
+        im_dst_w_line = im_dst.RGB(cmap='gray').opencv()
+    im_src_w_line = ImageTensor(drawlines(im_src_w_line, epipolar_lines_src, pts_src)[..., [2, 1, 0]])
+    im_dst_w_line = ImageTensor(drawlines(im_dst_w_line, epipolar_lines_dst, pts_dst)[..., [2, 1, 0]])
+    im_dst_w_line = im_dst_w_line.pad(im_src_w_line)
+    im_src_w_line = im_src_w_line.pad(im_dst_w_line)
+    B, C, H, W = im_src_w_line.shape
+    torch.stack([im_src_w_line, im_dst_w_line], dim=3).view([B, C, H, 2*W]).show()
 
 
 def result_visualizer(path: str or Path, target: str, ref: str, start_idx=-1):
@@ -162,13 +195,17 @@ def viz_depth_tensor(disp, return_numpy=False, colormap='plasma'):
 def visual_control(*args):
     for idx, im in enumerate(args):
         if isinstance(im, torch.Tensor):
-            im_show = im.squeeze().cpu().numpy()
+            im_show = im.squeeze()
+            if im_show.shape[0] == 3:
+                im_show = im_show.permute(1, 2, 0)
+            im_show = im_show.cpu().numpy()
         else:
             im_show = im.copy()
         if im.ndim == 3:
-            im_show = im_show / im_show.max()
+            im_show = ImageCustom(im_show).BGR() / im_show.max()
         else:
             im_show = vis_disparity(im_show)
         cv.imshow(f'Image {idx}', im_show)
     cv.waitKey(0)
     cv.destroyAllWindows()
+

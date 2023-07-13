@@ -126,7 +126,7 @@ class Visualizer:
             if self.key == 116 and self.device:  # t
                 self.tensor = not self.tensor
             self.idx = self.idx % self.idx_max
-            print(self.key)
+            print(key)
 
     def _create_grad_im(self, new_im, ref_im, target_im):
         if self.tensor:

@@ -8,14 +8,17 @@ import matplotlib as mpl
 import matplotlib.cm as cm
 
 
-def vis_disparity(disp):
-    if disp.ndim > 2:
-        disp = disp.squeeze()
-    disp_vis = (disp - disp.min()) / (disp.max() - disp.min()) * 255.0
-    disp_vis = disp_vis.astype("uint8")
-    disp_vis = cv2.applyColorMap(disp_vis, cv2.COLORMAP_INFERNO)
+def vis_disparity(*args):
+    res = []
+    for disp in args:
+        if disp.ndim > 2:
+            disp = disp.squeeze()
+        disp_vis = (disp - disp.min()) / (disp.max() - disp.min()) * 255.0
+        disp_vis = disp_vis.astype("uint8")
+        disp_vis = cv2.applyColorMap(disp_vis, cv2.COLORMAP_INFERNO)
+        res.append(disp_vis)
 
-    return disp_vis
+    return res
 
 
 def gen_error_colormap():

@@ -1,9 +1,23 @@
 import time
 import cv2 as cv
+import kornia
 import numpy as np
+import torch
 
-from classes.Image import ImageCustom
+# from classes.Image import ImageCustom
 
+
+def perspective2grid(matrix, shape, device):
+    height, width = shape[0], shape[1]
+    grid_reg = kornia.utils.create_meshgrid(height, width, normalized_coordinates=False, device=device)  # [1 H W 2]
+    z = torch.ones_like(grid_reg[:, :, :, 0])
+    grid = torch.stack([grid_reg[..., 0], grid_reg[..., 1], z], dim=-1)  # [1 H W 3]
+
+    grid_transformed = (matrix @ grid.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)  # [1 H W 3]
+    alpha = grid_transformed[:, :, :, 2]
+    grid_transformed[:, :, :, 0] = 2 * (grid_transformed[:, :, :, 0] / alpha) / width - 1  # [1 H W 3]
+    grid_transformed[:, :, :, 1] = 2 * (grid_transformed[:, :, :, 1] / alpha) / height - 1  # [1 H W 3]
+    return grid_transformed[..., :2]  # [1 H W 2]
 
 def histogram_equalization(image, method=0):
     if method == 0:

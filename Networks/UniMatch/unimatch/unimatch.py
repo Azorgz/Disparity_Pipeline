@@ -97,6 +97,7 @@ class UniMatch(nn.Module):
         return F.interpolate(flow, scale_factor=1 / downsample_factor,
                                       mode='bilinear', align_corners=True) * 1 / downsample_factor
 
+
     def forward(self, img0, img1,
                 attn_type=None,
                 attn_splits_list=None,

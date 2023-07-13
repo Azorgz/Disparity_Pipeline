@@ -3,7 +3,7 @@ device: auto
 # Possibilities : "auto" to be set automatically on the first available gpu,
 #                 "multiple" to use all available gpu,
 #                 "cpu" to use only cpu, automatically set if no gpu is found
-name_experiment: algo_1_refine
+name_experiment: try
 output_path: /results/
 
 save_inputs: True # Save the input images
@@ -21,11 +21,11 @@ dataset:
   shuffle: False # True if the data need to be randomly picked
   path:
     # Path of the 3 directories. If only one is given it must contain the folders : left, right, other with an equal number of images
-    left: /home/godeta/PycharmProjects/LYNRED/Images/Day/master/visible
-    right: /home/godeta/PycharmProjects/LYNRED/Images/Day/slave/visible
-    other: /home/godeta/PycharmProjects/LYNRED/Images/Day/master/infrared_corrected
+    left: /home/godeta/PycharmProjects/LYNRED/Images/Night/master/visible
+    right: /home/godeta/PycharmProjects/LYNRED/Images/Night/slave/visible
+    other: /home/godeta/PycharmProjects/LYNRED/Images/Night/master/infrared_corrected
     unique: null #dataset/vis_day #
-  load_dataset_conf_if_available: True
+  load_dataset_conf_if_available: False
   save_dataset_conf: True # If a conf is loaded it won't be erased even if this option is true
   save_file_list_in_conf: False  # If the conf is saved the list of file is saved only if this option is true
 
@@ -82,7 +82,7 @@ reconstruction:
 
 # 3D PointCloud
 pointsCloud:
-  activated: False
+  activated: True
   disparity: False  # Set to False the system will use a depth estimation instead of the computed disparity
   stereo: True
   use_bidir: True

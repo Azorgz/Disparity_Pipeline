@@ -4,7 +4,7 @@ from skimage.metrics import structural_similarity, mean_squared_error, normalize
     normalized_mutual_information, peak_signal_noise_ratio
 
 import torch
-from .Image import ImageCustom
+# from .Image import ImageCustom
 from torchvision.transforms import Grayscale
 from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
 from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MS_SSIM

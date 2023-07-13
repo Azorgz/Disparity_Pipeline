@@ -1,0 +1,15 @@
+inference_size: [960, 1280]
+path_checkpoint: Networks/UniMatch/pretrained/gmdepth-scale1-demon-bd64786e.pth
+padding_factor: 32
+upsample_factor: 8
+num_scales: 1
+attn_type: swin
+attn_splits_list: [2]
+prop_radius_list: [-1]
+min_depth: 1
+max_depth: 64
+num_depth_candidates: 64
+depth_from_argmax: True
+reg_refine: False
+num_reg_refine: 1
+launcher: null
