@@ -86,7 +86,7 @@ class BaseCamera(PinholeCamera):
         return {'name': self.name,
                 'path': self.path,
                 'intrinsics': self.intrinsics.squeeze().cpu().numpy().tolist(),
-                'extrinsics': self.extrinsics.inverse().squeeze().cpu().numpy().tolist(),
+                'extrinsics': self.extrinsics.squeeze().cpu().numpy().tolist(),
                 'is_ref': self.is_ref,
                 'is_positioned': self.is_positioned,
                 'im_type': self.im_type,
@@ -203,7 +203,7 @@ class BaseCamera(PinholeCamera):
 
     def __getitem__(self, index):
         im_path = f'{self.path}/{sorted(os.listdir(self.path))[index]}'
-        im = ImageTensor(im_path)
+        im = ImageTensor(im_path, device=self.device)
         return im
 
     @property

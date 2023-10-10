@@ -1,19 +1,23 @@
 import os
 from pathlib import Path
+from typing import Union
+
 import cv2 as cv
 import numpy as np
 import torch
 import yaml
+from kornia.utils import get_cuda_device_if_available
 
-from utils.classes import ImageCustom
+from utils.classes import ImageTensor
+# from utils.classes import ImageCustom
 from utils.gradient_tools import grad_tensor, grad
-from utils.transforms import ToTensor, ToNumpy
+from utils.transforms import ToTensor
 
 
 class Visualizer:
     show_validation = False
     show_grad_im = False
-    show_disp_overlay = True
+    show_disp_overlay = False
     show_idx = True
     font = cv.FONT_HERSHEY_TRIPLEX
     color = (255, 255, 255)
@@ -26,11 +30,9 @@ class Visualizer:
     tensor = False
     window = 0
 
-    def __init__(self, path: str or Path, target: str, ref: str):
+    def __init__(self, path: Union[str, Path, list] = None):
         """
         :param path: Path to the result folder
-        :param target: str: other, left or right being the targeted image
-        :param ref: other, left or right being the projected image
         :return: None
         path ___|input|target
                 |reg_images
@@ -44,66 +46,117 @@ class Visualizer:
         To show/hide the overlay of disparity press d
         To show/hide the validation indexes (only available with the validation done) press v
         """
-        try:
-            self.target_path, _, target_list = os.walk(f'{path}/input/{target}').__next__()
-            self.new_path, _, new_list = os.walk(f'{path}/reg_images').__next__()
-            self.ref_path, _, ref_list = os.walk(f'{path}/input/{ref}').__next__()
-            self.target_disp_path, _, target_disp_list = os.walk(f'{path}/disp_{target}').__next__()
-            self.ref_disp_path, _, ref_disp_list = os.walk(f'{path}/disp_{ref}').__next__()
-        except FileNotFoundError:
-            print('The given directory does not contain the needed folders')
-        self.target_list, self.new_list, self.ref_list = sorted(target_list), sorted(new_list), sorted(ref_list)
-        self.target_disp_list, self.ref_disp_list = sorted(target_disp_list), sorted(ref_disp_list)
-        if os.path.exists(f'{path}/Validation.yaml'):
-            self.validation_available = True
-            with open(f'{path}/Validation.yaml', "r") as file:
-                self.val = yaml.safe_load(file)
+        if path is None:
+            p = "/home/godeta/PycharmProjects/Disparity_Pipeline/results"
+            path = [p + f'/{d}' for d in os.listdir(p)]
+        if isinstance(path, list):
+            self.exp_list = []
+            self.path = []
+            for pa in path:
+                self.exp_list.append(*os.listdir(pa + '/image_reg'))
+                self.path.append(pa)
         else:
-            self.validation_available = False
-        self.idx_max = len(new_list)
-        if torch.cuda.is_available():
-            self.device = torch.device('cuda')
-            self.tensor = True
-        else:
-            self.device = None
+            self.exp_list = os.listdir(path + '/image_reg')
+        self.experiment = {}
+        for idx, (p, P) in enumerate(zip(self.exp_list, self.path)):
+            ref, target = p.split('_to_')
+            exp_name = os.path.split(P)[1]
+            p = f'{exp_name} - {p}'
+            self.exp_list[idx] = p
+            self.experiment[p] = {}
+            self.experiment[p]['target_path'], _, target_list = os.walk(f'{P}/inputs/{target}').__next__()
+            self.experiment[p]['new_path'], _, new_list = os.walk(f'{P}/image_reg/{ref}_to_{target}').__next__()
+            self.experiment[p]['ref_path'], _, ref_list = os.walk(f'{P}/inputs/{ref}').__next__()
+            self.experiment[p]['target_list'], self.experiment[p]['new_list'], self.experiment[p]['ref_list'] = \
+                sorted(target_list), sorted(new_list), sorted(ref_list)
+            try:
+                self.experiment[p]['target_disp_path'], _, target_disp_list = os.walk(
+                    f'{P}/pred_disp/{target}').__next__()
+                self.experiment[p]['ref_disp_path'], _, ref_disp_list = os.walk(f'{P}/disp_reg/{ref}').__next__()
+                self.experiment[p]['target_disp_list'], self.experiment[p]['ref_disp_list'] = \
+                    sorted(target_disp_list), sorted(ref_disp_list)
+                self.experiment[p]['disp_ok'] = True
+            except StopIteration:
+                self.experiment[p]['disp_ok'] = False
+                print(f'Disparity images wont be available for the {p} couple')
+            try:
+                self.experiment[p]['target_depth_path'], _, target_depth_list = os.walk(
+                    f'{P}/pred_depth/{target}').__next__()
+                self.experiment[p]['ref_depth_path'], _, ref_depth_list = os.walk(f'{P}/depth_reg/{ref}').__next__()
+                self.experiment[p]['target_depth_list'], self.experiment[p]['ref_depth_list'] = \
+                    sorted(target_depth_list), sorted(ref_depth_list)
+                self.experiment[p]['depth_ok'] = True
+            except StopIteration:
+                self.experiment[p]['depth_ok'] = False
+                print(f'Depth images wont be available for the {p} couple')
+
+            if os.path.exists(f'{P}/Validation.yaml'):
+                self.experiment[p]['validation_available'] = True
+                with open(f'{P}/Validation.yaml', "r") as file:
+                    self.experiment[p]['val'] = yaml.safe_load(file)
+            else:
+                self.experiment[p]['validation_available'] = False
+            self.experiment[p]['idx_max'] = len(new_list)
+        self.device = get_cuda_device_if_available()
+        self.tensor = True
+        self.idx = 0
+        self.show_disp_overlay = 0
 
     def run(self):
+        exp = self.exp_list[0]
+        exp_idx = 0
+        experiment = self.experiment[exp]
         while self.key != 27:
-            target_im = ImageCustom(f'{self.target_path}/{self.target_list[self.idx]}').BGR()
-            new_im = ImageCustom(f'{self.new_path}/{self.new_list[self.idx]}').BGR()
-            ref_im = ImageCustom(f'{self.ref_path}/{self.ref_list[self.idx]}').BGR()
-            visu = np.vstack([target_im / 510 + new_im / 510, target_im / 510 + ref_im / 510])
-            h, w = ref_im.shape[:2]
+            target_im = ImageTensor(f'{experiment["target_path"]}/{experiment["target_list"][self.idx]}').RGB()
+            new_im = ImageTensor(f'{experiment["new_path"]}/{experiment["new_list"][self.idx]}').RGB()
+            ref_im = ImageTensor(f'{experiment["ref_path"]}/{experiment["ref_list"][self.idx]}').RGB().match_shape(
+                target_im)
+            visu = (target_im / 2 + new_im / 2).vstack(target_im / 2 + ref_im / 2)
 
             if self.show_grad_im:
                 grad_im = self._create_grad_im(new_im, ref_im, target_im)
-                visu = np.hstack([visu, grad_im])
+                visu = visu.hstack(grad_im)
 
             if self.show_disp_overlay:
-                disp_overlay = self._create_disp_overlay(ref_im, target_im)
-                visu = np.hstack([visu, disp_overlay])
+                if self.show_disp_overlay == 1:
+                    disp_overlay = self._create_disp_overlay(experiment, ref_im, target_im)
+                    visu = visu.hstack(disp_overlay)
+                elif self.show_disp_overlay >= 2:
+                    depth_overlay = self._create_depth_overlay(experiment, ref_im, target_im)
+                    visu = visu.hstack(depth_overlay)
 
-            if visu.shape[1] > 1920 or visu.shape[0] > 1080:
-                visu = cv.pyrDown(visu)
-                h, w = int(h/2), int(w/2)
+            h, w = ref_im.shape[-2:]
+
+            while visu.shape[3] > 1920 or visu.shape[2] > 1080:
+                visu = visu.pyrDown()
+                h, w = h // 2, w // 2
+
+            visu = visu.opencv()
             if self.show_idx:
                 visu = cv.putText(visu, f'idx : {self.idx}', self.org_idx, self.font, self.fontScale, self.color,
                                   self.thickness, cv.LINE_AA)
             if self.show_grad_im:
                 org = self.org_idx[0] + w, self.org_idx[1]
-                visu = cv.putText(visu, f'Image grad : {"with tensor" if self.tensor else "with numpy"}', org, self.font,
-                           self.fontScale, self.color,
-                           self.thickness, cv.LINE_AA)
-            if self.show_validation and self.validation_available:
+                visu = cv.putText(visu, f'Image grad : {"with tensor" if self.tensor else "with numpy"}', org,
+                                  self.font,
+                                  self.fontScale, self.color,
+                                  self.thickness, cv.LINE_AA)
+            if self.show_validation and experiment['validation_available']:
                 org_val = 10, visu.shape[0] - 65
-                for key, value in self.val['2. results'].items():
-                    stats = f'{key} : {value[self.idx][0]} / {value[self.idx][1]}'
-                    color_val = (0, 1, 0) if value[self.idx][0] >= value[self.idx][1] else (0, 0, 1)
-                    visu = cv.putText(visu, stats, org_val, self.font, self.fontScale, color_val, self.thickness,
-                                      cv.LINE_AA)
-                    org_val = org_val[0], org_val[1] + 15
+                for key, value in experiment['val']['2. results'].items():
+                    if key in exp:
+                        for key_stat, stat in value.items():
+                            stats = f'{key_stat} : {stat[self.idx][0]} / {stat[self.idx][1]}'
+                            if key_stat == 'rmse':
+                                color_val = (0, 0, 255) if stat[self.idx][0] >= stat[self.idx][1] else (0, 255, 0)
+                            else:
+                                color_val = (0, 255, 0) if stat[self.idx][0] >= stat[self.idx][1] else (0, 0, 255)
+                            visu = cv.putText(visu, stats, org_val, self.font, self.fontScale, color_val,
+                                              self.thickness,
+                                              cv.LINE_AA)
+                            org_val = org_val[0], org_val[1] + 15
 
-            cv.imshow('Result visionner', visu)
+            cv.imshow(f'Experience {exp}', visu)
             self.key = cv.waitKey(0)
             i = 0
             while self.key in [55, 56, 57, 52, 53, 54, 49, 50, 51, 48]:
@@ -116,7 +169,13 @@ class Visualizer:
             if self.key == 83 or self.key == 84 or self.key == 43:  # right or down or -
                 self.idx += 1
             if self.key == 100:  # d
-                self.show_disp_overlay = not self.show_disp_overlay
+                self.show_disp_overlay += 1
+                if self.show_disp_overlay == 1:
+                    if not experiment['disp_ok']:
+                        self.show_disp_overlay += 1
+                if self.show_disp_overlay >= 2:
+                    if not experiment['depth_ok']:
+                        self.show_disp_overlay = 0
             if self.key == 105:  # i
                 self.show_idx = not self.show_idx
             if self.key == 118:  # v
@@ -125,29 +184,51 @@ class Visualizer:
                 self.show_grad_im = not self.show_grad_im
             if self.key == 116 and self.device:  # t
                 self.tensor = not self.tensor
-            self.idx = self.idx % self.idx_max
-            print(key)
+            if self.key == 9:
+                exp_idx += 1
+                exp_idx = exp_idx % len(self.exp_list)
+                exp = self.exp_list[exp_idx]
+                experiment = self.experiment[exp]
+                if self.show_disp_overlay == 1:
+                    if not experiment['disp_ok']:
+                        self.show_disp_overlay += 1
+                if self.show_disp_overlay >= 2:
+                    if not experiment['depth_ok']:
+                        self.show_disp_overlay = 0
+            self.idx = self.idx % self.experiment[exp]['idx_max']
+            # print(self.key)
 
     def _create_grad_im(self, new_im, ref_im, target_im):
         if self.tensor:
-            to_tensor = ToTensor()
-            to_numpy = ToNumpy()
-            grad_new = ImageCustom(to_numpy(grad_tensor(to_tensor(new_im, self.device), self.device))).BGR()
-            grad_ref = ImageCustom(to_numpy(grad_tensor(to_tensor(ref_im, self.device), self.device))).BGR()
-            grad_target = ImageCustom(to_numpy(grad_tensor(to_tensor(target_im, self.device), self.device))).BGR()
+            grad_new = grad_tensor(new_im, self.device)
+            grad_ref = grad_tensor(ref_im, self.device)
+            grad_target = grad_tensor(target_im, self.device)
         else:
             grad_new = grad(new_im)
             grad_ref = grad(ref_im)
             grad_target = grad(target_im)
-        # im = np.vstack([grad_new / 256, grad_target / 256])
-        im = np.vstack([grad_new / 510 + grad_target / 510, grad_ref / 510 + grad_target / 510])
+        im = (grad_new / 2 + grad_target / 2).vstack(grad_ref / 2 + grad_target / 2)
 
         return im
 
-    def _create_disp_overlay(self, ref_im, target_im):
-        disp_target = ImageCustom(
-            f'{self.target_disp_path}/{self.target_disp_list[self.idx]}').GRAYSCALE().expand_dims()
-        disp_ref = ImageCustom(f'{self.ref_disp_path}/{self.ref_disp_list[self.idx]}').GRAYSCALE().expand_dims()
-        disp_overlay_ref = (ref_im / 255) * (disp_ref / 255)
-        disp_overlay_target = (target_im / 255) * (disp_target / 255)
-        return np.vstack([disp_overlay_ref / disp_overlay_ref.max(), disp_overlay_target / disp_overlay_target.max()])
+    def _create_disp_overlay(self, experiment, ref_im, target_im):
+        disp_target = ImageTensor(
+            f'{experiment["target_disp_path"]}/{experiment["target_disp_list"][self.idx]}').GRAYSCALE()
+        disp_ref = ImageTensor(f'{experiment["ref_disp_path"]}/{experiment["ref_disp_list"][self.idx]}').GRAYSCALE()
+        disp_overlay_ref = ref_im * disp_ref.match_shape(ref_im)
+        disp_overlay_target = target_im * disp_target
+        return (disp_overlay_ref / disp_overlay_ref.max()).vstack(disp_overlay_target / disp_overlay_target.max())
+
+    def _create_depth_overlay(self, experiment, ref_im, target_im):
+        depth_target = ImageTensor(
+            f'{experiment["target_depth_path"]}/{experiment["target_depth_list"][self.idx]}').GRAYSCALE()
+        depth_ref = ImageTensor(f'{experiment["ref_depth_path"]}/{experiment["ref_depth_list"][self.idx]}').GRAYSCALE()
+        depth_overlay_ref = ref_im * depth_ref.match_shape(ref_im)
+        depth_overlay_target = target_im * depth_target
+        return (depth_overlay_ref / depth_overlay_ref.max()).vstack(depth_overlay_target / depth_overlay_target.max())
+
+
+if __name__ == '__main__':
+    # path = ["/home/godeta/PycharmProjects/Disparity_Pipeline/results/Disparity",
+    #         "/home/godeta/PycharmProjects/Disparity_Pipeline/results/Depth"]
+    Visualizer().run()

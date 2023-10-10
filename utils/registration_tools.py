@@ -7,7 +7,7 @@ from torch import Tensor
 
 from utils.classes import ImageTensor
 from utils.gradient_tools import grad
-from utils.transforms import ToTensor, ToFloatTensor, Resize, Resize_disp
+from utils.transforms import ToTensor, ToFloatTensor, Resize, ResizeDisp
 from utils.visualization import vis_disparity
 
 
@@ -15,7 +15,7 @@ def automatic_keypoints_selection(im_src: ImageTensor, ref: ImageTensor, pts_ref
     delta = [0, 200, 0, 5]
 
     height, width = im_src.shape[-2:]
-    pts_src, pts_dst = SIFT(imR, imL, MIN_MATCH_COUNT=4, matcher='FLANN', lowe_ratio=0.5,
+    pts_src, pts_dst = SIFT(ref, im_src, MIN_MATCH_COUNT=4, matcher='FLANN', lowe_ratio=0.5,
                             nfeatures=0, nOctaveLayers=4, contrastThreshold=0.04, edgeThreshold=10, sigma=1.6,
                             toggle_evaluate=False, verbose=True, delta=delta)
     warp_matrix_rotation, _ = cv.findHomography(pts_dst, pts_src)
@@ -25,10 +25,10 @@ def automatic_keypoints_selection(im_src: ImageTensor, ref: ImageTensor, pts_ref
 
     imL_aligned = cv.warpPerspective(imL, warp_matrix_rotation, (width, height),
                                      flags=cv.INTER_LINEAR + cv.WARP_INVERSE_MAP)
-    imR_aligned = imR
+    imR_aligned = ref
     imL_aligned, imR_aligned = crop_from_cut(imL_aligned, imR_aligned, (CutTop, CutLeft, CutBot, CutRight), idx=2)
-    cv.imwrite(os.path.join(path_save, 'calib', 'left.png'), np.uint8(imL_aligned))
-    cv.imwrite(os.path.join(path_save, 'calib', 'right.png'), np.uint8(imR_aligned))
+    # cv.imwrite(os.path.join(path_save, 'calib', 'left.png'), np.uint8(imL_aligned))
+    # cv.imwrite(os.path.join(path_save, 'calib', 'right.png'), np.uint8(imR_aligned))
     return warp_matrix_rotation, [CutTop, CutLeft, CutBot, CutRight]
 
 

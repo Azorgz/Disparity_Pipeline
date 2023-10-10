@@ -1,5 +1,5 @@
 import warnings
-from Config.Config import ConfigPipe
+from config.Config import ConfigPipe
 from Disparity_Pipeline import Pipe
 
 

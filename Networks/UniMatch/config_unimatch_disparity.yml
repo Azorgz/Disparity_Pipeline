@@ -8,5 +8,5 @@ attn_splits_list: [2, 8]
 corr_radius_list: [-1, 4]
 prop_radius_list: [-1, 1]
 reg_refine: True
-num_reg_refine: 1
+num_reg_refine: 3
 launcher: null

@@ -1,0 +1,79 @@
+# How to create a new Process:
+# Use the Keyword "Process" followed by the Name of the experiment if you want to set it
+# Keyword: saveInput
+
+# KeyWord of the Pipeline:
+# disparity   cam1      cam2     option [pred_bidir, right_pred]
+# depth       cam1      cam2     option [pred_bidir, right_pred]
+# wrap        cam_dst   cam_src  depthTensor [pred_depth, pred_disp, depth_reg, disp_reg] option [depth, return_depth_reg, return_occlusion, cam_1 .... cam_n]
+# valid       cam_reg   cam_ref
+# save        dict_name [pred_depth, pred_disp, image_reg, depth_reg, disp_reg, inputs, occlusion]
+
+#Process dummy :
+#Depth-Depth:
+#  depth:
+#    cameras:
+#    option:
+#  disparity:
+#    cameras:
+#    option:
+#  wrap:
+#    cameras:
+#    method:
+#    source:
+#    option:
+#  valid:
+#  save:
+
+Depth-Depth:
+  depth:
+    cameras: [RGB, RGB2]
+    option: []
+  wrap:
+    cameras: [RGB2, RGB]
+    method: depth
+    source: pred_depth
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [RGB2, RGB]
+  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]
+
+Depth-Disparity:
+  depth:
+    cameras: [RGB, RGB2]
+    option: []
+  wrap:
+    cameras: [RGB2, RGB]
+    method: disparity
+    source: pred_depth
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [RGB2, RGB]
+  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]
+
+Disparity-Disparity:
+  disparity:
+    cameras: [RGB, RGB2]
+    option: []
+  wrap:
+    cameras: [RGB2, RGB]
+    method: disparity
+    source: pred_disp
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [RGB2, RGB]
+  save: [pred_disp, image_reg, disp_reg, inputs, occlusion]
+
+Disparity-Depth:
+  disparity:
+    cameras: [RGB, RGB2]
+    option: []
+  wrap:
+    cameras: [RGB2, RGB]
+    method: depth
+    source: pred_disp
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [RGB2, RGB]
+  save: [pred_disp, image_reg, disp_reg, inputs, occlusion]
+
+
+
+
+

@@ -3,85 +3,91 @@ import os
 
 import torch
 import yaml
-from utils.classes import norms_dict, stats_dict, norms_dict_gpu
+
+from module.BaseModule import BaseModule
+from utils.classes import stats_dict, norms_dict
 import numpy as np
 
 from utils.misc import timeit, deactivated
-from utils.transforms import ToNumpy, ToTensor
+from utils.transforms import ToTensor
 
 
-class Validation:
+class Validation(BaseModule):
     """
     A class which compute for each input sample the reconstruction error
     """
 
     def __init__(self, config):
+        """
+        :param config: Config from ConfigPipe
+        the module compute two indices for each norm chosen:
+        - The "ref" : between Ref and Old
+        - The "new" : between the Ref and New
+        """
+        self.activated = False
+        super(Validation, self).__init__(config)
+
+    def _update_conf(self, config, *args, **kwargs):
         self.activated = config["validation"]['activated']
         if self.activated:
-            if config["timeit"]:
-                self.timeit = []
-            self.compare_smaller = config["validation"]['compare_smaller']
-            self.device = config["device"]["device"]
             self.norms = {}
             self.ref = {}
             self.res = {}
             self.stats = {}
             self.res_stats = {}
             norms = config["validation"]['indices']
-            self.method = config["validation"]['method']
-
             for key, value in norms.items():
                 if value:
-                    self.norms[key] = norms_dict[key] if self.method != 'pytorch' else norms_dict_gpu[key]
-                    self.res[key] = []
+                    self.norms[key] = norms_dict[key](self.device)
             stats = config["validation"]['stats']
             for key, value in stats.items():
                 if value:
                     self.stats[key] = stats_dict[key]
-            print(f'############# VALIDATION ######',
-                  f'\nThe validation of the results will compute the following indexes : {list(self.norms.keys())}',
-                  f'\nThe Statistic selected for those indexes are the following : {list(self.stats.keys())}')
+
+    def __str__(self):
+        string = super().__str__()
+        string += f'The validation of the results will compute the following indexes : {list(self.norms.keys())}'
+        string += f'\nThe Statistic selected for those indexes are the following : {list(self.stats.keys())}'
+        return string
 
     @deactivated
     @timeit
-    def __call__(self, sample, target, ref_image):
-        if self.method != 'pytorch':
-            if sample.max() <= 1:
-                to_numpy = ToNumpy()
-            else:
-                to_numpy = ToNumpy(normalize=False)
-            sample = to_numpy(sample)
-        else:
-            to_tensor = ToTensor()
-            sample = sample.unsqueeze(0)
-            target = to_tensor(target, self.device)
-            ref_image = to_tensor(ref_image, self.device)
+    def __call__(self, new, ref, old, name, *args, **kwargs):
+        if name not in self.res.keys():
+            self.res[name] = {}
         for key, n in self.norms.items():
-            res = n(target, sample, self.device).value
-            ref = n(target, ref_image, self.device).value
-            if self.method == 'pytorch':
-                res, ref = res.cpu().numpy(), ref.cpu().numpy()
-            self.res[key].append([round(float(res), 3), round(float(ref), 3)])
+            if key not in self.res[name].keys():
+                self.res[name][key] = []
+            res_new = n(ref, new)
+            res_old = n(ref, old)
+            self.res[name][key].append([round(float(res_new), 3), round(float(res_old), 3)])
 
     @deactivated
     def statistic(self):
-        for key_stat, stat in self.stats.items():
-            self.res_stats[key_stat] = {}
-            for key, res in self.res.items():
-                s = stat(np.array(res), 0)
-                res_stat = s[0]
-                ref_stat = s[1]
-                self.res_stats[key_stat][key] = float(round(res_stat, 3))
-                self.res_stats[key_stat][key + "_ref"] = float(round(ref_stat, 3))
+
+        for key, norms in self.res.items():
+            self.res_stats[key] = {}
+            for key_norms, n in norms.items():
+                self.res_stats[key][key_norms] = {}
+                for key_stat, stat in self.stats.items():
+                    sample = self.res[key][key_norms]
+                    s = stat(np.array(sample), 0)
+                    res_stat = s[0]
+                    ref_stat = s[1]
+                    self.res_stats[key][key_norms][key_stat] = [float(round(res_stat, 3)), float(round(ref_stat, 3))]
+
+    def reset(self):
+        self._update_conf(self.config)
 
     @deactivated
     def save(self, path):
         name = os.path.join(path, "Validation.yaml")
         stat_dict = {key: np.array(item).tolist() for key, item in self.res_stats.items()}
-        res_dict = {key + '_new/' + key + '_ref': np.array(item).tolist() for key, item in self.res.items()}
+        res_dict = {key: np.array(item).tolist() for key, item in self.res.items()}
         # ref_dict = {key: np.array(item).tolist() for key, item in self.ref.items()}
         with open(name, "w") as file:
             yaml.dump({"2. results": res_dict, "1. stats": stat_dict}, file)
+        self.activated = False
 
 
 #

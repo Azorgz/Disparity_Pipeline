@@ -15,7 +15,7 @@ from kornia.geometry import compute_correspond_epilines
 from utils.classes import ImageTensor
 from utils.manipulation_tools import drawlines
 
-from utils.classes import ImageCustom
+# from utils.classes import ImageCustom
 
 convert_alpha_number = {55: 7, 56: 8, 57: 9, 52: 4, 53: 5, 54: 6, 49: 1, 50: 2, 51: 3, 48: 0}
 
@@ -89,23 +89,22 @@ def result_visualizer(path: str or Path, target: str, ref: str, start_idx=-1):
     key = 0
     idx_max = len(new_list)
     while key != 27:
-        target_im = ImageCustom(f'{target_path}/{target_list[idx]}').BGR()
-        new_im = ImageCustom(f'{new_path}/{new_list[idx]}').BGR()
-        ref_im = ImageCustom(f'{ref_path}/{ref_list[idx]}').BGR()
-        visu = np.hstack([target_im / 510 + new_im / 510, target_im / 510 + ref_im / 510])
-        if visu.shape[1] > 1920 or visu.shape[0] > 1080:
-            visu = cv.pyrDown(visu)
+        target_im = ImageTensor(f'{target_path}/{target_list[idx]}').RGB()
+        new_im = ImageTensor(f'{new_path}/{new_list[idx]}').RGB()
+        ref_im = ImageTensor(f'{ref_path}/{ref_list[idx]}').RGB()
+        visu = (target_im/2 + new_im/2).hstack(target_im/2 + ref_im/2)
+        if visu.shape[3] > 1920 or visu.shape[2] > 1080:
+            visu = visu.pyrDown()
 
         if show_grad_im:
             pass
         if show_disp_overlay:
-            disp_target = ImageCustom(f'{target_disp_path}/{target_disp_list[idx]}').GRAYSCALE().expand_dims()
-            disp_ref = ImageCustom(f'{ref_disp_path}/{ref_disp_list[idx]}').GRAYSCALE().expand_dims()
-            disp_overlay_ref = (ref_im / 255) * (disp_ref / 255)
-            disp_overlay_target = (target_im / 255) * (disp_target / 255)
-            visu = np.vstack([visu, np.hstack(
-                [disp_overlay_ref / disp_overlay_ref.max(), disp_overlay_target / disp_overlay_target.max()])])
-
+            disp_target = ImageTensor(f'{target_disp_path}/{target_disp_list[idx]}').GRAYSCALE()
+            disp_ref = ImageTensor(f'{ref_disp_path}/{ref_disp_list[idx]}').GRAYSCALE()
+            disp_overlay_ref = ref_im * disp_ref
+            disp_overlay_target = target_im * disp_target
+            visu = visu.vstack(disp_overlay_ref.hstack(disp_overlay_target))
+        visu = visu.opencv()
         if show_idx:
             visu = cv.putText(visu, f'idx : {idx}', org_idx, font, fontScale, color, thickness, cv2.LINE_AA)
         if show_validation and validation_available:

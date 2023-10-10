@@ -1,0 +1,128 @@
+# Global parameters ########
+device: auto
+# Possibilities : "auto" to be set automatically on the first available gpu,
+#                 "multiple" to use all available gpu,
+#                 "cpu" to use only cpu, automatically set if no gpu is found
+
+output_path: /results/
+print_info: True
+timeit: True
+reset_images_name: True # Change the images original name for an incremental name
+
+
+# General option if there is no Process specified
+name_experiment: try
+save_inputs: True # Save the input images
+save_disp: True # Save all the disparity images computed
+save_reg_images: True # Save the final Registered image
+
+
+# Cameras Setup #########
+setup: # Paths to the config file of the pre-calibrated camera's setup
+  path: Setup_Camera.yaml
+
+# Dataset #########
+dataset:
+  number_of_sample: 20
+  shuffle: True # True if the data need to be randomly picked
+  save_dataset_conf: True # If a conf is loaded it won't be erased even if this option is true
+  save_file_list_in_conf: False  # If the conf is saved the list of file is saved only if this option is true
+
+# Disparity Network #########
+disparity_network:
+  name: unimatch # Possibilities : unimatch, acvNet, custom
+  backbone: null # Possibilities : null for now (to be set in case of custom Network)
+  transformer: null # Possibilities : null for now (to be set in case of custom Network)
+  detection_head: null # Possibilities : null for now (to be set in case of custom Network)
+  path_checkpoint: null # If "null" is given the Network will be initialized randomly or with the Network configuration file
+  use_bidir_disp: True  # Allow the computation and the use of the bidirectional disparity if other is located between left and right
+  # Data Preparation ########
+  preprocessing: # The preprocessing is automatically set for a no-custom network. If a new network is added, you have to add the associated transformation in the pre_processing class
+    inference_size: [640, 960] # If a resize is needed
+    match_shape: False # If the entrance images need to have matching shape / number of channels
+    normalize: True # If a boolean is given, the mean and std will be automatically set. Other possibility : (mean, std)
+
+# Depth Network #########
+depth_network:
+  name: unimatch # Possibilities : unimatch, custom
+  backbone: null # Possibilities : null for now (to be set in case of custom Network)
+  transformer: null # Possibilities : null for now (to be set in case of custom Network)
+  detection_head: null # Possibilities : null for now (to be set in case of custom Network)
+  path_checkpoint: null # If "null" is given the Network will be initialized randomly or with the Network configuration file
+  use_bidir_depth: True  # Allow the computation and the use of the bidirectional disparity if other is located between left and right
+  # Data Preparation ########
+  preprocessing: # The preprocessing is automatically set for a no-custom network. If a new network is added, you have to add the associated transformation in the pre_processing class
+    inference_size: [640, 960] # If a resize is needed
+    match_shape: False # If the entrance images need to have matching shape / number of channels
+    normalize: True # If a boolean is given, the mean and std will be automatically set. Other possibility : (mean, std)
+
+# Reconstruction
+reconstruction:
+  remove_occlusion: True # If True the occluded pixels will be suppressed of the resampled image
+  post_process_depth: 5 # If method_3d is >0 a median blurring and a dilation for disparity will be done
+  post_process_image: 3
+
+# Validation of the result #######
+validation:
+  activated: True
+  indices:
+    # value based errors:
+    rmse: True      # Root Mean Square Error
+    nmi: False       # Normalized Mutual Information // available only on CPU with the "opencv" and "algo" reconstruction
+    psnr: False      # Peak Signal Noise Ratio
+    # Structure based errors:
+    ssim: True      # Structural Similarity
+    ms_ssim: True   # SSIM multi-scale // available only on GPU following the "torch" reconstruction
+    nec: True       # Normalized Edge Convolution
+  stats:
+    mean: True
+    std: True
+
+#
+## Disparity refinement #######
+#refinement:
+#  correction_algo: null # To be implemented, an algo to clean the estimated disparity from unrealistic values
+#  time_consistency_network: null # Point to a RNN design to keep the time consistency from a frame to another
+#  time_consistency_checkpoint: null # If None is given the Network will be initialized randomly
+
+
+
+# 3D PointCloud
+#pointsCloud:
+#  activated: True
+#  disparity: False  # Set to False the system will use a depth estimation instead of the computed disparity
+#  stereo: True
+#  use_bidir: True
+#  both: False
+#  visualisation: True
+#  save: True
+#  min_disparity: 0.95 # Either between 0-1 or 1-100%
+
+
+
+
+
+#Enumerator
+# BORDER FLAG:
+#BORDER_CONSTANT = 0    iiiiii|abcdefgh|iiiiiii with some specified i
+#BORDER_REPLICATE = 1   aaaaaa|abcdefgh|hhhhhhh
+#BORDER_REFLECT = 2     fedcba|abcdefgh|hgfedcb
+#BORDER_WRAP = 3        cdefgh|abcdefgh|abcdefg
+#BORDER_REFLECT_101 = 4 gfedcb|abcdefgh|gfedcba
+#BORDER_TRANSPARENT = 5 uvwxyz|abcdefgh|ijklmno
+#BORDER_ISOLATED = 16   do not look outside of ROI
+
+# INTERPOLATION FLAG:
+#INTER_NEAREST = 0       nearest neighbor interpolation
+#INTER_LINEAR 1          bilinear interpolation
+#INTER_CUBIC = 2         bicubic interpolation
+#INTER_AREA = 3          resampling using pixel area relation. It may be a preferred method for image decimation, as it gives moire'-free results. But when the image is zoomed, it is similar to the INTER_NEAREST method.
+#INTER_LANCZOS4 = 4      Lanczos interpolation over 8x8 neighborhood
+#INTER_LINEAR_EXACT = 5  Bit exact bilinear interpolation
+#INTER_NEAREST_EXACT = 6 Bit exact nearest neighbor interpolation. This will produce same results as the nearest neighbor method in PIL, scikit-image or Matlab.
+#INTER_MAX = 7           mask for interpolation codes
+#WARP_FILL_OUTLIERS = 8  flag, fills all the destination image pixels. If some of them correspond to outliers in the source image, they are set to zero
+#WARP_INVERSE_MAP = 16   flag, inverse transformation,
+#                           For example, linearPolar or logPolar transforms:
+#                           flag is not set: dst(ρ,ϕ)=src(x,y)
+#                           flag is set: dst(x,y)=src(ρ,ϕ)

@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 import stat
@@ -15,11 +16,12 @@ import torch
 #     return lines
 
 
-def name_generator(idx, max_number=10e6):
+def name_generator(idx, max_number=10e4):
     k_str = str(idx)
-    while idx + 0.5 < max_number:
+    digits = 1 if max_number < 10 else int(math.log10(max_number)) + 1
+    current_digits = 1 if idx < 10 else int(math.log10(idx)) + 1
+    for i in range(digits-current_digits):
         k_str = '0' + k_str
-        max_number /= 10
     return k_str
 
 

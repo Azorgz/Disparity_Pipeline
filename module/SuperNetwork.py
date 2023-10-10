@@ -1,9 +1,17 @@
-from Config.Config import ConfigPipe
+import warnings
+
+from torch import Tensor
+
+from config.Config import ConfigPipe
 from Networks.ACVNet.models import ACVNet
 from Networks.UniMatch.unimatch.unimatch import UniMatch
 from module.BaseModule import BaseModule
+from module.Preprocessing import Preprocessing
+from utils.classes.Image import ImageTensor, DepthTensor
 from utils.misc import timeit, count_parameter
 import torch
+
+Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch']}
 
 
 class SuperNetwork(BaseModule):
@@ -13,72 +21,195 @@ class SuperNetwork(BaseModule):
     """
 
     def __init__(self, config: ConfigPipe):  # model, args, name: str, timeit=False):
+        self.name_disparity = ''
+        self.model_disparity = None
+        self.model_depth = None
+        self.name_depth = ''
+        self.preprocessing_disparity = None
+        self.preprocessing_depth = None
+        self.pred_right = False
+        self.pred_bidir = False
         super(SuperNetwork, self).__init__(config)
 
-    def _update_conf(self, config):
-        self.args = config['network']["network_args"]
+    def _update_conf(self, config, *args, **kwargs):
+        self.args_disparity = config['disparity_network']["network_args"]
+        self.args_depth = config['depth_network']["network_args"]
         self.device_index = config["device"]["index"]
         self.__class__.__name__ = 'Neural Network'
-        self.name = config['network']["name"]
-        if self.name == ('unimatch' or 'uni' or 'Uni' or 'Unimatch'):
-            model = UniMatch(feature_channels=self.args.feature_channels,
-                             num_scales=self.args.num_scales,
-                             upsample_factor=self.args.upsample_factor,
-                             num_head=self.args.num_head,
-                             ffn_dim_expansion=self.args.ffn_dim_expansion,
-                             num_transformer_layers=self.args.num_transformer_layers,
-                             reg_refine=self.args.reg_refine,
-                             task=self.args.task).to(self.device)
-        if self.name == ("acvNet" or 'acv' or 'avc' or 'avcNet'):
+        self.disparity_network_init(config)
+        self.depth_network_init(config)
+        # self.preprocessing_disparity_init(config)
+        # self.preprocessing_depth_init(config)
+
+    def update_pred_right(self, activate: bool = True):
+        self.pred_right = activate
+        self.update_preprocessing()
+
+    def update_pred_bidir(self, activate: bool = True):
+        self.pred_bidir = activate
+        self.update_preprocessing()
+
+    def update_preprocessing(self):
+        self.preprocessing_disparity = Preprocessing(self.config["disparity_network"]["preprocessing"], self.device,
+                                                     task='disparity', pred_right=self.pred_right,
+                                                     pred_bidir=self.pred_bidir)
+        self.preprocessing_depth = Preprocessing(self.config["depth_network"]["preprocessing"], self.device,
+                                                 task='depth', pred_right=self.pred_right, pred_bidir=False)
+
+    def disparity_network_init(self, config):
+        # Disparity Network initialization
+        if config['disparity_network']["name"] == ('unimatch' or 'uni' or 'Uni' or 'Unimatch'):
+            self.name_disparity = 'unimatch'
+            model = UniMatch(feature_channels=self.args_disparity.feature_channels,
+                             num_scales=self.args_disparity.num_scales,
+                             upsample_factor=self.args_disparity.upsample_factor,
+                             num_head=self.args_disparity.num_head,
+                             ffn_dim_expansion=self.args_disparity.ffn_dim_expansion,
+                             num_transformer_layers=self.args_disparity.num_transformer_layers,
+                             reg_refine=self.args_disparity.reg_refine,
+                             task=self.args_disparity.task).to(self.device)
+        elif config['disparity_network']["name"] == ("acvNet" or 'acv' or 'avc' or 'avcNet'):
+            self.name_disparity = 'acvNet'
             torch.manual_seed(1)
             torch.cuda.manual_seed(1)
-            model = ACVNet(self.args.maxdisp, self.args.attn_weights_only, self.args.freeze_attn_weights).to(
-                self.device)
+            model = ACVNet(self.args_disparity.maxdisp, self.args_disparity.attn_weights_only,
+                           self.args_disparity.freeze_attn_weights).to(self.device)
+        # elif config['network']["name"] == "custom":
+        # self.name_disparity = 'custom'
+        # self.feature_extraction = self._initialize_features_extraction_(self.config['network'])
+        # self.transformer = self._initialize_transformer_(self.config['network'])
+        # self.detection_head = self._initialize_detection_head_(self.config['network'])
+        # self.model = torch.nn.Sequential([self.feature_extraction, self.transformer, self.detection_head])
+        # pass
+        else:
+            model = None
+        self.model_disparity = model.eval()
+        if torch.cuda.device_count() > 1 or self.name_disparity == ("acvNet" or 'acv' or 'avc' or 'avcNet'):
+            print('Use %d GPUs' % torch.cuda.device_count())
+            model.model = torch.nn.DataParallel(model.model)
 
-        if self.name == "custom":
+        if self.config['disparity_network']["path_checkpoint"]:
+            checkpoint = torch.load(self.config['disparity_network']["path_checkpoint"], map_location=self.device_index)
+            model_dict = self.model_disparity.state_dict()
+            pre_dict = {k: v for k, v in checkpoint['model'].items() if k in model_dict}
+            model_dict.update(pre_dict)
+            self.model_disparity.load_state_dict(model_dict)
+        self.preprocessing_disparity = Preprocessing(config["disparity_network"]["preprocessing"], self.device,
+                                                     task='disparity',
+                                                     pred_right=self.pred_right, pred_bidir=self.pred_bidir)
+
+    def depth_network_init(self, config):
+        # Disparity Network initialization
+
+        if config['depth_network']["name"] == ('unimatch' or 'uni' or 'Uni' or 'Unimatch'):
+            self.name_depth = config['depth_network']["name"]
+            model = UniMatch(feature_channels=self.args_depth.feature_channels,
+                             num_scales=self.args_depth.num_scales,
+                             upsample_factor=self.args_depth.upsample_factor,
+                             num_head=self.args_depth.num_head,
+                             ffn_dim_expansion=self.args_depth.ffn_dim_expansion,
+                             num_transformer_layers=self.args_depth.num_transformer_layers,
+                             reg_refine=self.args_depth.reg_refine,
+                             task='depth').to(self.device)
+        elif config['depth_network']["name"] == "custom":
+            self.name_depth = "custom"
             # self.feature_extraction = self._initialize_features_extraction_(self.config['network'])
             # self.transformer = self._initialize_transformer_(self.config['network'])
             # self.detection_head = self._initialize_detection_head_(self.config['network'])
             # self.model = torch.nn.Sequential([self.feature_extraction, self.transformer, self.detection_head])
             pass
-
-        self.model = model.eval()
-        if torch.cuda.device_count() > 1 or self.name == ("acvNet" or 'acv' or 'avc' or 'avcNet'):
+        else:
+            model = None
+        self.model_depth = model.eval()
+        if torch.cuda.device_count() > 1:
             print('Use %d GPUs' % torch.cuda.device_count())
             model.model = torch.nn.DataParallel(model.model)
-
-        if self.config['network']["path_checkpoint"]:
-            checkpoint = torch.load(self.config['network']["path_checkpoint"], map_location=self.device_index)
-            model_dict = self.model.state_dict()
+        if self.config['depth_network']["path_checkpoint"]:
+            checkpoint = torch.load(self.config['depth_network']["path_checkpoint"], map_location=self.device_index)
+            model_dict = self.model_depth.state_dict()
             pre_dict = {k: v for k, v in checkpoint['model'].items() if k in model_dict}
             model_dict.update(pre_dict)
-            self.model.load_state_dict(model_dict)
+            self.model_depth.load_state_dict(model_dict)
+        self.preprocessing_depth = Preprocessing(config["depth_network"]["preprocessing"], self.device, task='depth',
+                                                 pred_right=self.pred_right, pred_bidir=False)
 
     def __str__(self):
         string = super().__str__()
-        string += f'The model "{self.name}" has been initialized'
-        string += f"\nLoad checkpoint: {self.config['network']['path_checkpoint']}\n"
-        string += count_parameter(self.model)
+        string += f'The model "{self.name_disparity}" has been initialized for disparity'
+        string += f"\nLoad checkpoint: {self.config['disparity_network']['path_checkpoint']}\n"
+        string += count_parameter(self.model_disparity)
+        string += f'\nThe model "{self.name_depth}" has been initialized for depth'
+        string += f"\nLoad checkpoint: {self.config['depth_network']['path_checkpoint']}\n"
+        string += count_parameter(self.model_depth)
         return string
 
     @torch.no_grad()
     @timeit
-    def __call__(self, im_left, im_right, *args, **kwargs):
-        if self.name == "unimatch":
-            return self.model(im_left, im_right,
-                              attn_type=self.args.attn_type,
-                              attn_splits_list=self.args.attn_splits_list,
-                              corr_radius_list=self.args.corr_radius_list,
-                              prop_radius_list=self.args.prop_radius_list,
-                              num_reg_refine=self.args.num_reg_refine,
-                              task='stereo')['flow_preds'][-1]
-        elif self.name == "acvNet":
-            return self.model(im_left, im_right)[0]
+    def __call__(self, sample, *args, depth=False, intrinsics=None, pose=None, **kwargs):
+        if not depth:
+            sample = self.preprocessing_disparity(sample.copy())
+            im_left, im_right = sample['left'], sample['right']
+            if self.name_disparity == "unimatch":
+                res = self.model_disparity(Tensor(im_left), Tensor(im_right),
+                                           attn_type=self.args_disparity.attn_type,
+                                           attn_splits_list=self.args_disparity.attn_splits_list,
+                                           corr_radius_list=self.args_disparity.corr_radius_list,
+                                           prop_radius_list=self.args_disparity.prop_radius_list,
+                                           num_reg_refine=self.args_disparity.num_reg_refine,
+                                           task='stereo')['flow_preds'][-1]
+            elif self.name_disparity == "acvNet":
+                res = self.model_disparity(im_left, im_right)[0]
+            else:
+                warnings.warn('This Network is not implemented')
+            res = self.preprocessing_disparity(res, reverse=True)
+            if self.pred_bidir:
+                left = DepthTensor(res[0], device=self.device).scale()
+                left.im_name = im_left.im_name
+                right = DepthTensor(res[1], device=self.device).scale()
+                right.im_name = im_right.im_name
+                res = {'left': left, 'right': right}
+            elif self.pred_right:
+                right = DepthTensor(res[1], device=self.device).scale()
+                right.im_name = im_right.im_name
+                res = {'right': right}
+            else:
+                left = DepthTensor(res[0], device=self.device).scale()
+                left.im_name = im_left.im_name
+                res = {'left': left}
+            return res
 
-    def refine(self, im, flow, *args, **kwargs):
-        return self.model.disp_refine(im, flow,
-                                      attn_type=self.args.attn_type,
-                                      attn_splits_list=self.args.attn_splits_list,
-                                      corr_radius_list=self.args.corr_radius_list,
-                                      prop_radius_list=self.args.prop_radius_list,
-                                      num_reg_refine=self.args.num_reg_refine)['flow_preds'][-1]
+        else:
+            sample = self.preprocessing_depth(sample)
+            img_ref, img_tgt = sample['ref'], sample['target']
+            if self.name_depth == "unimatch":
+                res = self.model_depth(Tensor(img_ref), Tensor(img_tgt),
+                                       attn_type=self.args_depth.attn_type,
+                                       attn_splits_list=self.args_depth.attn_splits_list,
+                                       prop_radius_list=self.args_depth.prop_radius_list,
+                                       num_reg_refine=self.args_depth.num_reg_refine,
+                                       intrinsics=intrinsics,
+                                       pose=pose,
+                                       min_depth=1. / self.args_depth.max_depth,
+                                       max_depth=1. / self.args_depth.min_depth,
+                                       num_depth_candidates=self.args_depth.num_depth_candidates,
+                                       pred_bidir_depth=self.pred_bidir,
+                                       depth_from_argmax=self.args_depth.depth_from_argmax,
+                                       task='depth')['flow_preds'][-1]  # [1, H, W]
+            else:
+                warnings.warn('This Network is not implemented')
+            self.preprocessing_depth(res, reverse=True)
+            if self.pred_bidir:
+                ref = DepthTensor(res[0], device=self.device).scale()
+                ref.im_name = sample['ref'].im_name
+                target = DepthTensor(res[1], device=self.device).scale()
+                target.im_name = sample['target'].im_name
+                res = {'ref': ref, 'target': target}
+            elif self.pred_right:
+                target = DepthTensor(res[1], device=self.device).scale()
+                target.im_name = sample['target'].im_name
+                res = {'target': target}
+            else:
+                ref = DepthTensor(res[0], device=self.device).scale()
+                ref.im_name = sample['ref'].im_name
+                res = {'ref': ref}
+            return res

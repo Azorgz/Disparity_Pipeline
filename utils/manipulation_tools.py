@@ -3,9 +3,11 @@ import time
 import cv2 as cv
 import numpy as np
 import torch
+from kornia import create_meshgrid
+from kornia.utils import get_cuda_device_if_available
 from torch import Tensor, FloatTensor
 from kornia.feature.responses import harris_response
-from utils.classes.Image import ImageCustom, ImageTensor
+from utils.classes.Image import ImageTensor
 
 
 def extract_roi_from_map(mask_left: Tensor, mask_right: Tensor):
@@ -73,3 +75,12 @@ def drawlines(img, lines, pts):
         img = cv.circle(img, (int(pt[0]), int(pt[1])), 5, color, -1)
     return img
 
+def create_meshgrid3d(depth: int, height: int, width: int, device: torch.device = None, type: torch.dtype = None)\
+        -> ImageTensor:
+    device = get_cuda_device_if_available() if device is None else device
+    grid_2d = create_meshgrid(height, width, device=device).to(type).unsqueeze(1).repeat(1, depth, 1, 1, 1)  # 1xDxHxWx2
+    vec = torch.arange(-1, 1+1/depth, 1/depth, device=device).to(type).unsqueeze(0)  # 1xD
+    grid_z = (ImageTensor(torch.ones([height, width])).squeeze().unsqueeze(-1) @ vec).permute(2, 0, 1).unsqueeze(0).unsqueeze(-1)  # 1xDxHxWx1
+    grid_3d = torch.cat([grid_2d, grid_z], dim=-1)
+
+    return grid_3d

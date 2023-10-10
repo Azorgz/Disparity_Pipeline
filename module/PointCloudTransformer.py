@@ -128,21 +128,22 @@ class PointCloudTransformer(BaseModule):
         return pc
 
     def _configure_cameras(self, config) -> None:
+        F = 777
         if self.disparity_mode:
             if config['cameras']['left']:
                 self.matrix_left = torch.tensor(config['cameras']['left'], dtype=torch.double).unsqueeze(0).to(
                     self.device)
             else:
-                self.matrix_left = torch.tensor([[1000, 0, int(config['dataset']["ori_size"][1] / 2), 0],
-                                                 [0, 1000, int(config['dataset']["ori_size"][0] / 2), 0],
+                self.matrix_left = torch.tensor([[F, 0, int(config['dataset']["ori_size"][1] / 2), 0],
+                                                 [0, F, int(config['dataset']["ori_size"][0] / 2), 0],
                                                  [0, 0, 1, 0]], dtype=torch.double).unsqueeze(0).to(self.device)
             if config['cameras']['right']:
                 self.matrix_right = torch.tensor(config['cameras']['right'], dtype=torch.double).unsqueeze(0).to(
                     self.device)
             else:
                 self.matrix_right = torch.tensor(
-                    [[1000, 0, int(config['dataset']["ori_size"][1] / 2), -1],
-                     [0, 1000, int(config['dataset']["ori_size"][0] / 2), 0],
+                    [[F, 0, int(config['dataset']["ori_size"][1] / 2), -1],
+                     [0, F, int(config['dataset']["ori_size"][0] / 2), 0],
                      [0, 0, 1, 0]], dtype=torch.double).unsqueeze(0).to(self.device)
             self.camera = {'stereo': StereoCamera(self.matrix_left, self.matrix_right)}
             self.function = self._cloud_from_disparity
@@ -161,8 +162,8 @@ class PointCloudTransformer(BaseModule):
                                                                  dtype=torch.double).unsqueeze(0).to(self.device)
                 else:
                     self.matrix_intrinsic['left'] = \
-                        torch.tensor([[1000, 0, int(config['dataset']["ori_size"][1] / 2), 0],
-                                      [0, 1000, int(config['dataset']["ori_size"][0] / 2), 0], [0, 0, 1, 0],
+                        torch.tensor([[F, 0, int(config['dataset']["ori_size"][1] / 2), 0],
+                                      [0, F, int(config['dataset']["ori_size"][0] / 2), 0], [0, 0, 1, 0],
                                       [0, 0, 0, 1]], dtype=torch.double).unsqueeze(0).to(self.device)
                     self.matrix_extrinsic['left'] = torch.tensor(
                         [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
@@ -174,8 +175,8 @@ class PointCloudTransformer(BaseModule):
                                                                   dtype=torch.double).unsqueeze(0).to(self.device)
                 else:
                     self.matrix_intrinsic['right'] = \
-                        torch.tensor([[1000, 0, int(config['dataset']["ori_size"][1] / 2), 0],
-                                      [0, 1000, int(config['dataset']["ori_size"][0] / 2), 0], [0, 0, 1, 0],
+                        torch.tensor([[F, 0, int(config['dataset']["ori_size"][1] / 2), 0],
+                                      [0, F, int(config['dataset']["ori_size"][0] / 2), 0], [0, 0, 1, 0],
                                       [0, 0, 0, 1]], dtype=torch.double).unsqueeze(0).to(self.device)
                     self.matrix_extrinsic['right'] = torch.tensor(
                         [[1, 0, 0, -0.341], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
@@ -198,8 +199,8 @@ class PointCloudTransformer(BaseModule):
                                                                   dtype=torch.double).unsqueeze(0).to(self.device)
                 else:
                     self.matrix_intrinsic['other'] = \
-                        torch.tensor([[1000, 0, int(config['dataset']["ori_size"][1] / 2), 0],
-                                      [0, 1000, int(config['dataset']["ori_size"][0] / 2), 0], [0, 0, 1, 0],
+                        torch.tensor([[F, 0, int(config['dataset']["ori_size"][1] / 2), 0],
+                                      [0, F, int(config['dataset']["ori_size"][0] / 2), 0], [0, 0, 1, 0],
                                       [0, 0, 0, 1]], dtype=torch.double).unsqueeze(0).to(self.device)
                     self.matrix_extrinsic['other'] = \
                         torch.tensor([[1, 0, 0, -0.127], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],

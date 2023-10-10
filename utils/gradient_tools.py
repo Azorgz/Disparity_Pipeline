@@ -4,16 +4,16 @@ from kornia import pi
 from kornia.color import hsv_to_rgb
 from kornia.morphology import dilation
 
-from utils.classes.Image import ImageCustom
+# from utils.classes.Image import ImageCustom
 from torchmetrics.functional import image_gradients
 import torch
 
+from utils.classes import ImageTensor
 from utils.manipulation_tools import normalisation_tensor
 
 
-def grad(image: ImageCustom or np.ndarray) -> ImageCustom:
-    if len(image.shape) == 3:
-        image = ImageCustom(image).GRAYSCALE()
+def grad(image: ImageTensor) -> ImageTensor:
+    image = image.GRAYSCALE().squeeze().cpu().numpy()
     Ix = cv.Sobel(image, cv.CV_64F, 1, 0, borderType=cv.BORDER_REFLECT_101)
     Iy = cv.Sobel(image, cv.CV_64F, 0, 1, borderType=cv.BORDER_REFLECT_101)
     grad = np.sqrt(Ix ** 2 + Iy ** 2)
@@ -29,11 +29,11 @@ def grad(image: ImageCustom or np.ndarray) -> ImageCustom:
     h[grad == 0] = 0
     output = np.uint8(np.stack([h, s, v], axis=-1))
     output = cv.cvtColor(output, cv.COLOR_HSV2RGB)
-    return ImageCustom(output)
+    return ImageTensor(output)
 
 
 def grad_tensor(image_tensor, device):
-    _, c, _, _ = image_tensor.shape
+    c = image_tensor.shape[image_tensor.channel_pos]
     dy, dx = image_gradients(image_tensor)
     if c > 1:
         dx, dy = torch.sum(dx, dim=1) / 3, torch.sum(dy, dim=1) / 3
@@ -50,6 +50,5 @@ def grad_tensor(image_tensor, device):
     s[grad_im == 0] = 0
     h = normalisation_tensor(orient % pi) * (2 * pi)
     h[grad_im == 0] = 0
-    output = hsv_to_rgb(torch.stack((h, s, v), dim=1))
-
+    output = hsv_to_rgb(torch.stack([h, s, v], dim=1).squeeze(2))
     return output

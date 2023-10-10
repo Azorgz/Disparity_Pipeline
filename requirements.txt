@@ -28,3 +28,4 @@ kornia~=0.6.11
 open3d~=0.17.0
 tqdm~=4.65.0
 joblib~=1.2.0
+oyaml~=1.0

@@ -9,7 +9,7 @@ from kornia.geometry import StereoCamera, relative_transformation, find_homograp
     get_perspective_transform, warp_perspective
 from torch import Tensor, FloatTensor
 from torch.nn.functional import grid_sample
-from utils.classes.Image import ImageTensor
+from utils.classes.Image import ImageTensor, DepthTensor
 from utils.classes.Cameras import IRCamera, RGBCamera
 from utils.image_processing_tools import perspective2grid
 from utils.manipulation_tools import extract_roi_from_map
@@ -22,7 +22,7 @@ class StereoSetup(StereoCamera):
     _ROI = [0, 0, 0, 0]
 
     def __init__(self, left: Union[IRCamera, RGBCamera], right: Union[IRCamera, RGBCamera],
-                 device: torch.device, name: str = None):
+                 device: torch.device, name: str = None, accuracy=0.1, z_min=3):
 
         self._left = left
         self._right = right
@@ -54,11 +54,13 @@ class StereoSetup(StereoCamera):
 
         super(StereoSetup, self).__init__(Tensor(P1).to(device=device).unsqueeze(0),
                                           Tensor(P2).to(device=device).unsqueeze(0))
+        self.depth_min = Tensor([z_min]).to(self.device)
+        self.depth_max = Tensor([abs(P2[0, -1] * accuracy)]).to(self.device)
         self._init_maps_(R1, R2, P1, P2)
         self._name = name if name is not None else f'{left.name}&{right.name}'
 
         self._init_roi_()
-        self._ROI = [self.current_roi_max, self.current_roi_max]
+        self._ROI = [self.roi_max, self.roi_min]
         self.last_call = {}
 
     def _init_maps_(self, R1, R2, P1, P2):
@@ -85,44 +87,16 @@ class StereoSetup(StereoCamera):
         scale = scale_im_left[0] * scale_im_right[0], scale_im_left[1] * scale_im_right[1]
 
         self.map_right[0] = 2 * (self.map_right[0] / scale_im_right[1] - self.new_shape[1] / 2 / scale[1]) / (
-                    self.new_shape[1] / (1 + self.scale))
+                self.new_shape[1] / (1 + self.scale))
         self.map_right[1] = 2 * (self.map_right[1] / scale_im_right[0] - self.new_shape[0] / 2 / scale[0]) / (
-                    self.new_shape[0] / (1 + self.scale))
+                self.new_shape[0] / (1 + self.scale))
         self.map_left[0] = 2 * (self.map_left[0] / scale_im_left[1] - self.new_shape[1] / 2 / scale[1]) / (
-                    self.new_shape[1] / (1 + self.scale))
+                self.new_shape[1] / (1 + self.scale))
         self.map_left[1] = 2 * (self.map_left[1] / scale_im_left[0] - self.new_shape[0] / 2 / scale[0]) / (
-                    self.new_shape[0] / (1 + self.scale))
+                self.new_shape[0] / (1 + self.scale))
 
         self.map_right = Tensor(self.map_right).permute(1, 2, 0).unsqueeze(0).to(self.device)
         self.map_left = Tensor(self.map_left).permute(1, 2, 0).unsqueeze(0).to(self.device)
-
-        # transformation inverse
-        self.map_left_inv = np.zeros([2, *self.new_shape])
-        self.map_left_inv[0], self.map_left_inv[1] = \
-            cv.initUndistortRectifyMap(P1[:3, :3], distCoeffs1, np.linalg.inv(R1), cameraMatrix1,
-                                       (self.new_shape[1], self.new_shape[0]), cv.CV_32FC1)
-        self.map_right_inv = np.zeros([2, *self.new_shape])
-        self.map_right_inv[0], self.map_right_inv[1] = \
-            cv.initUndistortRectifyMap(P2[:3, :3], distCoeffs2, np.linalg.inv(R2), cameraMatrix2,
-                                       (self.new_shape[1], self.new_shape[0]), cv.CV_32FC1)
-
-        scale_im_right_inv = P2[0, 0] / cameraMatrix2[0, 0], P2[1, 1] / cameraMatrix2[1, 1]
-        scale_im_left_inv = P1[0, 0] / cameraMatrix1[0, 0], P1[1, 1] / cameraMatrix1[1, 1]
-
-        scale_inv = (scale_im_left_inv[0] + scale_im_right_inv[0]), (scale_im_left_inv[1] + scale_im_right_inv[1])
-        # scale_inv = scale_im_left_inv[0] * scale_im_right_inv[0], scale_im_left_inv[1] * scale_im_right_inv[1]
-
-        self.map_right_inv[0] = 2 * (self.map_right_inv[0] / scale_im_right_inv[1] - self.new_shape[1] / scale_inv[1]) / \
-                                self.shape_right[1]
-        self.map_right_inv[1] = 2 * (self.map_right_inv[1] / scale_im_right_inv[0] - self.new_shape[0] / scale_inv[0]) / \
-                                self.shape_right[0]
-        self.map_left_inv[0] = 2 * (self.map_left_inv[0] / scale_im_left_inv[1] - self.new_shape[1] / scale_inv[1]) / \
-                               self.shape_left[1]
-        self.map_left_inv[1] = 2 * (self.map_left_inv[1] / scale_im_left_inv[0] - self.new_shape[0] / scale_inv[0]) / \
-                               self.shape_left[0]
-
-        self.map_right_inv = Tensor(self.map_right_inv).permute(1, 2, 0).unsqueeze(0).to(self.device)
-        self.map_left_inv = Tensor(self.map_left_inv).permute(1, 2, 0).unsqueeze(0).to(self.device)
 
     def _init_map_inv_(self):
         pass
@@ -136,8 +110,6 @@ class StereoSetup(StereoCamera):
         self.homography_l = get_perspective_transform(self.pts_left, self.pts_left_ori).to(self.device)
         self.homography_r = get_perspective_transform(self.pts_right, self.pts_right_ori).to(self.device)
 
-        # self.map_right_inv = warp_perspective(grid_right, self.homography_r, self.new_shape).permute(0, 2, 3, 1)-2000
-        # self.map_left_inv = warp_perspective(grid_left, self.homography_l, self.new_shape).permute(0, 2, 3, 1)-2000
     def _init_roi_(self):
         pass
         mask_left = (1 >= self.map_left) * (self.map_left >= -1) * torch.ones_like(self.map_left)
@@ -203,6 +175,26 @@ class StereoSetup(StereoCamera):
                 new_sample[right] = self.cut_to_original(temp, side='right')
         return new_sample
 
+    def disparity_to_depth(self, sample, *args):
+        for key, t in sample.items():
+            mask = t == 0
+            t_ = t.clone()
+            t_[mask] = 1
+            sample[key] = self.reproject_disparity_to_3D(t_.put_channel_at(-1))
+            sample[key] = sample[key][:, :, :, -1].unsqueeze(1)
+            sample[key][mask] = 0
+            # new_sample[key] = torch.clamp(new_sample[key], self.depth_min, self.depth_max)
+            sample[key].pass_attr(t)
+        return sample
+
+    def depth_to_disparity(self, depth, *args):
+        mask = depth == 0
+        t_ = depth.clone()
+        t_[mask] = 1
+        disp = self.tx / t_ * self.fx
+        disp[mask] = 0
+        return disp
+
     @staticmethod
     def cut_to_roi(im, roi):
         return im[:, :, roi[0]:roi[2], roi[1]:roi[3]]
@@ -251,11 +243,10 @@ class StereoSetup(StereoCamera):
         im_right = self.right.im_calib
         sample = {self.left.name: im_left, self.right.name: im_right}
         sample_1 = self(sample)
-        sample_2 = self(sample_1, reverse=True)
-
+        # sample_2 = self(sample_1, reverse=True)
+        sample_1['right'].show(num='right image', point=self.pts_right)
+        sample_1['left'].show(num='left image', point=self.pts_left)
         (sample_1['right'] * 0.5 + sample_1['left'] * 0.5).show(roi=[self.current_roi_max, self.current_roi_min])
-        sample_2[self.left.name].show(num='reversed')
-        sample_2[self.right.name].show(num='reversed')
 
         # sample_0['right'].show(num='Right 2 Left', roi=[self.roi_right2left_min, self.roi_right2left_max])
         # sample_1['right'].show(num='Left 2 Right', roi=[self.roi_left2right_min, self.roi_left2right_max])
@@ -295,3 +286,65 @@ class StereoSetup(StereoCamera):
     @property
     def roi(self):
         return self._ROI
+
+
+class DepthSetup:
+    _ref = None
+    _target = None
+    _name = 'DepthSetup'
+    _pose = torch
+    _intrinsics = torch.eye(3)
+    _f = 10e-3
+    _shape = 0, 0
+
+    def __init__(self, ref: Union[IRCamera, RGBCamera], target: Union[IRCamera, RGBCamera],
+                 device: torch.device, name: str = None, accuracy_min: float = 10.):
+        assert ref.im_type == target.im_type
+        self.device = device
+        self._intrinsics = ref.intrinsics[:, :3, :3].to(torch.float32)
+        self._pose = relative_transformation(target.extrinsics.inverse(), ref.extrinsics.inverse()).to(torch.float32)
+        self._ref = ref
+        self._target = target
+        self._f = ref.f
+        self._shape = ref.im_calib.shape[-2:]
+        self._name = name if name is not None else f'{ref.name}&{target.name}'
+
+    def __call__(self, sample, *args, reverse=False, **kwargs):
+        if not reverse:
+            return {'sample': {'ref': sample[self.ref.name].clone(), 'target': sample[self.target.name].clone()},
+                    'intrinsics': self.intrinsics,
+                    'pose': self._pose,
+                    'depth': True}
+        else:
+            res = {}
+            res.update({self.ref.name: sample['ref']}) if 'ref' in sample.keys() else res.update({self.target.name: sample['target']})
+            res.update({self.target.name: sample['target']}) if 'target' in sample.keys() else res.update({self.ref.name: sample['ref']})
+            return res
+
+    @property
+    def ref(self):
+        return self._ref
+
+    @property
+    def target(self):
+        return self._target
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def pose(self):
+        return self._pose
+
+    @property
+    def intrinsics(self):
+        return self._intrinsics
+
+    @property
+    def f(self):
+        return self._f
+
+    @property
+    def shape(self):
+        return self._shape

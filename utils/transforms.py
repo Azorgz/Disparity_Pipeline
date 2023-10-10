@@ -9,10 +9,12 @@ import torchvision.transforms.functional as F
 from torch import Tensor
 from torchvision.transforms.functional import hflip
 import torch.nn.functional as F1
-from utils.classes.Image import ImageCustom
+
 import inspect
 from types import FrameType
 from typing import cast, Union
+
+from utils.classes.Image import ImageTensor
 
 
 class Compose(object):
@@ -30,85 +32,183 @@ class Compose(object):
         self.device = device
 
     def __call__(self, sample):
-        if not isinstance(sample, F.Tensor):
-            sample_ = sample.copy()
-        else:
-            sample_ = torch.tensor(sample)
+        # if not isinstance(sample, Tensor) and not isinstance(sample, ImageTensor):
+        #     sample_ = sample.copy()
+        # else:
+        #     sample_ = torch.tensor(sample)
         for t in self.transforms:
-            sample_ = t(sample_, self.device)
-        return sample_
-
-
-class ToTensor(object):
-    """Convert numpy array to torch tensor and load it on the specified device"""
-
-    def __init__(self, no_normalize=False):
-        self.no_normalize = no_normalize
-
-    def __call__(self, sample, device, *args):
-        if isinstance(sample, dict):
-            for key in sample.keys():
-                sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
-                if self.no_normalize:
-                    sample[key] = torch.from_numpy(sample[key])
-                else:
-                    sample[key] = torch.from_numpy(sample[key]) / 255.
-                sample[key] = sample[key].to(device).unsqueeze(0)
-        else:
-            sample = np.transpose(sample, (2, 0, 1))
-            sample = torch.from_numpy(sample) / 255.
-            sample = sample.to(device).unsqueeze(0)
+            sample = t(sample, self.device)
         return sample
 
 
-class ToFloatTensor(object):
-    """Convert numpy array to torch tensor and load it on the specified device"""
+class PerspectiveTransform:
+    """Register an image to another one following the perspective Transform matrix"""
+    _matrix = None
+    _inverse_matrix = None
+    _shape = None
+    _center = None
+    _map = None
+    _inverse_map = None
 
-    def __init__(self, no_normalize=False):
-        self.no_normalize = no_normalize
+    def __init__(self, matrix, shape, device, center=()):
+        self.device = device
+        self.update(matrix, shape, center)
 
-    def __call__(self, sample, device, *args):
-        if isinstance(sample, dict):
-            for key in sample.keys():
-                sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
-                if self.no_normalize:
-                    sample[key] = torch.cuda.FloatTensor(sample[key])
-                else:
-                    sample[key] = torch.cuda.FloatTensor(sample[key] / 255.)
-                sample[key] = sample[key].to(device).unsqueeze(0)
-        else:
-            sample = np.transpose(sample, (2, 0, 1))
-            sample = torch.cuda.FloatTensor(sample / 255.)
-            sample = sample.to(device).unsqueeze(0)
-        return sample
+    def __call__(self, image, image_ref, reverse=False):
+        pass
 
+    def __mul__(self, other):
+        matrix = other.inverse_matrix @ self.matrix
+        return PerspectiveTransform(matrix, self.shape, self.device, self.center)
 
-class ToNumpy(object):
-    """Convert torch tensor to a numpy array loading it from the specified device"""
+    def __truediv__(self, other):
+        matrix = other.matrix @ self.inverse_matrix
+        return PerspectiveTransform(matrix, self.shape, self.device, self.center)
 
-    def __init__(self, normalize=True, permute=True):
-        self.normalize = normalize
-        self.permute = permute
+    def __add__(self, other):
+        return self * other
 
-    def __call__(self, sample, *args):
-        if isinstance(sample, dict):
-            for key in sample.keys():
-                if not isinstance(sample[key], np.ndarray or ImageCustom):
-                    if self.permute and len(sample[key].shape) == 3:
-                        sample[key] = sample[key].squeeze().permute(1, 2, 0)  # [C, H, W]
-                    if not self.normalize:
-                        sample[key] = sample[key].cpu().numpy()
-                    else:
-                        sample[key] = (sample[key].cpu().numpy() * 255).astype("uint8")
-        else:
-            if not isinstance(sample, np.ndarray or ImageCustom):
-                sample = sample.squeeze()
-                if self.permute and len(sample.shape) == 3:
-                    sample = sample.squeeze().permute(1, 2, 0)
-                sample = sample.cpu().numpy()
-            if self.normalize:
-                sample = (sample * 255).astype("uint8")
-        return sample
+    def __sub__(self, other):
+        return self / other
+
+    def update_matrix(self, matrix):
+        self._matrix = Tensor(matrix).to(self.device)  # [3, 3]
+        i_matrix = torch.linalg.inv(self.matrix)  # [3, 3]
+        self._inverse_matrix = Tensor(i_matrix).to(self.device)  # [3, 3]
+
+    def update_shape(self, shape):
+        self._shape = Tensor(shape).to(self.device)
+
+    def update_center(self, center):
+        c = center if center else (int(self.shape[0] / 2), int(self.shape[1] / 2))
+        self._center = Tensor(c).to(self.device)
+
+    def update(self, matrix, shape, center=None):
+        self.update_shape(shape)
+        self.update_matrix(matrix)
+        self.update_center(center)
+        self._init_map_()
+
+    def _init_map_(self):
+        height, width = self.shape[0], self.shape[1]
+        grid_reg = kornia.utils.create_meshgrid(height, width, normalized_coordinates=False,
+                                                device=self.device)  # [1 H W 2]
+        grid_reg[:, :, :, 0] = grid_reg[:, :, :, 0] - self.center[1]
+        grid_reg[:, :, :, 1] = grid_reg[:, :, :, 1] - self.center[0]
+        z = torch.ones_like(grid_reg[:, :, :, 0])
+        grid = torch.stack([grid_reg, z], dim=-1)  # [1 H W 3]
+
+        grid_transformed = (self.matrix @ grid.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)  # [1 H W 3]
+        alpha = grid_transformed[:, :, :, 2]
+        grid_transformed[:, :, :, 0] = 2 * (grid_transformed[:, :, :, 0] / alpha) / width - 1  # [1 H W 3]
+        grid_transformed[:, :, :, 1] = 2 * (grid_transformed[:, :, :, 1] / alpha) / height - 1  # [1 H W 3]
+        self._map = grid_transformed  # [1 H W 3]
+
+        grid_transformed_inv = (self.inverse_matrix @ grid.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)  # [1 H W 3]
+        grid_transformed_inv[:, :, :, 0] = 2 * (
+                grid_transformed_inv[:, :, :, 0] / grid_transformed_inv[:, :, :, 2]) / width - 1  # [1 H W 3]
+        grid_transformed_inv[:, :, :, 1] = 2 * (
+                grid_transformed_inv[:, :, :, 1] / grid_transformed_inv[:, :, :, 2]) / height - 1  # [1 H W 3]
+        self._inverse_map = grid_transformed_inv  # [1 H W 3]
+
+    @property
+    def map(self):
+        return self._map
+
+    # @map.setter
+    # def map(self, value):
+    #     """Return the calling function's name."""
+    #     # Ref: https://stackoverflow.com/a/57712700/
+    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+    #     if name == '_init_map_' or name == '__new__':
+    #         self.map = value
+    #
+    # @map.deleter
+    # def map(self):
+    #     warnings.warn("The attribute can't be deleted")
+
+    @property
+    def inverse_map(self):
+        return self._inverse_map
+
+    #
+    # @inverse_map.setter
+    # def inverse_map(self, value):
+    #     """Return the calling function's name."""
+    #     # Ref: https://stackoverflow.com/a/57712700/
+    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+    #     if name == '_init_map_' or name == '__new__':
+    #         self.inverse_map = value
+
+    @inverse_map.deleter
+    def inverse_map(self):
+        warnings.warn("The attribute can't be deleted")
+
+    @property
+    def matrix(self):
+        return self._matrix
+
+    # @matrix.setter
+    # def matrix(self, value):
+    #     """Return the calling function's name."""
+    #     # Ref: https://stackoverflow.com/a/57712700/
+    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+    #     if name == 'update_matrix' or name == '__new__':
+    #         self.matrix = value
+    #
+    # @matrix.deleter
+    # def matrix(self):
+    #     warnings.warn("The attribute can't be deleted")
+
+    @property
+    def inverse_matrix(self):
+        return self._matrix
+
+    # @inverse_matrix.setter
+    # def inverse_matrix(self, value):
+    #     """Return the calling function's name."""
+    #     # Ref: https://stackoverflow.com/a/57712700/
+    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+    #     if name == 'update_matrix' or name == '__new__':
+    #         self.inverse_matrix = value
+    #
+    # @inverse_matrix.deleter
+    # def inverse_matrix(self):
+    #     warnings.warn("The attribute can't be deleted")
+
+    @property
+    def shape(self):
+        return self._shape
+
+    #
+    # @shape.setter
+    # def shape(self, value):
+    #     """Return the calling function's name."""
+    #     # Ref: https://stackoverflow.com/a/57712700/
+    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+    #     if name == 'update_shape' or name == '__new__':
+    #         self.shape = value
+    #
+    # @shape.deleter
+    # def shape(self):
+    #     warnings.warn("The attribute can't be deleted")
+
+    @property
+    def center(self):
+        return self._center
+
+    # @center.setter
+    # def center(self, value):
+    #     """Return the calling function's name."""
+    #     # Ref: https://stackoverflow.com/a/57712700/
+    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+    #     if name == 'update_center' or name == '__new__':
+    #         self.center = value
+    #
+    # @center.deleter
+    # def center(self):
+    #     warnings.warn("The attribute can't be deleted")
+
 
 class Pad:
     def __init__(self, shape, keep_ratio=False):
@@ -200,12 +300,8 @@ class Normalize(object):
             self.std = [0, 0, 0]
 
     def __call__(self, sample, *args):
-        norm_keys = ['left', 'right', 'other']
-        if self.mean == [0, 0, 0]:
-            self.mean = torch.squeeze(sample['left']).mean(axis=[1, 2])
-        if self.std == [0, 0, 0]:
-            self.std = torch.squeeze(sample['left']).std(axis=[1, 2])
-        for key in norm_keys:
+
+        for key in sample.keys():
             # Images have converted to tensor, with shape [C, H, W]
             for t, m, s in zip(sample[key], self.mean, self.std):
                 t.sub_(m).div_(s)
@@ -220,14 +316,15 @@ class Resize(object):
         self.inference_size = inference_size
 
     def __call__(self, sample, *args):
+        key_ref = list(sample.keys())[0]
         if self.inference_size is None:
             if self.padding_factor > 0:
                 self.inference_size = [
-                    int(np.ceil(sample["left"].size(-2) / self.padding_factor)) * self.padding_factor,
-                    int(np.ceil(sample["left"].size(-1) / self.padding_factor)) * self.padding_factor]
+                    int(np.ceil(sample[key_ref].size(-2) / self.padding_factor)) * self.padding_factor,
+                    int(np.ceil(sample[key_ref].size(-1) / self.padding_factor)) * self.padding_factor]
             else:
                 pass
-        self.ori_size = sample["left"].shape[-2:]
+        self.ori_size = sample[key_ref].shape[-2:]
         if self.inference_size is not None:
             if self.inference_size[0] != self.ori_size[0] or self.inference_size[1] != self.ori_size[1]:
                 for key in sample.keys():
@@ -240,7 +337,7 @@ class Resize(object):
         return sample
 
 
-class Resize_depth(object):
+class ResizeDepth(object):
     """Resize Disparity image, with type tensor"""
 
     def __init__(self, size):
@@ -253,10 +350,11 @@ class Resize_depth(object):
             return F1.interpolate(depth.unsqueeze(1), size=self.size,
                                   mode='bilinear',
                                   align_corners=True).squeeze(1)  # [1, H, W]
+        else:
+            return depth
 
 
-
-class Resize_disp(object):
+class ResizeDisp(object):
     """Resize Disparity image, with type tensor"""
 
     def __init__(self, size):
@@ -268,7 +366,7 @@ class Resize_disp(object):
             # resize back
             disp = F1.interpolate(disp.unsqueeze(1), size=self.size,
                                   mode='bilinear',
-                                  align_corners=True).squeeze(1)  # [1, H, W]
+                                  align_corners=True).squeeze(1)  # [C, H, W]
             return disp * self.size[1] / float(w)
 
 
@@ -286,6 +384,51 @@ class DispSide(object):
             new_left, new_right = hflip(sample["right"]), hflip(sample["left"])
             sample["left"] = torch.cat((sample["left"], new_left), dim=0)
             sample["right"] = torch.cat((sample["right"], new_right), dim=0)
+        return sample
+
+
+
+class ToTensor(object):
+    """Convert numpy array to torch tensor and load it on the specified device"""
+
+    def __init__(self, no_normalize=False):
+        self.no_normalize = no_normalize
+
+    def __call__(self, sample, device, *args):
+        if isinstance(sample, dict):
+            for key in sample.keys():
+                sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
+                if self.no_normalize:
+                    sample[key] = torch.from_numpy(sample[key])
+                else:
+                    sample[key] = torch.from_numpy(sample[key]) / 255.
+                sample[key] = sample[key].to(device).unsqueeze(0)
+        else:
+            sample = np.transpose(sample, (2, 0, 1))
+            sample = torch.from_numpy(sample) / 255.
+            sample = sample.to(device).unsqueeze(0)
+        return sample
+
+
+class ToFloatTensor(object):
+    """Convert numpy array to torch tensor and load it on the specified device"""
+
+    def __init__(self, no_normalize=False):
+        self.no_normalize = no_normalize
+
+    def __call__(self, sample, device, *args):
+        if isinstance(sample, dict):
+            for key in sample.keys():
+                sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
+                if self.no_normalize:
+                    sample[key] = torch.cuda.FloatTensor(sample[key])
+                else:
+                    sample[key] = torch.cuda.FloatTensor(sample[key] / 255.)
+                sample[key] = sample[key].to(device).unsqueeze(0)
+        else:
+            sample = np.transpose(sample, (2, 0, 1))
+            sample = torch.cuda.FloatTensor(sample / 255.)
+            sample = sample.to(device).unsqueeze(0)
         return sample
 
 #
