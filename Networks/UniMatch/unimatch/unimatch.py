@@ -95,8 +95,7 @@ class UniMatch(nn.Module):
 
     def downsample_flow(self, flow, downsample_factor=8):
         return F.interpolate(flow, scale_factor=1 / downsample_factor,
-                                      mode='bilinear', align_corners=True) * 1 / downsample_factor
-
+                             mode='bilinear', align_corners=True) * 1 / downsample_factor
 
     def forward(self, img0, img1,
                 attn_type=None,
@@ -186,8 +185,7 @@ class UniMatch(nn.Module):
 
             feature0, feature1 = self.transformer(feature0, feature1,
                                                   attn_type=attn_type,
-                                                  attn_num_splits=attn_splits,
-                                                  )
+                                                  attn_num_splits=attn_splits)
 
             # correlation and softmax
             if task == 'depth':
@@ -202,8 +200,7 @@ class UniMatch(nn.Module):
                                                       pose,
                                                       depth_candidates=depth_candidates,
                                                       depth_from_argmax=depth_from_argmax,
-                                                      pred_bidir_depth=pred_bidir_depth,
-                                                      )[0]
+                                                      pred_bidir_depth=pred_bidir_depth)[0]
 
             else:
                 if corr_radius == -1:  # global matching
@@ -229,7 +226,9 @@ class UniMatch(nn.Module):
 
             # upsample to the original resolution for supervison at training time only
             if self.training:
-                flow_bilinear = self.upsample_flow(flow, None, bilinear=True, upsample_factor=upsample_factor,
+                flow_bilinear = self.upsample_flow(flow, None,
+                                                   bilinear=True,
+                                                   upsample_factor=upsample_factor,
                                                    is_depth=task == 'depth')
                 flow_preds.append(flow_bilinear)
 
@@ -239,12 +238,12 @@ class UniMatch(nn.Module):
 
             flow = self.feature_flow_attn(feature0, flow.detach(),
                                           local_window_attn=prop_radius > 0,
-                                          local_window_radius=prop_radius,
-                                          )
+                                          local_window_radius=prop_radius)
 
             # bilinear exclude the last one
             if self.training and scale_idx < self.num_scales - 1:
-                flow_up = self.upsample_flow(flow, feature0, bilinear=True,
+                flow_up = self.upsample_flow(flow, feature0,
+                                             bilinear=True,
                                              upsample_factor=upsample_factor,
                                              is_depth=task == 'depth')
                 flow_preds.append(flow_up)
@@ -307,16 +306,14 @@ class UniMatch(nn.Module):
                                 feature0_ori,
                                 feature1_ori,
                                 flow=flow_from_depth,
-                                local_radius=4,
-                            )  # [B, (2R+1)^2, H, W]
+                                local_radius=4)  # [B, (2R+1)^2, H, W]
 
                         else:
                             correlation = local_correlation_with_flow(
                                 feature0_ori,
                                 feature1_ori,
                                 flow=flow,
-                                local_radius=4,
-                            )  # [B, (2R+1)^2, H, W]
+                                local_radius=4)  # [B, (2R+1)^2, H, W]
 
                         proj = self.refine_proj(feature0)
 
@@ -398,7 +395,7 @@ class UniMatch(nn.Module):
             feature0_ori, feature1_ori = feature0, feature1
 
             upsample_factor = self.upsample_factor * (2 ** (self.num_scales - 1 - scale_idx))
-            downsample_factor = self.upsample_factor / (2 ** (scale_idx-1))
+            downsample_factor = self.upsample_factor / (2 ** (scale_idx - 1))
             # if scale_idx > 0:
             #     flow = F.interpolate(flow, scale_factor=2, mode='bilinear', align_corners=True) * 2
 
@@ -410,7 +407,6 @@ class UniMatch(nn.Module):
             # NOTE: reverse disp, disparity is positive
             # breakpoint()
             displace = torch.cat((-flow_, zeros), dim=1)  # [B, 2, H, W]
-
 
             feature1 = flow_warp(feature1, displace)  # [B, C, H, W]
 
@@ -427,15 +423,14 @@ class UniMatch(nn.Module):
                                                   attn_type=attn_type,
                                                   attn_num_splits=attn_splits)
 
-
             # flow propagation with self-attn
             if pred_bidir_flow and scale_idx == 0:
                 feature0 = torch.cat((feature0, feature1), dim=0)  # [2*B, C, H, W] for propagation
 
             flow_ = self.feature_flow_attn(feature0, flow_.detach(),
-                                          local_window_attn=prop_radius > 0,
-                                          local_window_radius=prop_radius,
-                                          )
+                                           local_window_attn=prop_radius > 0,
+                                           local_window_radius=prop_radius,
+                                           )
 
             # bilinear exclude the last one
             if self.training and scale_idx < self.num_scales - 1:

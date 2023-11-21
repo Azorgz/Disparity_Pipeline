@@ -1,4 +1,4 @@
-inference_size: [640, 960]
+#inference_size: [640, 960]
 path_checkpoint: Networks/UniMatch/checkpoints_stereo/gmstereo-scale2-regrefine3-resumeflowthings-mixdata-train320x640-ft640x960-e4e291fd.pth
 padding_factor: 32
 upsample_factor: 4

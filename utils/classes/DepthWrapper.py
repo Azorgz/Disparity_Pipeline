@@ -39,6 +39,8 @@ class DepthWrapper:
             the warped tensor in the source frame with shape :math:`(B,3,H,W)`.
         """
         b, c, h, w = depth_dst.shape
+        kernel = torch.ones(3, 3).to(self.device)
+        depth_dst = dilation(depth_dst, kernel)
         points_3d_dst: Tensor = depth_to_3d(depth_dst, matrix_dst, False)  # Bx3xHxW
         # points_3d_dst[:, :1] *= -1
         # points_3d_dst[:, 2] *= -1
@@ -76,7 +78,7 @@ class DepthWrapper:
             res['occlusion'] = self.find_occlusion(cloud, [height, width])
             res['occlusion'].im_name = image_src.im_name + '_occlusion'
             # res[:, :, mask_occlusion[0, 0, :, :]] = 0
-            mask_valid = (~res['occlusion']).flatten()
+            # mask_valid = (~res['occlusion']).flatten()
             # grid[0, mask_occlusion[0, 0, :, :], :] -= 2
         if return_depth_reg:
             depth_reg = self.compute_depth_src(cloud, [height, width], mask_valid,
@@ -116,7 +118,7 @@ class DepthWrapper:
         c[:, 1] = c[:, 1] * cloud.shape[2]/size_image[1]
         # create a unique index for each point according where they land in the src frame and their depth
         M = torch.round(c[:, 2].max() + 1)
-        max_u = torch.round(c[:, 0].max())
+        max_u = torch.round(c[:, 0].max() + 1)
         c_ = torch.round(c[:, 1]) * M * max_u + torch.round(c[:, 0]) * M + torch.round(c[:, 2])
         # Remove the point landing outside the image
         mask = ((c[:, 0] < 0) + (c[:, 0] >= cloud.shape[2]) + (c[:, 1] < 0) + (c[:, 1] >= cloud.shape[1])) > 0
@@ -127,19 +129,24 @@ class DepthWrapper:
         c_[mask] = 0
         # Define a new ordered vector but only using the position u,v not the depth
         c_ = torch.round(c_[indexes, 1]) * max_u + torch.round(c_[indexes, 0])
+        c_depth = torch.round(c[indexes, 2])
         # Trick to find the point landing in the same pixel, only the closer is removed
         c_[1:] -= c_[:-1].clone()
-        idx = torch.nonzero(c_ == 0)
+        c_depth[1:] = 1 - c_depth[:-1].clone()/c_depth[1:].clone()
+
+        idx = torch.nonzero((c_ == 0) * (c_depth > 0.03) + mask[indexes])
         # Use the indexes found to create a mask of the occluded point
         idx = indexes[idx]
         result = torch.zeros([c.shape[0], 1]).to(self.device)
         result[idx] = 1
         result = result.reshape([1, 1, cloud.shape[1], cloud.shape[2]])
+
         # postprocessing of the mask to remove the noise due to the round operation
         # blur = MedianBlur(3)
         # result = blur(result)
         # kernel_small = torch.ones(3, 3).to(self.device)
         # result = opening(result, kernel_small)
+        # result = dilation(result, kernel_small)
         return ImageTensor(result).to(torch.bool)
 
 

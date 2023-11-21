@@ -25,55 +25,99 @@
 #  valid:
 #  save:
 
-Depth-Depth:
-  depth:
-    cameras: [RGB, RGB2]
-    option: []
-  wrap:
-    cameras: [RGB2, RGB]
-    method: depth
-    source: pred_depth
-    option: [return_depth_reg, return_occlusion, []]
-  valid: [RGB2, RGB]
-  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]
+#Depth-Depth:
+#  depth:
+#    cameras: [RGB, RGB2]
+#    option: []
+#  wrap:
+#    cameras: [RGB2, RGB]
+#    method: disparity
+#    source: pred_depth
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [RGB2, RGB]
+##  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]
+#
+#Depth-Disparity:
+#  depth:
+#    cameras: [RGB, RGB2]
+#    option: []
+#  wrap:
+#    cameras: [RGB2, RGB]
+#    method: disparity
+#    source: pred_depth
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [RGB2, RGB]
+##  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]
+#
+#Disparity-Disparity:
+#  disparity:
+#    cameras: [RGB, RGB2]
+#    option: []
+#  wrap:
+#    cameras: [RGB2, RGB]
+#    method: disparity
+#    source: pred_disp
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [RGB2, RGB]
+##  save: [pred_disp, image_reg, disp_reg, inputs, occlusion]
+#
+#Disparity-Depth:
+#  disparity:
+#    cameras: [RGB, RGB2]
+#    option: []
+#  wrap:
+#    cameras: [RGB2, RGB]
+#    method: depth
+#    source: pred_disp
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [RGB2, RGB]
+##  save: [pred_disp, image_reg, disp_reg, inputs, occlusion]
 
-Depth-Disparity:
-  depth:
-    cameras: [RGB, RGB2]
-    option: []
-  wrap:
-    cameras: [RGB2, RGB]
-    method: disparity
-    source: pred_depth
-    option: [return_depth_reg, return_occlusion, []]
-  valid: [RGB2, RGB]
-  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]
 
-Disparity-Disparity:
+Disparity-HD_5e-2_5e-4:
   disparity:
     cameras: [RGB, RGB2]
-    option: []
+    option: [inference_size: [640, 960]]
   wrap:
     cameras: [RGB2, RGB]
     method: disparity
     source: pred_disp
     option: [return_depth_reg, return_occlusion, []]
   valid: [RGB2, RGB]
-  save: [pred_disp, image_reg, disp_reg, inputs, occlusion]
+  save: [pred_disp, image_reg, disp_reg, occlusion]
 
-Disparity-Depth:
-  disparity:
+#Disparity-LD:
+#  disparity:
+#    cameras: [RGB, RGB2]
+#    option: [inference_size: [320, 480]]
+#  wrap:
+#    cameras: [RGB2, RGB]
+#    method: disparity
+#    source: pred_disp
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [RGB2, RGB]
+##  save: [pred_disp, image_reg, disp_reg, occlusion]
+#
+Depth-HD_5e-2_5e-4:
+  depth:
     cameras: [RGB, RGB2]
-    option: []
+    option: [inference_size: [960, 1280]]
   wrap:
     cameras: [RGB2, RGB]
     method: depth
-    source: pred_disp
+    source: pred_depth
     option: [return_depth_reg, return_occlusion, []]
   valid: [RGB2, RGB]
-  save: [pred_disp, image_reg, disp_reg, inputs, occlusion]
-
-
-
-
-
+  save: [pred_depth, image_reg, depth_reg, occlusion]
+#
+#Depth-LD:
+#  depth:
+#    cameras: [RGB, RGB2]
+#    option: [inference_size: [480, 640]]
+#  wrap:
+#    cameras: [RGB2, RGB]
+#    method: depth
+#    source: pred_depth
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [RGB2, RGB]
+##  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]

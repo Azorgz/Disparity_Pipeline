@@ -22,24 +22,50 @@ class Preprocessing:
         self.task = task
         self.pad = None
         self.resize = None
-        self.postprocessing = None
         self.device = device
+        for t in self.transforms.transforms:
+            if isinstance(t, Resize):
+                self.resize = t
+            if isinstance(t, Pad):
+                self.pad = t
+        self.postprocessing = None
+
+    @property
+    def inference_size(self):
+        if self.resize is not None:
+            return self.resize.inference_size
+        elif self.pad is not None:
+            return self.pad.shape
+        else:
+            return None
+
+    @inference_size.setter
+    def inference_size(self, size):
+        if self.resize is not None and self.resize.inference_size != size:
+            self.resize.inference_size = size
+        elif self.pad is not None and self.pad.shape != size:
+            self.pad.shape = size
+
+    @property
+    def ori_size(self):
+        if self.resize is not None:
+            return self.resize.ori_size
+        elif self.pad is not None:
+            return self.pad.ori_size
+        else:
+            return None
 
     def __str__(self):
         return ""
 
     def __call__(self, sample, reverse=False, *args, **kwargs):
         if not reverse:
-            self.inference_size = None
-            self.ori_size = None
+            for key, im in sample.items():
+                if im.im_type == 'IR':
+                    sample[key] = im.RGB('gray')
             if self.transforms is not None:
                 sample = self.transforms(sample)
             if self.postprocessing is None:
-                for t in self.transforms.transforms:
-                    if isinstance(t, Resize):
-                        self.resize = t
-                    if isinstance(t, Pad):
-                        self.pad = t
                 self.postprocessing = PostProcessing(self.config,
                                                      self.device,
                                                      task=self.task,
@@ -47,5 +73,8 @@ class Preprocessing:
                                                      resize=self.resize,
                                                      post_process=None)
         else:
+            for key, im in sample.items():
+                if im.im_type == 'IR':
+                    sample[key] = im.GRAYSCALE()
             sample = self.postprocessing(sample)
         return sample

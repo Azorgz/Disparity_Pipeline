@@ -314,6 +314,7 @@ class Resize(object):
     def __init__(self, inference_size, padding_factor):
         self.padding_factor = padding_factor
         self.inference_size = inference_size
+        self.ori_size = None
 
     def __call__(self, sample, *args):
         key_ref = list(sample.keys())[0]
@@ -341,15 +342,20 @@ class ResizeDepth(object):
     """Resize Disparity image, with type tensor"""
 
     def __init__(self, size):
-        self.size = size
+        if size:
+            self.size = size
+        else:
+            self.size = 0
 
     def __call__(self, depth, device, *args):
         h, w = depth.shape[-2:]
-        if h != self.size[0] or w != self.size[1]:
+        if self.size == 0:
+            pass
+        elif h != self.size[0] or w != self.size[1]:
             # resize back
-            return F1.interpolate(depth.unsqueeze(1), size=self.size,
+            return F1.interpolate(depth, size=self.size,
                                   mode='bilinear',
-                                  align_corners=True).squeeze(1)  # [1, H, W]
+                                  align_corners=True)  # [1, H, W]
         else:
             return depth
 
@@ -358,16 +364,23 @@ class ResizeDisp(object):
     """Resize Disparity image, with type tensor"""
 
     def __init__(self, size):
-        self.size = size
+        if size:
+            self.size = size
+        else:
+            self.size = 0
 
     def __call__(self, disp, device, *args):
         h, w = disp.shape[-2:]
-        if h != self.size[0] or w != self.size[1]:
+        if self.size == 0:
+            pass
+        elif h != self.size[0] or w != self.size[1]:
             # resize back
-            disp = F1.interpolate(disp.unsqueeze(1), size=self.size,
+            disp = F1.interpolate(disp, size=self.size,
                                   mode='bilinear',
-                                  align_corners=True).squeeze(1)  # [C, H, W]
+                                  align_corners=True)  # [1, H, W]
             return disp * self.size[1] / float(w)
+        else:
+            return disp
 
 
 class DispSide(object):
@@ -385,7 +398,6 @@ class DispSide(object):
             sample["left"] = torch.cat((sample["left"], new_left), dim=0)
             sample["right"] = torch.cat((sample["right"], new_right), dim=0)
         return sample
-
 
 
 class ToTensor(object):

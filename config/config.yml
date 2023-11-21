@@ -4,26 +4,26 @@ device: auto
 #                 "multiple" to use all available gpu,
 #                 "cpu" to use only cpu, automatically set if no gpu is found
 
-output_path: /results/
+output_path: /results
 print_info: True
 timeit: True
 reset_images_name: True # Change the images original name for an incremental name
 
 
 # General option if there is no Process specified
-name_experiment: try
-save_inputs: True # Save the input images
+name_experiment: Camera_position
+save_inputs: True # Save the input images paths
 save_disp: True # Save all the disparity images computed
 save_reg_images: True # Save the final Registered image
 
 
 # Cameras Setup #########
 setup: # Paths to the config file of the pre-calibrated camera's setup
-  path: Setup_Camera.yaml
+  path: Setup_Camera/error_5e-2_5e-4.yaml
 
 # Dataset #########
 dataset:
-  number_of_sample: 20
+  number_of_sample: 100
   shuffle: True # True if the data need to be randomly picked
   save_dataset_conf: True # If a conf is loaded it won't be erased even if this option is true
   save_file_list_in_conf: False  # If the conf is saved the list of file is saved only if this option is true
@@ -52,7 +52,7 @@ depth_network:
   use_bidir_depth: True  # Allow the computation and the use of the bidirectional disparity if other is located between left and right
   # Data Preparation ########
   preprocessing: # The preprocessing is automatically set for a no-custom network. If a new network is added, you have to add the associated transformation in the pre_processing class
-    inference_size: [640, 960] # If a resize is needed
+    inference_size: [960, 1280] # If a resize is needed
     match_shape: False # If the entrance images need to have matching shape / number of channels
     normalize: True # If a boolean is given, the mean and std will be automatically set. Other possibility : (mean, std)
 
@@ -68,8 +68,8 @@ validation:
   indices:
     # value based errors:
     rmse: True      # Root Mean Square Error
-    nmi: False       # Normalized Mutual Information // available only on CPU with the "opencv" and "algo" reconstruction
-    psnr: False      # Peak Signal Noise Ratio
+    nmi: True       # Normalized Mutual Information // available only on CPU with the "opencv" and "algo" reconstruction
+    psnr: True      # Peak Signal Noise Ratio
     # Structure based errors:
     ssim: True      # Structural Similarity
     ms_ssim: True   # SSIM multi-scale // available only on GPU following the "torch" reconstruction

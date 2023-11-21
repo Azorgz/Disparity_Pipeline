@@ -1,12 +1,36 @@
 import os
 import random
+from collections import OrderedDict
 from glob import glob
 import numpy as np
 import yaml
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader, TensorDataset
 from module.SetupCameras import CameraSetup
 from utils.classes.Image import ImageTensor
 from utils.misc import timeit, name_generator
+from torch import device
+
+
+# class StereoDataLoader(DataLoader):
+#     """
+#     This class implement a DataLoader instance from the StereoDataset class implemented from the camera setup
+#     """
+#     def __init__(self, setup: CameraSetup, config, batch_size=1):
+#         self.config = config
+#         stereoDataSet = StereoDataSet(setup, config)
+#         super(StereoDataLoader, self).__init__(stereoDataSet,
+#                                                batch_size=batch_size,
+#                                                shuffle=stereoDataSet.shuffle)
+#
+#     @property
+#     def timeit(self):
+#         if self.config["timeit"]:
+#             return self.dataset.timeit
+#
+#     @timeit.setter
+#     def timeit(self, value):
+#         if self.config["timeit"]:
+#             self.dataset.timeit = value
 
 
 class StereoDataLoader(Dataset):
@@ -21,6 +45,7 @@ class StereoDataLoader(Dataset):
             self.timeit = []
         self.path = setup.cameras[setup.camera_ref].path
         self.camera_setup = setup
+
         # Initialize the setup of the stereo pair and the other channel even if it wasn't defined in the Config file
         # Create the lists of files for the left, right and other camera
         # dataset_conf = config["dataset"]["dataset_config"]
@@ -35,29 +60,28 @@ class StereoDataLoader(Dataset):
                                      glob(p + '/*.jpeg'))
 
         if config["dataset"]["number_of_sample"] <= 0:
-            nb = len(self.files[setup.camera_ref])
+            self.nb = len(self.files[setup.camera_ref])
         else:
-            nb = int(config["dataset"]["number_of_sample"])
+            self.nb = int(config["dataset"]["number_of_sample"])
         # If the data needs to be shuffled
-
+        self.shuffle = config["dataset"]["shuffle"]
         if config["dataset"]["shuffle"]:
             idx = np.arange(0, len(self.files[setup.camera_ref]))
             random.shuffle(idx)
-            idx = idx[:nb]
-            # idx = np.arange(1040, 1400, 20)
+            idx = idx[:self.nb]
             for key, f in self.files.items():
                 self.files[key] = [self.files[key][i] for i in idx]
         else:
             for key, f in self.files.items():
-                self.files[key] = self.files[key][:nb]
+                self.files[key] = self.files[key][:self.nb]
 
-        self.samples = [{key: p[i] for key, p in self.files.items()} for i in range(nb)]
+        self.samples = []
+        self.camera_used = []
         self.reset_images_name = config['reset_images_name']
 
     @timeit
     def __getitem__(self, index):
-        sample_path = self.samples[index]
-        sample = {key: ImageTensor(p, device=self.device) for key, p in sample_path.items()}
+        sample = {key: ImageTensor(p, device=self.device) for key, p in self.samples[index].items()}
         if self.reset_images_name:
             for key in sample.keys():
                 sample[key].im_name = f'{key}_{name_generator(index, max_number=len(self))}'
@@ -69,6 +93,15 @@ class StereoDataLoader(Dataset):
 
     def __len__(self):
         return len(self.samples)
+
+    @property
+    def camera_used(self):
+        return self._camera_used
+
+    @camera_used.setter
+    def camera_used(self, value):
+        self._camera_used = value
+        self.samples = [{key: self.files[key][i] for key in self.camera_used} for i in range(self.nb)]
 
     def __rmul__(self, v):
         self.samples = v * self.samples
@@ -87,16 +120,9 @@ class StereoDataLoader(Dataset):
         self.device = config["device"]["device"]
         self.save_inputs = config['save_inputs']
 
-    def save_conf(self, load_and_save: bool = False, files: bool = False):
-        name = os.path.join(self.path, "dataset.yaml")
-        if load_and_save and os.path.exists(name):
-            with open(name, "r") as file:
-                dataset_conf = yaml.safe_load(file)
-        else:
-            dataset_conf = {}
-        dataset_conf['0.Number of sample'] = len(self)
-        dataset_conf['1.Paths'] = {key: p for key, p in self.cameras_paths.items()}
-        if files:
-            dataset_conf['2.Files'] = {key: p for key, p in self.files.items()}
+    def save_conf(self, output_path):
+        name = os.path.join(output_path, "dataset.yaml")
+        dataset_conf = OrderedDict({'Number of sample': len(self),
+                                    'Files': {key: p for key, p in self.files.items()}})
         with open(name, "w") as file:
             yaml.dump(dataset_conf, file)

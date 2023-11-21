@@ -1,29 +1,26 @@
 import os
-import torch
-
-import cv2 as cv
-import numpy as np
-import oyaml as yaml
-from tqdm import tqdm
 import warnings
-
-from module.ImageSaver import ImageSaver
-# module
-from module.SuperNetwork import SuperNetwork
-from module.DataLoader import StereoDataLoader
-from module.ImageWrapper import ImageWrapper
-from module.SetupCameras import CameraSetup
-# from module.Validation import Validation
-from module.Process import Process
+import oyaml as yaml
+import torch
+from tqdm import tqdm
 
 # Config
 from config.Config import ConfigPipe
+from module.DataLoader import StereoDataLoader
+from module.ImageSaver import ImageSaver
+from module.ImageWrapper import ImageWrapper
+# from module.Validation import Validation
+from module.Process import Process
+from module.SetupCameras import CameraSetup
+# module
+from module.SuperNetwork import SuperNetwork
 from module.Validation import Validation
-
-# from utils.disparity_tools import find_occluded_pixel
-
+from utils.classes.CSV_Generator import CSV_Generator
 # Utils
 from utils.misc import time2str  # , form_cloud_data
+
+
+# from utils.disparity_tools import find_occluded_pixel
 
 
 # Networks
@@ -77,11 +74,15 @@ class Pipe:
                                         desc=f"Nombre d'itérations for {name_experiment}: "):
                     experiment(sample)
                 if self.timeit:
-                    self.save_timers(experiment.path)
+                    self.save_timers(experiment)
                     self.reset_timers()
+                if self.save_inputs:
+                    self.dataloader.save_conf(experiment.path)
                 self.validation.statistic()
                 self.validation.save(experiment.path)
                 self.validation.reset()
+            gen = CSV_Generator(os.getcwd() + self.path_output)
+            gen.save(os.getcwd() + self.path_output + "/Results.xlsx")
 
         else:
             for idx, sample in tqdm(enumerate(self.dataloader),
@@ -132,23 +133,24 @@ class Pipe:
             # if self.timeit:
             #     self.save_timers()
 
-    def save_timers(self, path=None):
+    def save_timers(self, experiment=None):
+        path = experiment.path
         time_dict = {"1. Sample Number": len(self.dataloader),
-                     "2. Total Execution time": "0",
-                     "3. Time per module": {}}
+                     "2. Total Execution time": {experiment.name: "0"},
+                     "3. Time per module": {experiment.name: {}}}
         tot = 0
         for m in self.modules.values():
             name = m.__class__.__name__
             time = m.timeit
             if time:
-                time_dict["3. Time per module"][name] = {
+                time_dict["3. Time per module"][experiment.name][name] = {
                     "Number of calls": len(time),
                     "Average time": time2str(sum(time) / (len(time) + 0.00001)),
                     "Min time": time2str(min(time)),
                     "Max time": time2str(max(time)),
                     "Total time": time2str(sum(time))}
                 tot += sum(time)
-        time_dict["2. Total Execution time"] = time2str(tot)
+        time_dict["2. Total Execution time"][experiment.name] = time2str(tot)
         if path is None:
             path = self.path_output
         name = os.path.join(path, "Execution_time.yaml")
@@ -200,7 +202,7 @@ class Pipe:
 
 if __name__ == '__main__':
     warnings.filterwarnings('ignore')
-    Process = Process('/home/godeta/PycharmProjects/Disparity_Pipeline/Process.yaml')
+    Process = Process(os.getcwd() + '/Process.yaml')
     config = ConfigPipe()
     pipe = Pipe(config)
     pipe.run(Process)

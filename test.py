@@ -43,11 +43,13 @@ from utils.classes.Visualizer import Visualizer
 #
 # plt.legend()
 # plt.show()
+im = ImageTensor("/home/godeta/PycharmProjects/Disparity_Pipeline/results/Res/Disparity-HD/image_reg/RGB2_to_RGB/RGB2_000.png",
+                 device=torch.cuda.device(0))
+i = im.RGB('gray')
+i.show()
 
-
-path = ["/home/godeta/PycharmProjects/Disparity_Pipeline/results/Test",
-        "/home/godeta/PycharmProjects/Disparity_Pipeline/results/Test2"]
-Visualizer(path).run()
+# path = "/home/godeta/PycharmProjects/Disparity_Pipeline/results/Res/Disparity-HD"
+# Visualizer(path).run()
 
 # R2 = CameraSetup(from_file="/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera.yaml")
 #

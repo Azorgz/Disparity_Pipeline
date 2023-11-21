@@ -1,4 +1,5 @@
 import time
+from collections.abc import Iterable
 
 import cv2 as cv
 import numpy as np
@@ -14,8 +15,8 @@ def extract_roi_from_map(mask_left: Tensor, mask_right: Tensor):
     roi = []
     pts = []
 
-    m_roi = [ImageTensor((mask_right+mask_left > 0) * torch.ones_like(mask_right)).pad([1, 1, 1, 1]),
-             ImageTensor((mask_right*mask_left > 0) * torch.ones_like(mask_right)).pad([1, 1, 1, 1])]
+    m_roi = [ImageTensor((mask_right + mask_left > 0) * torch.ones_like(mask_right)).pad([1, 1, 1, 1]),
+             ImageTensor((mask_right * mask_left > 0) * torch.ones_like(mask_right)).pad([1, 1, 1, 1])]
     m_transfo = [ImageTensor(mask_left).pad([1, 1, 1, 1]), ImageTensor(mask_right).pad([1, 1, 1, 1])]
 
     for m_ in m_roi:
@@ -55,12 +56,80 @@ def extract_roi_from_map(mask_left: Tensor, mask_right: Tensor):
     return roi[1], roi[0], FloatTensor(pts[0]), FloatTensor(pts[1])
 
 
-def normalisation_tensor(image):
-    m, M = image.min(), image.max()
-    if m != M:
-        return (image - m) / (M - m)
+def random_noise(mean, std, *args):
+    if args is None:
+        return
     else:
-        return image
+        noise = (np.random.random([len(args)]) - 0.5) * 2
+        noise -= noise.mean() + mean
+        noise = noise / (noise**2).sum() * std
+    if len(args) == 1:
+        args = float(args[0])
+        noise = float(noise[0])
+    return noise+args
+
+
+def merge_dict(dict1: dict, dict2: dict, *args):
+    if not dict1.keys() == dict2.keys():
+        res = dict1 | dict2
+        if args:
+            res = merge_dict(res, *args)
+    else:
+        res = dict1.copy()
+        for k in res.keys():
+            if isinstance(res[k], dict) and isinstance(dict2[k], dict):
+                res[k] = merge_dict(res[k], dict2[k])
+            elif isinstance(res[k], list) and isinstance(dict2[k], list):
+                if isinstance(res[k][0], list):
+                    res[k] = [*res[k], dict2[k]]
+                else:
+                    res[k] = [res[k], dict2[k]]
+                # for idx, (r1, r2) in enumerate(zip(res[k], dict2[k])):
+                #     if isinstance(r1, dict) and isinstance(r2, dict):
+                #         res[k][idx] = merge_dict(r1, r2)
+                #     elif isinstance(r1, list) and isinstance(r2, float):
+                #         res[k][idx] = [*r1, r2]
+                #     elif isinstance(r1, float) and isinstance(r2, list):
+                #         res[k][idx] = [r1, *r2]
+                #     else:
+                #         res[k][idx] = [r1, r2]
+            elif isinstance(res[k], list) and (isinstance(dict2[k], float) or isinstance(dict2[k], int)):
+                res[k] = [*res[k], dict2[k]]
+            elif (isinstance(res[k], float)  or isinstance(dict2[k], int)) and isinstance(dict2[k], list):
+                res[k] = [res[k], *dict2[k]]
+            else:
+                res[k] = [res[k], dict2[k]]
+        if args:
+            res = merge_dict(res, *args)
+    return res
+
+
+def flatten_dict(x):
+    result = []
+    if isinstance(x, dict):
+        x = x.values()
+    for el in x:
+        if isinstance(el, dict) and not isinstance(el, str):
+            result.extend(flatten_dict(el))
+        else:
+            result.append(el)
+    return result
+
+
+def map_dict_level(d: dict, level=0, map_of_dict=[], map_of_keys=[]):
+    if len(map_of_dict) <= level:
+        map_of_dict.append([len(d)])
+        map_of_keys.append(list(d.keys()))
+    else:
+        map_of_dict[level].append(len(d))
+    for idx, res in d.items():
+        if isinstance(res, dict):
+            map_of_dict, map_of_keys = map_dict_level(res, level + 1, map_of_dict, map_of_keys)
+        else:
+            return map_of_dict, map_of_keys
+    if level == 0:
+        map_of_dict.pop(0)
+    return map_of_dict, map_of_keys
 
 
 def drawlines(img, lines, pts):
@@ -75,12 +144,14 @@ def drawlines(img, lines, pts):
         img = cv.circle(img, (int(pt[0]), int(pt[1])), 5, color, -1)
     return img
 
-def create_meshgrid3d(depth: int, height: int, width: int, device: torch.device = None, type: torch.dtype = None)\
+
+def create_meshgrid3d(depth: int, height: int, width: int, device: torch.device = None, type: torch.dtype = None) \
         -> ImageTensor:
     device = get_cuda_device_if_available() if device is None else device
     grid_2d = create_meshgrid(height, width, device=device).to(type).unsqueeze(1).repeat(1, depth, 1, 1, 1)  # 1xDxHxWx2
-    vec = torch.arange(-1, 1+1/depth, 1/depth, device=device).to(type).unsqueeze(0)  # 1xD
-    grid_z = (ImageTensor(torch.ones([height, width])).squeeze().unsqueeze(-1) @ vec).permute(2, 0, 1).unsqueeze(0).unsqueeze(-1)  # 1xDxHxWx1
+    vec = torch.arange(-1, 1 + 1 / depth, 1 / depth, device=device).to(type).unsqueeze(0)  # 1xD
+    grid_z = (ImageTensor(torch.ones([height, width])).squeeze().unsqueeze(-1) @ vec).permute(2, 0, 1).unsqueeze(
+        0).unsqueeze(-1)  # 1xDxHxWx1
     grid_3d = torch.cat([grid_2d, grid_z], dim=-1)
 
     return grid_3d

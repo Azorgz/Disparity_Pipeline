@@ -124,6 +124,11 @@ class PointCloudTransformer(BaseModule):
             flat_image = torch.flatten(image, start_dim=0, end_dim=1).cpu().numpy()  # HWx3
             pcd.points = o3d.utility.Vector3dVector(flat_pointCloud)
             pcd.colors = o3d.utility.Vector3dVector(flat_image)
+            o3d.visualization.draw_geometries(pcd,
+                                              mesh_show_wireframe=True,
+                                              window_name="_pointCloud_",
+                                              point_show_normal=True,
+                                              mesh_show_back_face=True)
             pc.append(pcd)
         return pc
 

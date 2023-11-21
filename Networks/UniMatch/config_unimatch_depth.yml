@@ -1,4 +1,4 @@
-inference_size: [960, 1280]
+#inference_size: [960, 1280]
 path_checkpoint: Networks/UniMatch/pretrained/gmdepth-scale1-demon-bd64786e.pth
 padding_factor: 32
 upsample_factor: 8

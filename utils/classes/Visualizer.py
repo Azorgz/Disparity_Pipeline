@@ -9,7 +9,6 @@ import yaml
 from kornia.utils import get_cuda_device_if_available
 
 from utils.classes import ImageTensor
-# from utils.classes import ImageCustom
 from utils.gradient_tools import grad_tensor, grad
 from utils.transforms import ToTensor
 
@@ -17,6 +16,7 @@ from utils.transforms import ToTensor
 class Visualizer:
     show_validation = False
     show_grad_im = False
+    show_occlusion = False
     show_disp_overlay = False
     show_idx = True
     font = cv.FONT_HERSHEY_TRIPLEX
@@ -30,7 +30,7 @@ class Visualizer:
     tensor = False
     window = 0
 
-    def __init__(self, path: Union[str, Path, list] = None):
+    def __init__(self, path: Union[str, Path, list] = None, search_exp=False):
         """
         :param path: Path to the result folder
         :return: None
@@ -38,6 +38,7 @@ class Visualizer:
                 |reg_images
                 |disp_target
                 |disp_ref
+                |occlusion
                 |Validation.yaml
         To navigate use the arrows or +/- or specify an index using the num pad and validate with Enter.
                 |     |ref
@@ -46,9 +47,12 @@ class Visualizer:
         To show/hide the overlay of disparity press d
         To show/hide the validation indexes (only available with the validation done) press v
         """
-        if path is None:
-            p = "/home/godeta/PycharmProjects/Disparity_Pipeline/results"
-            path = [p + f'/{d}' for d in os.listdir(p)]
+        if path is None or search_exp:
+            if path is None:
+                p = "/home/godeta/PycharmProjects/Disparity_Pipeline/results"
+            else:
+                p = path
+            path = [p + f'/{d}' for d in os.listdir(p) if os.path.isdir(p + f'/{d}')]
         if isinstance(path, list):
             self.exp_list = []
             self.path = []
@@ -64,11 +68,35 @@ class Visualizer:
             p = f'{exp_name} - {p}'
             self.exp_list[idx] = p
             self.experiment[p] = {}
-            self.experiment[p]['target_path'], _, target_list = os.walk(f'{P}/inputs/{target}').__next__()
-            self.experiment[p]['new_path'], _, new_list = os.walk(f'{P}/image_reg/{ref}_to_{target}').__next__()
-            self.experiment[p]['ref_path'], _, ref_list = os.walk(f'{P}/inputs/{ref}').__next__()
-            self.experiment[p]['target_list'], self.experiment[p]['new_list'], self.experiment[p]['ref_list'] = \
-                sorted(target_list), sorted(new_list), sorted(ref_list)
+            new_path, _, new_list = os.walk(f'{P}/image_reg/{ref}_to_{target}').__next__()
+            if os.path.exists(f'{P}/inputs'):
+                target_path, _, target_list = os.walk(f'{P}/inputs/{target}').__next__()
+                ref_path, _, ref_list = os.walk(f'{P}/inputs/{ref}').__next__()
+
+            elif os.path.exists(f'{P}/dataset.yaml'):
+                with open(f'{P}/dataset.yaml', "r") as file:
+                    dataset = yaml.safe_load(file)
+                target_path, target_list = '', dataset['Files'][target]
+                ref_path, ref_list = '', dataset['Files'][ref]
+            else:
+                target_path, ref_path = None, None
+            try:
+                self.experiment[p]['occlusion_path'], _, occlusion_list = (
+                    os.walk(f'{P}/occlusion/{ref}_to_{target}').__next__())
+                self.experiment[p]['occlusion_mask'] = sorted(occlusion_list)
+                self.experiment[p]['occlusion_ok'] = True
+            except StopIteration:
+                self.experiment[p]['occlusion_ok'] = False
+                print(f'Occlusion masks wont be available for the {p} couple')
+            if target_path is not None:
+                self.experiment[p]['target_list'] = [target_path + '/' + n for n in target_list]
+                self.experiment[p]['ref_list'] = [ref_path + '/' + n for n in ref_list]
+                self.experiment[p]['inputs_available'] = True
+            else:
+                self.experiment[p]['target_list'], self.experiment[p]['ref_list'] = None, None
+                print(f'Inputs images wont be available for experiment {p}')
+                self.experiment[p]['inputs_available'] = False
+            self.experiment[p]['new_list'] = [new_path + '/' + n for n in sorted(new_list)]
             try:
                 self.experiment[p]['target_disp_path'], _, target_disp_list = os.walk(
                     f'{P}/pred_disp/{target}').__next__()
@@ -107,22 +135,31 @@ class Visualizer:
         exp_idx = 0
         experiment = self.experiment[exp]
         while self.key != 27:
-            target_im = ImageTensor(f'{experiment["target_path"]}/{experiment["target_list"][self.idx]}').RGB()
-            new_im = ImageTensor(f'{experiment["new_path"]}/{experiment["new_list"][self.idx]}').RGB()
-            ref_im = ImageTensor(f'{experiment["ref_path"]}/{experiment["ref_list"][self.idx]}').RGB().match_shape(
+            new_im = ImageTensor(f'{experiment["new_list"][self.idx]}').RGB()
+            if experiment["inputs_available"]:
+                target_im = ImageTensor(f'{experiment["target_list"][self.idx]}').RGB()
+                ref_im = ImageTensor(f'{experiment["ref_list"][self.idx]}').RGB().match_shape(
                 target_im)
-            visu = (target_im / 2 + new_im / 2).vstack(target_im / 2 + ref_im / 2)
+            else:
+                target_im = new_im.clone()
+                ref_im = new_im.clone()
+            if self.show_occlusion:
+                mask = 1 - ImageTensor(f'{experiment["occlusion_path"]}/{experiment["occlusion_mask"][self.idx]}').match_shape(
+                target_im)
+            else:
+                mask = 1
+            visu = (target_im / 2 + new_im * mask / 2).vstack(target_im / 2 + ref_im / 2)
 
             if self.show_grad_im:
-                grad_im = self._create_grad_im(new_im, ref_im, target_im)
+                grad_im = self._create_grad_im(new_im, ref_im, target_im, mask)
                 visu = visu.hstack(grad_im)
 
             if self.show_disp_overlay:
                 if self.show_disp_overlay == 1:
-                    disp_overlay = self._create_disp_overlay(experiment, ref_im, target_im)
+                    disp_overlay = self._create_disp_overlay(experiment, ref_im, target_im, mask)
                     visu = visu.hstack(disp_overlay)
                 elif self.show_disp_overlay >= 2:
-                    depth_overlay = self._create_depth_overlay(experiment, ref_im, target_im)
+                    depth_overlay = self._create_depth_overlay(experiment, ref_im, target_im, mask)
                     visu = visu.hstack(depth_overlay)
 
             h, w = ref_im.shape[-2:]
@@ -145,12 +182,13 @@ class Visualizer:
                 org_val = 10, visu.shape[0] - 65
                 for key, value in experiment['val']['2. results'].items():
                     if key in exp:
+                        k = 2 if self.show_occlusion else 0
                         for key_stat, stat in value.items():
-                            stats = f'{key_stat} : {stat[self.idx][0]} / {stat[self.idx][1]}'
+                            stats = f'{key_stat} : {stat[self.idx][0+k]} / {stat[self.idx][1]}'
                             if key_stat == 'rmse':
-                                color_val = (0, 0, 255) if stat[self.idx][0] >= stat[self.idx][1] else (0, 255, 0)
+                                color_val = (0, 0, 255) if stat[self.idx][0+k] >= stat[self.idx][1] else (0, 255, 0)
                             else:
-                                color_val = (0, 255, 0) if stat[self.idx][0] >= stat[self.idx][1] else (0, 0, 255)
+                                color_val = (0, 255, 0) if stat[self.idx][0+k] >= stat[self.idx][1] else (0, 0, 255)
                             visu = cv.putText(visu, stats, org_val, self.font, self.fontScale, color_val,
                                               self.thickness,
                                               cv.LINE_AA)
@@ -184,6 +222,8 @@ class Visualizer:
                 self.show_grad_im = not self.show_grad_im
             if self.key == 116 and self.device:  # t
                 self.tensor = not self.tensor
+            if self.key == 111 and experiment['occlusion_ok']:  # t
+                self.show_occlusion = not self.show_occlusion
             if self.key == 9:
                 exp_idx += 1
                 exp_idx = exp_idx % len(self.exp_list)
@@ -198,7 +238,7 @@ class Visualizer:
             self.idx = self.idx % self.experiment[exp]['idx_max']
             # print(self.key)
 
-    def _create_grad_im(self, new_im, ref_im, target_im):
+    def _create_grad_im(self, new_im, ref_im, target_im, mask):
         if self.tensor:
             grad_new = grad_tensor(new_im, self.device)
             grad_ref = grad_tensor(ref_im, self.device)
@@ -207,28 +247,27 @@ class Visualizer:
             grad_new = grad(new_im)
             grad_ref = grad(ref_im)
             grad_target = grad(target_im)
-        im = (grad_new / 2 + grad_target / 2).vstack(grad_ref / 2 + grad_target / 2)
+        im = (grad_new*mask / 2 + grad_target*mask / 2).vstack(grad_ref / 2 + grad_target / 2)
 
         return im
 
-    def _create_disp_overlay(self, experiment, ref_im, target_im):
+    def _create_disp_overlay(self, experiment, ref_im, target_im, mask):
         disp_target = ImageTensor(
-            f'{experiment["target_disp_path"]}/{experiment["target_disp_list"][self.idx]}').GRAYSCALE()
-        disp_ref = ImageTensor(f'{experiment["ref_disp_path"]}/{experiment["ref_disp_list"][self.idx]}').GRAYSCALE()
-        disp_overlay_ref = ref_im * disp_ref.match_shape(ref_im)
-        disp_overlay_target = target_im * disp_target
+            f'{experiment["target_disp_path"]}/{experiment["target_disp_list"][self.idx]}').RGB()
+        disp_ref = ImageTensor(f'{experiment["ref_disp_path"]}/{experiment["ref_disp_list"][self.idx]}').RGB()
+        disp_overlay_ref = disp_ref.match_shape(ref_im)
+        disp_overlay_target = disp_target.match_shape(ref_im) * mask
         return (disp_overlay_ref / disp_overlay_ref.max()).vstack(disp_overlay_target / disp_overlay_target.max())
 
-    def _create_depth_overlay(self, experiment, ref_im, target_im):
+    def _create_depth_overlay(self, experiment, ref_im, target_im, mask):
         depth_target = ImageTensor(
-            f'{experiment["target_depth_path"]}/{experiment["target_depth_list"][self.idx]}').GRAYSCALE()
-        depth_ref = ImageTensor(f'{experiment["ref_depth_path"]}/{experiment["ref_depth_list"][self.idx]}').GRAYSCALE()
-        depth_overlay_ref = ref_im * depth_ref.match_shape(ref_im)
-        depth_overlay_target = target_im * depth_target
+            f'{experiment["target_depth_path"]}/{experiment["target_depth_list"][self.idx]}').RGB()
+        depth_ref = ImageTensor(f'{experiment["ref_depth_path"]}/{experiment["ref_depth_list"][self.idx]}').RGB()
+        depth_overlay_ref = depth_ref.match_shape(ref_im)
+        depth_overlay_target = depth_target * mask
         return (depth_overlay_ref / depth_overlay_ref.max()).vstack(depth_overlay_target / depth_overlay_target.max())
 
 
 if __name__ == '__main__':
-    # path = ["/home/godeta/PycharmProjects/Disparity_Pipeline/results/Disparity",
-    #         "/home/godeta/PycharmProjects/Disparity_Pipeline/results/Depth"]
-    Visualizer().run()
+    path = "/home/godeta/PycharmProjects/Disparity_Pipeline/results/Camera_position"
+    Visualizer(path, search_exp=True).run()

@@ -229,7 +229,7 @@ class CameraSetup(object):
         if conf['depth_pair']['ref']:
             self.calibration_for_depth(**conf['depth_pair'])
 
-    def save(self, path):
+    def save(self, path, name='Setup_Camera.yaml'):
         dict_setup = {'cameras': {key: cam.save_dict() for key, cam in self.cameras.items()},
                       'camera_ref': self.camera_ref,
                       'stereo_pair': {'left': self.stereo_pair.left,
@@ -238,7 +238,7 @@ class CameraSetup(object):
                       'depth_pair': {'ref': self.depth_pair.left,
                                      'target': self.depth_pair.right,
                                      'name': self.depth_pair.names}}
-        name = f'{path}/Setup_Camera.yaml'
+        name = f'{path}/{name}'
         with open(name, 'w') as file:
             yaml.dump(dict_setup, file)
 

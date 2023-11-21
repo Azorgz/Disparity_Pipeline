@@ -21,6 +21,7 @@ class PostProcessing:
         self.task = task
         self.transform = []
         if pad:
+            self.ori_size = pad.ori_size
             self.transform.append(Unpad(pad.pad, pad.ori_size))
         if resize:
             self.ori_size = resize.ori_size
@@ -33,10 +34,12 @@ class PostProcessing:
         self.transform = Compose(self.transform, self.device)
         # self.histo = None
 
-    def __call__(self, disp, *args):
-        disp = self.transform(disp)
-        if self.config['pred_bidir'] and self.task != 'depth':
-            disp[1] = hflip(disp[1])
-        elif self.config['pred_right']:
-            disp = hflip(disp)
-        return disp
+    def __call__(self, sample, *args):
+        for key, disp in sample.items():
+            disp = self.transform(disp)
+            if self.config['pred_bidir'] and self.task != 'depth':
+                disp[1] = hflip(disp[1])
+            elif self.config['pred_right']:
+                disp = hflip(disp)
+            sample[key] = disp
+        return sample

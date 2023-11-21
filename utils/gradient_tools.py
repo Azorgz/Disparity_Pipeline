@@ -9,7 +9,14 @@ from torchmetrics.functional import image_gradients
 import torch
 
 from utils.classes import ImageTensor
-from utils.manipulation_tools import normalisation_tensor
+
+
+def normalisation_tensor(image):
+    m, M = image.min(), image.max()
+    if m != M:
+        return (image - m) / (M - m)
+    else:
+        return image
 
 
 def grad(image: ImageTensor) -> ImageTensor:

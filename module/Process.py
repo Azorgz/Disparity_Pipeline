@@ -10,9 +10,7 @@ class Process(OrderedDict):
     def __init__(self, path: str):
         super(Process, self).__init__()
         self.path = path
-        # if path.split('.')[-1] == "txt":
-        #     self._create_from_txt(path)
-        # elif path.split('.')[-1] == "yaml" or "yml":
+        self.camera_used = []
         self._create_from_dict(path)
 
     def __call__(self, sample, *args, **kwargs):
@@ -25,31 +23,16 @@ class Process(OrderedDict):
         for key, p in process.items():
             self[key] = self._make_process_dict_(p)
 
-    # def _create_from_txt(self, path: str) -> None:
-    #     with open(path) as f:
-    #         lines = f.readlines()
-    #     lines_sorted = OrderedDict()
-    #     for idx, l in enumerate(lines):
-    #         if not (l[0] == '#' or l[0] == '\n'):
-    #             l = l.strip('\n').split(' ')
-    #             if l[0].upper() == 'PROCESS':
-    #                 lines_sorted = OrderedDict()
-    #                 if len(l) > 1:
-    #                     name = ' '.join(l[1:])
-    #                 else:
-    #                     name = f'tbd_{len(self)}'
-    #                 self[name] = lines_sorted
-    #             else:
-    #                 lines_sorted[l[0]] =
-    #     for key, p in self.items():
-    #         self[key] = self._make_process_dict_(p)
-
     def init_process(self, pipe) -> None:
         setup = pipe.setup
+        path_result = os.getcwd() + pipe.path_output
+        if not os.path.exists(path_result):
+            os.makedirs(path_result, exist_ok=True)
+            os.chmod(path_result, 0o777)
         for Exp, p in self.items():
             first_save = True
             Exp = pipe.name_experiment if Exp[:3] == 'tbd' else Exp
-            path = os.getcwd() + pipe.path_output + f'/{Exp}'
+            path = path_result + f'/{Exp}'
             pred = {}
             res = {'image_reg': [], 'depth_reg': [], 'disp_reg': []}
             for idx, instruction in enumerate(p):
@@ -70,9 +53,15 @@ class Process(OrderedDict):
                         pred[name_var].append(*cam)
                     else:
                         pred.update({name_var: cam})
+                    if 'inference_size' not in val.keys():
+                        val['inference_size'] = None
                     p[idx] = self.disparity(pipe, **val)
+                    if val['cam1'] not in self.camera_used:
+                        self.camera_used.append(val['cam1'])
+                    if val['cam2'] not in self.camera_used:
+                        self.camera_used.append(val['cam2'])
                 elif key == 'DEPTH':
-                    assert val['cam1'] in setup.cameras and val['cam2'] in setup.cameras, \
+                    assert val['cam1'] in setup.cameras.keys() and val['cam2'] in setup.cameras.keys(), \
                         f'The chosen cameras for depth dont exist, available cameras are :{setup.cameras.keys()}'
                     assert setup.depth_ready(val['cam1']) and setup.depth_ready(val['cam2']), \
                         'The chosen cameras for depth are not positioned'
@@ -89,7 +78,13 @@ class Process(OrderedDict):
                         pred[name_var].append(*cam)
                     else:
                         pred.update({name_var: cam})
+                    if 'inference_size' not in val.keys():
+                        val['inference_size'] = None
                     p[idx] = self.depth(pipe, **val)
+                    if val['cam1'] not in self.camera_used:
+                        self.camera_used.append(val['cam1'])
+                    if val['cam2'] not in self.camera_used:
+                        self.camera_used.append(val['cam2'])
                 elif key == 'WRAP':
                     if val['depth']:
                         assert setup.depth_ready(val['cam_src']) and setup.depth_ready(val['cam_dst']), \
@@ -129,6 +124,10 @@ class Process(OrderedDict):
 
                     res['image_reg'].append(f'{val["cam_src"]}_to_{val["cam_dst"]}')
                     p[idx] = self.wrap(pipe, **val)
+                    if val['cam_src'] not in self.camera_used:
+                        self.camera_used.append(val['cam_src'])
+                    if val['cam_dst'] not in self.camera_used:
+                        self.camera_used.append(val['cam_dst'])
                 elif key == 'VALID':
                     assert val['cam_reg'] in setup.cameras.keys(), 'The chosen cam_reg for validation doesnt exist'
                     assert val['cam_ref'] in setup.cameras.keys(), 'The chosen cam_ref for validation doesnt exist'
@@ -136,6 +135,7 @@ class Process(OrderedDict):
                     assert name in res['image_reg'], \
                         f'You have to wrap the image before to valid the result. ' \
                         f'{name} is not in the list of the reg images'
+                    val['exp_name'] = Exp
                     p[idx] = self.valid(pipe, **val)
                 elif key == 'SAVE':
                     if first_save:
@@ -156,7 +156,7 @@ class Process(OrderedDict):
                                 os.chmod(path, 0o777)
                                 print(f'Directory created for results at : {os.path.abspath(path)}')
                     path_res = f'{path}/{val["variable_name"]}'
-                    if not os.path.exists(path_res):
+                    if not os.path.exists(path_res) and val["variable_name"] is not None:
                         os.makedirs(path_res, exist_ok=True)
                         os.chmod(path_res, 0o777)
                     if val["variable_name"] == 'inputs':
@@ -176,14 +176,18 @@ class Process(OrderedDict):
                             if not os.path.exists(path_used):
                                 os.mkdir(path_used)
                                 os.chmod(path_used, 0o777)
-                    else:
+                    elif val["variable_name"] == 'image_reg':
                         for cam in res[val["variable_name"]]:
                             path_res_ = path_res + f'/{cam}'
                             if not os.path.exists(path_res_):
                                 os.mkdir(path_res_)
                                 os.chmod(path_res_, 0o777)
-                    p[idx] = self.save(pipe, val["variable_name"], path)
+                    if val["variable_name"] is not None:
+                        p[idx] = self.save(pipe, val["variable_name"], path)
+                    else:
+                        p.pop(idx)
             self[Exp] = Experiment(p, path)
+        pipe.dataloader.camera_used = self.camera_used
 
     @staticmethod
     def _make_process_dict_(process) -> list:
@@ -196,7 +200,10 @@ class Process(OrderedDict):
                 option = {'cam1': p['cameras'][0], 'cam2': p['cameras'][1], 'pred_bidir': False, 'pred_right': False,
                           'cut_roi_max': False, 'cut_roi_min': False}
                 for p_ in p['option']:
-                    if p_.upper() == 'PRED_BIDIR':
+                    if isinstance(p_, dict):
+                        assert 'inference_size' in p_.keys(), f'The option given in {key} doesnt exist'
+                        option['inference_size'] = p_['inference_size']
+                    elif p_.upper() == 'PRED_BIDIR':
                         option['pred_bidir'] = True
                     elif p_.upper() == 'PRED_RIGHT':
                         option['pred_right'] = True
@@ -231,14 +238,19 @@ class Process(OrderedDict):
                         '[pred_depth, pred_disp, image_reg, depth_reg, disp_reg, inputs, occlusion]'
                     option = {'variable_name': p_}
                     proc.append([key, option])
-
+        if 'SAVE' not in [k.upper() for k in process.keys()]:
+            proc.append(['SAVE', {'variable_name': None}])
         return proc
 
     @staticmethod
-    def disparity(pipe, cam1, cam2, pred_bidir, pred_right, cut_roi_max, cut_roi_min, **kwargs):
+    def disparity(pipe, cam1, cam2, pred_bidir, pred_right, cut_roi_max, cut_roi_min, inference_size, **kwargs):
         def _disparity(sample, res):
             pipe.network.update_pred_bidir(activate=pred_bidir)
             pipe.network.update_pred_right(activate=pred_right)
+            if inference_size is not None:
+                pipe.network.update_size(inference_size, network='disparity')
+            else:
+                pipe.network.update_size(pipe.config['disparity_network']["network_args"].inference_size)
             setup = pipe.setup.stereo_pair(cam1, cam2)
             new_sample = setup(sample, cut_roi_min=cut_roi_min, cut_roi_max=cut_roi_max)
             output = pipe.network(new_sample)
@@ -248,10 +260,14 @@ class Process(OrderedDict):
         return _disparity
 
     @staticmethod
-    def depth(pipe, cam1, cam2, pred_bidir, pred_right, **kwargs):
+    def depth(pipe, cam1, cam2, pred_bidir, pred_right, inference_size, **kwargs):
         def _depth(sample, res):
             pipe.network.update_pred_bidir(activate=pred_bidir)
             pipe.network.update_pred_right(activate=pred_right)
+            if inference_size is not None:
+                pipe.network.update_size(inference_size, network='depth')
+            else:
+                pipe.network.update_size(pipe.config['depth_network']["network_args"].inference_size, network='depth')
             setup = pipe.setup.depth_pair(cam1, cam2)
             new_sample = setup(sample)
             output = pipe.network(**new_sample)
@@ -280,14 +296,18 @@ class Process(OrderedDict):
         return _wrap
 
     @staticmethod
-    def valid(pipe, cam_reg, cam_ref):
+    def valid(pipe, cam_reg, cam_ref, exp_name):
         def _valid(sample, res):
             name = f'{cam_reg}_to_{cam_ref}'
             im_reg = res['image_reg'][name]
             im_ref = sample[cam_ref]
             im_old = sample[cam_reg].match_shape(im_ref)
+            if name in res['occlusion'].keys():
+                occlusion = res['occlusion'][name]
+            else:
+                occlusion = None
             pipe.validation.activated = True
-            pipe.validation(im_reg.clone(), im_ref.clone(), im_old.clone(), name)
+            pipe.validation(im_reg.clone(), im_ref.clone(), im_old.clone(), name, exp_name, occlusion=occlusion.clone())
 
         return _valid
 
@@ -359,9 +379,13 @@ class Process(OrderedDict):
 
 class Experiment(list):
 
-    def __init__(self, instructions, path):
+    def __init__(self, instructions, path, name=None):
         super(Experiment, self).__init__(instructions)
         self.path = path
+        if name is None:
+            self.name = os.path.split(path)[1]
+        else:
+            self.name = name
 
     def __call__(self, sample, *args, **kwargs):
         res = {'pred_disp': {}, 'pred_depth': {}, 'image_reg': {}, 'depth_reg': {}, 'disp_reg': {}, 'occlusion': {}}

@@ -27,7 +27,7 @@ class BaseMetric_Tensor:
         self.range_max = 1
         self.commentary = "Just a base"
 
-    def __call__(self, im1, im2, *args, **kwargs):
+    def __call__(self, im1, im2, *args, mask=None, **kwargs):
         # Input array is a path to an image OR an already formed ndarray instance
         assert im1.shape[-2:] == im2.shape[-2:], " The inputs are not the same size"
         _, c, h, w = im1.shape
@@ -76,11 +76,13 @@ class Metric_ssim_tensor(BaseMetric_Tensor):
         self.metric = "SSIM"
         self.commentary = "The higher, the better"
 
-    def __call__(self, im1, im2, *args, **kwargs):
-        super().__call__(im1, im2, *args, **kwargs)
-        self.value = self.ssim(self.image_test, self.image_true)
+    def __call__(self, im1, im2, *args, mask=None, **kwargs):
+        super().__call__(im1, im2, *args, mask=mask, **kwargs)
+        if mask is None:
+            self.value = self.ssim(self.image_test, self.image_true)
+        else:
+            self.value = self.ssim(self.image_test * mask, self.image_true * mask)
         return self.value
-
 
     def scale(self):
         self.range_max += self.range_max
@@ -91,18 +93,21 @@ class MultiScaleSSIM_tensor(BaseMetric_Tensor):
     def __init__(self, device):
         super().__init__(device)
         self.ms_ssim = MS_SSIM(gaussian_kernel=True,
-                          sigma=1.5,
-                          kernel_size=11,
-                          reduction=None,
-                          data_range=None,
-                          k1=0.01, k2=0.03,
-                          betas=(0.0448, 0.2856, 0.3001, 0.2363, 0.1333)).to(self.device)
+                               sigma=1.5,
+                               kernel_size=11,
+                               reduction=None,
+                               data_range=None,
+                               k1=0.01, k2=0.03,
+                               betas=(0.0448, 0.2856, 0.3001, 0.2363, 0.1333)).to(self.device)
         self.metric = "Multi Scale SSIM"
         self.commentary = "The higher, the better"
 
-    def __call__(self, im1, im2, *args, **kwargs):
-        super().__call__(im1, im2, *args, **kwargs)
-        self.value = self.ms_ssim(self.image_test, self.image_true)
+    def __call__(self, im1, im2, *args, mask=None, **kwargs):
+        super().__call__(im1, im2, *args, mask=mask, **kwargs)
+        if mask is None:
+            self.value = self.ms_ssim(self.image_test, self.image_true)
+        else:
+            self.value = self.ms_ssim(self.image_test*mask, self.image_true*mask)
         return self.value
 
     def scale(self):
@@ -117,9 +122,13 @@ class Metric_mse_tensor(BaseMetric_Tensor):
         self.range_max = 1
         self.commentary = "The lower, the better"
 
-    def __call__(self, im1, im2, *args, **kwargs):
-        super().__call__(im1, im2, *args, **kwargs)
-        self.value = self.mse(self.image_true, self.image_test)
+    def __call__(self, im1, im2, *args, mask=None, **kwargs):
+        super().__call__(im1, im2, *args, mask=mask, **kwargs)
+        if mask is None:
+            self.value = self.mse(self.image_true, self.image_test)
+        else:
+            self.value = self.mse(self.image_true[:, :, mask[0, 0, :, :]].flatten(),
+                                  self.image_test[:, :, mask[0, 0, :, :]].flatten())
         return self.value
 
     def scale(self):
@@ -134,15 +143,18 @@ class Metric_rmse_tensor(BaseMetric_Tensor):
         self.metric = "RMSE"
         self.range_max = 1
 
-    def __call__(self, im1, im2, *args, **kwargs):
-        super().__call__(im1, im2, *args, **kwargs)
-        self.value = self.rmse(self.image_true, self.image_test)
+    def __call__(self, im1, im2, *args, mask=None, **kwargs):
+        super().__call__(im1, im2, *args, mask=mask, **kwargs)
+        if mask is None:
+            self.value = self.rmse(self.image_true, self.image_test)
+        else:
+            self.value = self.rmse(self.image_true[:, :, mask[0, 0, :, :]].flatten(),
+                                   self.image_test[:, :, mask[0, 0, :, :]].flatten())
         return self.value
 
     def scale(self):
         self.value = super().scale
         return self.value
-
 
 
 class Metric_psnr_tensor(BaseMetric_Tensor):
@@ -154,9 +166,13 @@ class Metric_psnr_tensor(BaseMetric_Tensor):
         self.range_min = 0
         self.range_max = "inf"
 
-    def __call__(self, im1, im2, *args, **kwargs):
-        super().__call__(im1, im2, *args, **kwargs)
-        self.value = self.psnr(self.image_true, self.image_test)
+    def __call__(self, im1, im2, *args, mask=None, **kwargs):
+        super().__call__(im1, im2, *args, mask=mask, **kwargs)
+        if mask is None:
+            self.value = self.psnr(self.image_true, self.image_test)
+        else:
+            self.value = self.psnr(self.image_true[:, :, mask[0, 0, :, :]].flatten(),
+                                   self.image_test[:, :, mask[0, 0, :, :]].flatten())
         return self.value
 
     def __add__(self, other):
@@ -177,12 +193,15 @@ class Metric_nec_tensor(BaseMetric_Tensor):
         self.range_min = 0
         self.range_max = 1
 
-    def __call__(self, im1, im2, *args, **kwargs):
-        super().__call__(im1, im2, *args, **kwargs)
+    def __call__(self, im1, im2, *args, mask=None, **kwargs):
+        super().__call__(im1, im2, *args, mask=mask, **kwargs)
         ref_true = grad_tensor(self.image_true, self.device)
         ref_test = grad_tensor(self.image_test, self.device)
         ref_true = ref_true / ref_true.max()
         ref_test = ref_test / ref_test.max()
+        if mask is not None:
+            ref_true = ref_true.flatten(start_dim=2)[:, :, mask[0, 0, :, :].flatten()]
+            ref_test = ref_test.flatten(start_dim=2)[:, :, mask[0, 0, :, :].flatten()]
         self.value = torch.sum(ref_true * ref_test) / torch.sum(ref_true * ref_true)
         return self.value
 

@@ -49,12 +49,19 @@ class SuperNetwork(BaseModule):
         self.pred_bidir = activate
         self.update_preprocessing()
 
+    def update_size(self, size, network='disparity'):
+        if size is not None:
+            if network == 'disparity':
+                self.preprocessing_disparity.inference_size = size
+            else:
+                self.preprocessing_depth.inference_size = size
+
     def update_preprocessing(self):
         self.preprocessing_disparity = Preprocessing(self.config["disparity_network"]["preprocessing"], self.device,
                                                      task='disparity', pred_right=self.pred_right,
                                                      pred_bidir=self.pred_bidir)
         self.preprocessing_depth = Preprocessing(self.config["depth_network"]["preprocessing"], self.device,
-                                                 task='depth', pred_right=self.pred_right, pred_bidir=False)
+                                                 task='depth', pred_right=self.pred_right, pred_bidir=self.pred_bidir)
 
     def disparity_network_init(self, config):
         # Disparity Network initialization
@@ -150,6 +157,10 @@ class SuperNetwork(BaseModule):
             sample = self.preprocessing_disparity(sample.copy())
             im_left, im_right = sample['left'], sample['right']
             if self.name_disparity == "unimatch":
+                if im_left.im_type == 'IR':
+                    im_left = im_left.RGB('gray')
+                if im_right.im_type == 'IR':
+                    im_right = im_right.RGB('gray')
                 res = self.model_disparity(Tensor(im_left), Tensor(im_right),
                                            attn_type=self.args_disparity.attn_type,
                                            attn_splits_list=self.args_disparity.attn_splits_list,
@@ -161,7 +172,6 @@ class SuperNetwork(BaseModule):
                 res = self.model_disparity(im_left, im_right)[0]
             else:
                 warnings.warn('This Network is not implemented')
-            res = self.preprocessing_disparity(res, reverse=True)
             if self.pred_bidir:
                 left = DepthTensor(res[0], device=self.device).scale()
                 left.im_name = im_left.im_name
@@ -176,12 +186,19 @@ class SuperNetwork(BaseModule):
                 left = DepthTensor(res[0], device=self.device).scale()
                 left.im_name = im_left.im_name
                 res = {'left': left}
+            res = self.preprocessing_disparity(res, reverse=True)
             return res
 
         else:
             sample = self.preprocessing_depth(sample)
             img_ref, img_tgt = sample['ref'], sample['target']
             if self.name_depth == "unimatch":
+                intrinsics = intrinsics.clone()
+                intrinsics[0, 0, 2] /= self.preprocessing_depth.ori_size[1] / img_ref.shape[-1]
+                intrinsics[0, 1, 2] /= self.preprocessing_depth.ori_size[0] / img_ref.shape[-2]
+                intrinsics[0, 0, 0] /= self.preprocessing_depth.ori_size[1] / img_ref.shape[-1]
+                intrinsics[0, 1, 0] /= self.preprocessing_depth.ori_size[0] / img_ref.shape[-2]
+
                 res = self.model_depth(Tensor(img_ref), Tensor(img_tgt),
                                        attn_type=self.args_depth.attn_type,
                                        attn_splits_list=self.args_depth.attn_splits_list,
@@ -197,7 +214,7 @@ class SuperNetwork(BaseModule):
                                        task='depth')['flow_preds'][-1]  # [1, H, W]
             else:
                 warnings.warn('This Network is not implemented')
-            self.preprocessing_depth(res, reverse=True)
+                return 0
             if self.pred_bidir:
                 ref = DepthTensor(res[0], device=self.device).scale()
                 ref.im_name = sample['ref'].im_name
@@ -212,4 +229,5 @@ class SuperNetwork(BaseModule):
                 ref = DepthTensor(res[0], device=self.device).scale()
                 ref.im_name = sample['ref'].im_name
                 res = {'ref': ref}
+            self.preprocessing_depth(res, reverse=True)
             return res

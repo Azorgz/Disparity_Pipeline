@@ -11,11 +11,10 @@ from utils import transforms as transforms
 
 
 class ConfigPipe(dict):
-    def __init__(self, interface=False):
+    def __init__(self):
         super(ConfigPipe, self).__init__()
-        if interface is False:
-            with open('config/config.yml', 'r') as file:
-                config = yaml.safe_load(file)
+        with open('config/config.yml', 'r') as file:
+            config = yaml.safe_load(file)
         self["save_inputs"] = config["save_inputs"]
         self["print_info"] = config["print_info"]
         self["save_disp"] = config["save_disp"]
@@ -32,7 +31,7 @@ class ConfigPipe(dict):
         self.config_reconstruction(config["reconstruction"])
         self.config_validation(config["validation"])
         # self.config_pointCLoud(config['pointsCloud'])
-        self["output_path"] = config["output_path"]
+        self["output_path"] = config["output_path"] + '/' + config["name_experiment"]
         self["name_experiment"] = config["name_experiment"]
         # self["output_path"], self["name_experiment"] = check_path(self)
 
@@ -67,6 +66,7 @@ class ConfigPipe(dict):
             from Networks.UniMatch.parser import get_args_parser_disparity
             parser = get_args_parser_disparity()
             args = configure_parser(parser,
+                                    config["preprocessing"],
                                     path_config='Networks/UniMatch/config_unimatch_disparity.yml',
                                     dict_vars=self["dataset"])
             self["disparity_network"]["network_args"] = args
@@ -93,6 +93,7 @@ class ConfigPipe(dict):
             from Networks.UniMatch.parser import get_args_parser_disparity
             parser = get_args_parser_depth()
             args = configure_parser(parser,
+                                    config["preprocessing"],
                                     path_config='Networks/UniMatch/config_unimatch_depth.yml',
                                     dict_vars=self["dataset"])
             self["depth_network"]["network_args"] = args
@@ -145,41 +146,8 @@ class ConfigPipe(dict):
                                        'std': config['stats']['std']}
         self['validation']['activated'] = config['activated']
 
-    def config_pointCLoud(self, config):
-        self['pointsCloud'] = {}
-        self['pointsCloud']['activated'] = config['activated']
-        self['pointsCloud']['disparity'] = config['disparity']
-        self['pointsCloud']['visualisation'] = config['visualisation']
-        self['pointsCloud']['save'] = config['save']
-        self['pointsCloud']['use_bidir'] = config['use_bidir']
-        if config['min_disparity'] > 1:
-            self['pointsCloud']['min_disparity'] = config['min_disparity']/100
-        else:
-            self['pointsCloud']['min_disparity'] = config['min_disparity']
-        if config['both']:
-            self['pointsCloud']['mode'] = 'both'
-        elif config['stereo']:
-            self['pointsCloud']['mode'] = 'stereo'
-        else:
-            self['pointsCloud']['mode'] = 'other'
 
-    def config_cameras(self, config):
-        self['cameras'] = {}
-        if config['left']:
-            self['cameras']['left'] = load_conf(config['left'])
-        else:
-            self['cameras']['left'] = None
-        if config['right']:
-            self['cameras']['right'] = load_conf(config['right'])
-        else:
-            self['cameras']['right'] = None
-        if config['other']:
-            self['cameras']['other'] = load_conf(config['other'])
-        else:
-            self['cameras']['other'] = None
-
-
-def configure_parser(parser, path_config=None, dict_vars=None):
+def configure_parser(parser, config, path_config=None, dict_vars=None):
     dict_pars = vars(parser.parse_args())
     config_vars = {}
     if path_config:
@@ -191,6 +159,7 @@ def configure_parser(parser, path_config=None, dict_vars=None):
     if not dict_vars:
         dict_vars = {}
     config_vars = config_vars | dict_vars
+    config_vars = config_vars | config
     for key, value in config_vars.items():
         try:
             dict_pars[key] = value

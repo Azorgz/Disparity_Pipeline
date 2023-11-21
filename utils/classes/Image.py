@@ -29,6 +29,8 @@ def find_class(args, class_name):
             return a
         elif isinstance(a, list) or isinstance(a, tuple):
             arg = find_class(a, class_name)
+            if arg != {}:
+                return arg
         else:
             arg = None
     return arg
@@ -545,7 +547,8 @@ class DepthTensor(ImageTensor):
         return ax
 
     def save(self, path, name=None):
-        ImageTensor(self.inverse_depth().normalize()).RGB().save(path, name=name)
+        ImageTensor(self.inverse_depth(remove_zeros=True)
+                    .normalize()).RGB().save(path, name=name)
 
     def opencv(self):
         if self.color_mode == 'L':
@@ -577,7 +580,9 @@ class DepthTensor(ImageTensor):
         else:
             return self.clone()
 
-    def inverse_depth(self):
+    def inverse_depth(self, remove_zeros=False):
+        if remove_zeros:
+            self[self == 0] = self.max() + 1
         return 10 / (self + 1)
 
     @property
