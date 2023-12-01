@@ -1,9 +1,14 @@
-import torch
-from torch.fft import fft2
+import time
 
-from module.SetupCameras import CameraSetup
-from utils.classes import ImageTensor
-from utils.classes.Visualizer import Visualizer
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib.pyplot import plot
+from pandas import DataFrame
+
+# import torch
+from Result_analysis.ResultFrame import ResultFrame
+# from utils.classes import ImageTensor
+# from utils.classes.Visualizer import Visualizer
 
 # from utils.classes.Image import ImageTensor
 # import numpy as np
@@ -12,6 +17,9 @@ from utils.classes.Visualizer import Visualizer
 # from utils.registration_tools import SIFT
 # from utils.visualization import result_visualizer, visual_control
 
+res = ResultFrame("/home/godeta/PycharmProjects/Disparity_Pipeline/results/methods_comparison/Disparity-Disparity")
+
+time.sleep(1)
 #
 # name = '/home/godeta/PycharmProjects/Disparity_Pipeline/results/Vis/Validation.yaml'
 # with open(name, "r") as file:
@@ -43,10 +51,10 @@ from utils.classes.Visualizer import Visualizer
 #
 # plt.legend()
 # plt.show()
-im = ImageTensor("/home/godeta/PycharmProjects/Disparity_Pipeline/results/Res/Disparity-HD/image_reg/RGB2_to_RGB/RGB2_000.png",
-                 device=torch.cuda.device(0))
-i = im.RGB('gray')
-i.show()
+# im = ImageTensor("/home/godeta/PycharmProjects/Disparity_Pipeline/results/Res/Disparity-HD/image_reg/RGB2_to_RGB/RGB2_000.png",
+#                  device=torch.cuda.device(0))
+# i = im.RGB('gray')
+# i.show()
 
 # path = "/home/godeta/PycharmProjects/Disparity_Pipeline/results/Res/Disparity-HD"
 # Visualizer(path).run()

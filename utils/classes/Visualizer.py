@@ -1,16 +1,15 @@
 import os
 from pathlib import Path
 from typing import Union
-
 import cv2 as cv
 import numpy as np
-import torch
-import yaml
+import oyaml as yaml
 from kornia.utils import get_cuda_device_if_available
+from tqdm import tqdm
 
 from utils.classes import ImageTensor
+from utils.classes.VideoGenerator import VideoGenerator
 from utils.gradient_tools import grad_tensor, grad
-from utils.transforms import ToTensor
 
 
 class Visualizer:
@@ -26,7 +25,6 @@ class Visualizer:
     fontScale = 0.5
     idx = 0
     key = 0
-    convert_alpha_number = {55: 7, 56: 8, 57: 9, 52: 4, 53: 5, 54: 6, 49: 1, 50: 2, 51: 3, 48: 0}
     tensor = False
     window = 0
 
@@ -61,6 +59,7 @@ class Visualizer:
                 self.path.append(pa)
         else:
             self.exp_list = os.listdir(path + '/image_reg')
+            self.path = [path]
         self.experiment = {}
         for idx, (p, P) in enumerate(zip(self.exp_list, self.path)):
             ref, target = p.split('_to_')
@@ -72,6 +71,8 @@ class Visualizer:
             if os.path.exists(f'{P}/inputs'):
                 target_path, _, target_list = os.walk(f'{P}/inputs/{target}').__next__()
                 ref_path, _, ref_list = os.walk(f'{P}/inputs/{ref}').__next__()
+                target_list = sorted(target_list)
+                ref_list = sorted(ref_list)
 
             elif os.path.exists(f'{P}/dataset.yaml'):
                 with open(f'{P}/dataset.yaml', "r") as file:
@@ -125,110 +126,35 @@ class Visualizer:
             else:
                 self.experiment[p]['validation_available'] = False
             self.experiment[p]['idx_max'] = len(new_list)
+            self.experiment[p]['videoWritter'] = VideoGenerator(30, P)
         self.device = get_cuda_device_if_available()
         self.tensor = True
         self.idx = 0
         self.show_disp_overlay = 0
+        self.video_array = []
 
     def run(self):
         exp = self.exp_list[0]
         exp_idx = 0
-        experiment = self.experiment[exp]
+        # experiment = self.experiment[exp]
         while self.key != 27:
-            new_im = ImageTensor(f'{experiment["new_list"][self.idx]}').RGB()
-            if experiment["inputs_available"]:
-                target_im = ImageTensor(f'{experiment["target_list"][self.idx]}').RGB()
-                ref_im = ImageTensor(f'{experiment["ref_list"][self.idx]}').RGB().match_shape(
-                target_im)
-            else:
-                target_im = new_im.clone()
-                ref_im = new_im.clone()
-            if self.show_occlusion:
-                mask = 1 - ImageTensor(f'{experiment["occlusion_path"]}/{experiment["occlusion_mask"][self.idx]}').match_shape(
-                target_im)
-            else:
-                mask = 1
-            visu = (target_im / 2 + new_im * mask / 2).vstack(target_im / 2 + ref_im / 2)
-
-            if self.show_grad_im:
-                grad_im = self._create_grad_im(new_im, ref_im, target_im, mask)
-                visu = visu.hstack(grad_im)
-
-            if self.show_disp_overlay:
-                if self.show_disp_overlay == 1:
-                    disp_overlay = self._create_disp_overlay(experiment, ref_im, target_im, mask)
-                    visu = visu.hstack(disp_overlay)
-                elif self.show_disp_overlay >= 2:
-                    depth_overlay = self._create_depth_overlay(experiment, ref_im, target_im, mask)
-                    visu = visu.hstack(depth_overlay)
-
-            h, w = ref_im.shape[-2:]
-
-            while visu.shape[3] > 1920 or visu.shape[2] > 1080:
-                visu = visu.pyrDown()
-                h, w = h // 2, w // 2
-
-            visu = visu.opencv()
-            if self.show_idx:
-                visu = cv.putText(visu, f'idx : {self.idx}', self.org_idx, self.font, self.fontScale, self.color,
-                                  self.thickness, cv.LINE_AA)
-            if self.show_grad_im:
-                org = self.org_idx[0] + w, self.org_idx[1]
-                visu = cv.putText(visu, f'Image grad : {"with tensor" if self.tensor else "with numpy"}', org,
-                                  self.font,
-                                  self.fontScale, self.color,
-                                  self.thickness, cv.LINE_AA)
-            if self.show_validation and experiment['validation_available']:
-                org_val = 10, visu.shape[0] - 65
-                for key, value in experiment['val']['2. results'].items():
-                    if key in exp:
-                        k = 2 if self.show_occlusion else 0
-                        for key_stat, stat in value.items():
-                            stats = f'{key_stat} : {stat[self.idx][0+k]} / {stat[self.idx][1]}'
-                            if key_stat == 'rmse':
-                                color_val = (0, 0, 255) if stat[self.idx][0+k] >= stat[self.idx][1] else (0, 255, 0)
-                            else:
-                                color_val = (0, 255, 0) if stat[self.idx][0+k] >= stat[self.idx][1] else (0, 0, 255)
-                            visu = cv.putText(visu, stats, org_val, self.font, self.fontScale, color_val,
-                                              self.thickness,
-                                              cv.LINE_AA)
-                            org_val = org_val[0], org_val[1] + 15
+            visu = self._create_visual(exp)
+            if self.key == ord('w') or len(self.video_array) > 0:
+                visu = self._video_creation(exp, visu)
 
             cv.imshow(f'Experience {exp}', visu)
+            cv.setWindowProperty(f'Experience {exp}', cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
+            cv.setWindowProperty(f'Experience {exp}', cv.WND_PROP_FULLSCREEN, cv.WINDOW_NORMAL)
             self.key = cv.waitKey(0)
-            i = 0
-            while self.key in [55, 56, 57, 52, 53, 54, 49, 50, 51, 48]:
-                i = i * 10 + self.convert_alpha_number[self.key]
-                self.key = cv.waitKey(0)
-                if self.key == 13:
-                    self.idx = i
-            if self.key == 81 or self.key == 82 or self.key == 45:  # left or up or +
-                self.idx -= 1
-            if self.key == 83 or self.key == 84 or self.key == 43:  # right or down or -
-                self.idx += 1
-            if self.key == 100:  # d
-                self.show_disp_overlay += 1
-                if self.show_disp_overlay == 1:
-                    if not experiment['disp_ok']:
-                        self.show_disp_overlay += 1
-                if self.show_disp_overlay >= 2:
-                    if not experiment['depth_ok']:
-                        self.show_disp_overlay = 0
-            if self.key == 105:  # i
-                self.show_idx = not self.show_idx
-            if self.key == 118:  # v
-                self.show_validation = not self.show_validation
-            if self.key == 103:  # g
-                self.show_grad_im = not self.show_grad_im
-            if self.key == 116 and self.device:  # t
-                self.tensor = not self.tensor
-            if self.key == 111 and experiment['occlusion_ok']:  # t
-                self.show_occlusion = not self.show_occlusion
-            if self.key == 9:
+
+            self._execute_cmd(exp)
+            if self.key == ord('\t'):
                 exp_idx += 1
                 exp_idx = exp_idx % len(self.exp_list)
                 exp = self.exp_list[exp_idx]
                 experiment = self.experiment[exp]
+                cv.setWindowProperty(f'Experience {exp}', cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
+                cv.setWindowProperty(f'Experience {exp}', cv.WND_PROP_FULLSCREEN, cv.WINDOW_NORMAL)
                 if self.show_disp_overlay == 1:
                     if not experiment['disp_ok']:
                         self.show_disp_overlay += 1
@@ -236,7 +162,137 @@ class Visualizer:
                     if not experiment['depth_ok']:
                         self.show_disp_overlay = 0
             self.idx = self.idx % self.experiment[exp]['idx_max']
-            # print(self.key)
+        cv.destroyAllWindows()
+
+    def _execute_cmd(self, exp):
+        i = 0
+        experiment = self.experiment[exp]
+        while self.key in [ord('0'), ord('1'), ord('2'), ord('3'), ord('4'),
+                           ord('5'), ord('6'), ord('7'), ord('8'), ord('9')]:  # selection from idx + enter
+            i = i * 10 + int(chr(self.key))
+            self.key = cv.waitKey(0)
+            if self.key == ord('\r'):
+                self.idx = i
+                self.key = -1
+        if self.key == ord('-'):  # +
+            self.idx -= 1
+        if self.key == ord('+'):  # -
+            self.idx += 1
+        if self.key == ord('d'):  # d
+            self.show_disp_overlay += 1
+            if self.show_disp_overlay == 1:
+                if not experiment['disp_ok']:
+                    self.show_disp_overlay += 1
+            if self.show_disp_overlay >= 2:
+                if not experiment['depth_ok']:
+                    self.show_disp_overlay = 0
+        if self.key == ord('i'):
+            self.show_idx = not self.show_idx
+        if self.key == ord('v'):
+            self.show_validation = not self.show_validation
+        if self.key == ord('g'):
+            self.show_grad_im = not self.show_grad_im
+        if self.key == ord('t') and self.device:
+            self.tensor = not self.tensor
+        if self.key == ord('o') and experiment['occlusion_ok']:
+            self.show_occlusion = not self.show_occlusion
+
+    def _create_visual(self, exp):
+        experiment = self.experiment[exp]
+        new_im = ImageTensor(f'{experiment["new_list"][self.idx]}').RGB()
+        if experiment["inputs_available"]:
+            target_im = ImageTensor(f'{experiment["target_list"][self.idx]}').RGB()
+            ref_im = ImageTensor(f'{experiment["ref_list"][self.idx]}').RGB().match_shape(target_im)
+        else:
+            target_im = new_im.clone()
+            ref_im = new_im.clone()
+        if self.show_occlusion:
+            mask = 1 - ImageTensor(
+                f'{experiment["occlusion_path"]}/{experiment["occlusion_mask"][self.idx]}').match_shape(
+                target_im)
+        else:
+            mask = 1
+        visu = (target_im / 2 + new_im * mask / 2).vstack(target_im / 2 + ref_im / 2)
+
+        if self.show_grad_im:
+            grad_im = self._create_grad_im(new_im, ref_im, target_im, mask)
+            visu = visu.hstack(grad_im)
+
+        if self.show_disp_overlay:
+            if self.show_disp_overlay == 1:
+                disp_overlay = self._create_disp_overlay(experiment, ref_im, target_im, mask)
+                visu = visu.hstack(disp_overlay)
+            elif self.show_disp_overlay >= 2:
+                depth_overlay = self._create_depth_overlay(experiment, ref_im, target_im, mask)
+                visu = visu.hstack(depth_overlay)
+
+        h, w = ref_im.shape[-2:]
+
+        while visu.shape[3] > 1920 or visu.shape[2] > 1080:
+            visu = visu.pyrDown()
+            h, w = h // 2, w // 2
+
+        visu = visu.opencv()
+        if self.show_idx:
+            visu = cv.putText(visu, f'idx : {self.idx}', self.org_idx, self.font, self.fontScale, self.color,
+                              self.thickness, cv.LINE_AA)
+
+        if self.show_grad_im:
+            org = self.org_idx[0] + w, self.org_idx[1]
+            visu = cv.putText(visu, f'Image grad : {"with tensor" if self.tensor else "with numpy"}', org,
+                              self.font,
+                              self.fontScale, self.color,
+                              self.thickness, cv.LINE_AA)
+
+        if self.show_validation and experiment['validation_available']:
+            org_val = 10, visu.shape[0] - 65
+            for key, value in experiment['val']['2. results'].items():
+                if key in exp:
+                    occ = 'new_occ' if self.show_occlusion else 'new'
+                    for key_stat, stat in value.items():
+                        stats = f'{key_stat} : {stat[occ][self.idx]} / {stat["ref"][self.idx]}'
+                        if key_stat == 'rmse':
+                            color_val = (0, 0, 255) if stat[occ][self.idx] >= stat['ref'][self.idx] else (0, 255, 0)
+                        else:
+                            color_val = (0, 255, 0) if stat[occ][self.idx] >= stat['ref'][self.idx] else (0, 0, 255)
+                        visu = cv.putText(visu, stats, org_val, self.font, self.fontScale, color_val,
+                                          self.thickness,
+                                          cv.LINE_AA)
+                        org_val = org_val[0], org_val[1] + 15
+        return visu
+
+    def _video_creation(self, exp, visu):
+        experiment = self.experiment[exp]
+        if self.key == ord('w'):
+            self.video_array.append(self.idx)
+        if len(self.video_array) > 2:
+            self.video_array = self.video_array[2:]
+        self.video_array = sorted(self.video_array)
+        org = self.org_idx[0], self.org_idx[1] + 20
+        visu = cv.putText(visu, f'Starting video frame : {self.video_array[0]}', org, self.font, self.fontScale,
+                          self.color,
+                          self.thickness, cv.LINE_AA)
+        if len(self.video_array) == 2:
+            org = self.org_idx[0], self.org_idx[1] + 40
+            visu = cv.putText(visu, f'Ending video frame : {self.video_array[1]}', org, self.font,
+                              self.fontScale, self.color,
+                              self.thickness, cv.LINE_AA)
+            org = self.org_idx[0], self.org_idx[1] + 60
+            visu = cv.putText(visu, f'Choose your format and press "Enter"', org, self.font,
+                              self.fontScale, self.color,
+                              self.thickness, cv.LINE_AA)
+            if self.key == ord('\r'):
+                frames_idx = np.arange(self.video_array[0], self.video_array[1] + 1)
+                visu = self._create_visual(exp)
+                for idx in tqdm(frames_idx, total=len(frames_idx), desc=f"Frames encoding..."):
+                    self.idx = idx
+                    visu = self._create_visual(exp)
+                    experiment['videoWritter'].append(visu)
+                name = input('Enter the Name of the video')
+                experiment['videoWritter'].write(name)
+                self.key = -1
+                self.video_array = []
+        return visu
 
     def _create_grad_im(self, new_im, ref_im, target_im, mask):
         if self.tensor:
@@ -247,7 +303,7 @@ class Visualizer:
             grad_new = grad(new_im)
             grad_ref = grad(ref_im)
             grad_target = grad(target_im)
-        im = (grad_new*mask / 2 + grad_target*mask / 2).vstack(grad_ref / 2 + grad_target / 2)
+        im = (grad_new * mask / 2 + grad_target * mask / 2).vstack(grad_ref / 2 + grad_target / 2)
 
         return im
 
@@ -267,7 +323,9 @@ class Visualizer:
         depth_overlay_target = depth_target * mask
         return (depth_overlay_ref / depth_overlay_ref.max()).vstack(depth_overlay_target / depth_overlay_target.max())
 
+    # def _write_video(self):
+
 
 if __name__ == '__main__':
-    path = "/home/godeta/PycharmProjects/Disparity_Pipeline/results/Camera_position"
+    path = "/home/godeta/PycharmProjects/Disparity_Pipeline/results/methods_comparison"
     Visualizer(path, search_exp=True).run()

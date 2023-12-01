@@ -17,6 +17,7 @@ from utils.classes.Image import ImageTensor
 from utils.classes.KeypointsGenerator import KeypointsGenerator
 # from utils.classes.Registration import Registration
 from utils.classes.StereoSetup import StereoSetup, DepthSetup
+from utils.misc import path_leaf
 from utils.visualization import show_epipolar
 
 
@@ -165,8 +166,10 @@ class CameraSetup(object):
         # self.manual_calibration_available = True if self.registration.model is not None else False
         if from_file and os.path.exists(from_file):
             self._init_from_file_(from_file, self.device)
+            self.name = path_leaf(from_file)
         else:
             self(*args, **kwargs)
+            self.name = 'Camera_Setup'
 
     def __new__(cls, *args, **kwargs):
         new = super(CameraSetup, cls).__new__(cls)

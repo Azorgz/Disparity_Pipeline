@@ -4,28 +4,49 @@ from typing import Union
 
 import oyaml as yaml
 
+from utils.misc import path_leaf
+
 
 class Process(OrderedDict):
 
-    def __init__(self, path: str):
+    def __init__(self, path: str = None, process_dict: dict = None):
         super(Process, self).__init__()
         self.path = path
         self.camera_used = []
-        self._create_from_dict(path)
+        self.option = {}
+        assert path is not None or process_dict is not None
+        if process_dict is not None:
+            self.path = os.getcwd()
+            self._create_from_dict(process_dict)
+        else:
+            self._create_from_path(path)
 
     def __call__(self, sample, *args, **kwargs):
         for experiment in self.values():
             experiment(sample)
 
-    def _create_from_dict(self, path: str) -> None:
+    def _create_from_dict(self, process_dict: dict) -> None:
+        for key, p in process_dict.items():
+            if key.upper() == 'OPTION':
+                self.option = p
+            else:
+                self[key] = self._make_process_dict_(p)
+
+    def _create_from_path(self, path: str) -> None:
         with open(path, 'r') as file:
             process = yaml.safe_load(file)
         for key, p in process.items():
-            self[key] = self._make_process_dict_(p)
+            if key.upper() == 'OPTION':
+                self.option = p
+            else:
+                self[key] = self._make_process_dict_(p)
 
     def init_process(self, pipe) -> None:
-        setup = pipe.setup
-        path_result = os.getcwd() + pipe.path_output
+        if isinstance(pipe.setup, list):
+            setup = pipe.setup[0]
+        else:
+            setup = pipe.setup
+        path_result = pipe.path_output
         if not os.path.exists(path_result):
             os.makedirs(path_result, exist_ok=True)
             os.chmod(path_result, 0o777)
@@ -35,6 +56,7 @@ class Process(OrderedDict):
             path = path_result + f'/{Exp}'
             pred = {}
             res = {'image_reg': [], 'depth_reg': [], 'disp_reg': []}
+            process = []
             for idx, instruction in enumerate(p):
                 key, val = instruction[0], instruction[1]
                 if key == 'DISPARITY':
@@ -55,7 +77,8 @@ class Process(OrderedDict):
                         pred.update({name_var: cam})
                     if 'inference_size' not in val.keys():
                         val['inference_size'] = None
-                    p[idx] = self.disparity(pipe, **val)
+                    val['setup'] = setup
+                    process.append(self.disparity(pipe, **val))
                     if val['cam1'] not in self.camera_used:
                         self.camera_used.append(val['cam1'])
                     if val['cam2'] not in self.camera_used:
@@ -80,7 +103,8 @@ class Process(OrderedDict):
                         pred.update({name_var: cam})
                     if 'inference_size' not in val.keys():
                         val['inference_size'] = None
-                    p[idx] = self.depth(pipe, **val)
+                    val['setup'] = setup
+                    process.append(self.depth(pipe, **val))
                     if val['cam1'] not in self.camera_used:
                         self.camera_used.append(val['cam1'])
                     if val['cam2'] not in self.camera_used:
@@ -123,7 +147,7 @@ class Process(OrderedDict):
                             res.update({'occlusion': [f'{val["cam_src"]}_to_{val["cam_dst"]}']})
 
                     res['image_reg'].append(f'{val["cam_src"]}_to_{val["cam_dst"]}')
-                    p[idx] = self.wrap(pipe, **val)
+                    process.append(self.wrap(pipe, **val))
                     if val['cam_src'] not in self.camera_used:
                         self.camera_used.append(val['cam_src'])
                     if val['cam_dst'] not in self.camera_used:
@@ -136,7 +160,7 @@ class Process(OrderedDict):
                         f'You have to wrap the image before to valid the result. ' \
                         f'{name} is not in the list of the reg images'
                     val['exp_name'] = Exp
-                    p[idx] = self.valid(pipe, **val)
+                    process.append(self.valid(pipe, **val))
                 elif key == 'SAVE':
                     if first_save:
                         first_save = False
@@ -165,28 +189,38 @@ class Process(OrderedDict):
                                 os.mkdir(path_res + f'/{cam}')
                                 os.chmod(path_res + f'/{cam}', 0o777)
                     elif val["variable_name"] == 'pred_depth' or val["variable_name"] == 'pred_disp':
-                        for cam in pred[val["variable_name"]]:
-                            path_used = path_res + f'/{cam}'
-                            if not os.path.exists(path_used):
-                                os.mkdir(path_used)
-                                os.chmod(path_used, 0o777)
+                        if val["variable_name"] in pred.keys():
+                            for cam in pred[val["variable_name"]]:
+                                path_used = path_res + f'/{cam}'
+                                if not os.path.exists(path_used):
+                                    os.mkdir(path_used)
+                                    os.chmod(path_used, 0o777)
+                        else:
+                            val["variable_name"] = None
                     elif val["variable_name"] == 'occlusion':
-                        for cam in res[val["variable_name"]]:
-                            path_used = path_res + f'/{cam}'
-                            if not os.path.exists(path_used):
-                                os.mkdir(path_used)
-                                os.chmod(path_used, 0o777)
+                        if val["variable_name"] in res.keys():
+                            for cam in res[val["variable_name"]]:
+                                path_used = path_res + f'/{cam}'
+                                if not os.path.exists(path_used):
+                                    os.mkdir(path_used)
+                                    os.chmod(path_used, 0o777)
+                        else:
+                            val["variable_name"] = None
                     elif val["variable_name"] == 'image_reg':
-                        for cam in res[val["variable_name"]]:
-                            path_res_ = path_res + f'/{cam}'
-                            if not os.path.exists(path_res_):
-                                os.mkdir(path_res_)
-                                os.chmod(path_res_, 0o777)
+                        if val["variable_name"] in res.keys():
+                            for cam in res[val["variable_name"]]:
+                                path_res_ = path_res + f'/{cam}'
+                                if not os.path.exists(path_res_):
+                                    os.mkdir(path_res_)
+                                    os.chmod(path_res_, 0o777)
+                        else:
+                            val["variable_name"] = None
                     if val["variable_name"] is not None:
-                        p[idx] = self.save(pipe, val["variable_name"], path)
-                    else:
-                        p.pop(idx)
-            self[Exp] = Experiment(p, path)
+                        process.append(self.save(pipe, val["variable_name"], path))
+                    # else:
+                    #     p.pop(idx - pop_count)
+                    #     pop_count += 1
+            self[Exp] = Experiment(process, path)
         pipe.dataloader.camera_used = self.camera_used
 
     @staticmethod
@@ -231,6 +265,8 @@ class Process(OrderedDict):
                 proc.append([key, option])
             elif key == 'SAVE':
                 assert len(p) >= 0, 'The SAVE instruction needs at least 1 positional argument : name_variable'
+                if 'all' in p:
+                    p = ['inputs', 'pred_depth', 'pred_disp', 'image_reg', 'depth_reg', 'disp_reg', 'occlusion']
                 for p_ in p:
                     assert p_ in ['inputs', 'pred_depth', 'pred_disp', 'image_reg', 'depth_reg', 'disp_reg',
                                   'occlusion'], \
@@ -243,7 +279,7 @@ class Process(OrderedDict):
         return proc
 
     @staticmethod
-    def disparity(pipe, cam1, cam2, pred_bidir, pred_right, cut_roi_max, cut_roi_min, inference_size, **kwargs):
+    def disparity(pipe, cam1, cam2, pred_bidir, pred_right, cut_roi_max, cut_roi_min, inference_size, setup, **kwargs):
         def _disparity(sample, res):
             pipe.network.update_pred_bidir(activate=pred_bidir)
             pipe.network.update_pred_right(activate=pred_right)
@@ -251,16 +287,16 @@ class Process(OrderedDict):
                 pipe.network.update_size(inference_size, network='disparity')
             else:
                 pipe.network.update_size(pipe.config['disparity_network']["network_args"].inference_size)
-            setup = pipe.setup.stereo_pair(cam1, cam2)
-            new_sample = setup(sample, cut_roi_min=cut_roi_min, cut_roi_max=cut_roi_max)
+            setup_ = setup.stereo_pair(cam1, cam2)
+            new_sample = setup_(sample, cut_roi_min=cut_roi_min, cut_roi_max=cut_roi_max)
             output = pipe.network(new_sample)
-            output = setup(output, reverse=True)
-            res['pred_disp'].update(setup.disparity_to_depth(output))
+            output = setup_(output, reverse=True)
+            res['pred_disp'].update(setup_.disparity_to_depth(output))
 
         return _disparity
 
     @staticmethod
-    def depth(pipe, cam1, cam2, pred_bidir, pred_right, inference_size, **kwargs):
+    def depth(pipe, cam1, cam2, pred_bidir, pred_right, inference_size, setup, **kwargs):
         def _depth(sample, res):
             pipe.network.update_pred_bidir(activate=pred_bidir)
             pipe.network.update_pred_right(activate=pred_right)
@@ -268,10 +304,10 @@ class Process(OrderedDict):
                 pipe.network.update_size(inference_size, network='depth')
             else:
                 pipe.network.update_size(pipe.config['depth_network']["network_args"].inference_size, network='depth')
-            setup = pipe.setup.depth_pair(cam1, cam2)
-            new_sample = setup(sample)
+            setup_ = setup.depth_pair(cam1, cam2)
+            new_sample = setup_(sample)
             output = pipe.network(**new_sample)
-            res['pred_depth'].update(setup(output, reverse=True))
+            res['pred_depth'].update(setup_(output, reverse=True))
 
         return _depth
 
@@ -383,7 +419,7 @@ class Experiment(list):
         super(Experiment, self).__init__(instructions)
         self.path = path
         if name is None:
-            self.name = os.path.split(path)[1]
+            self.name = path_leaf(path)
         else:
             self.name = name
 

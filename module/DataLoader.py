@@ -7,6 +7,7 @@ import yaml
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from module.SetupCameras import CameraSetup
 from utils.classes.Image import ImageTensor
+from utils.manipulation_tools import merge_dict, list_to_dict
 from utils.misc import timeit, name_generator
 from torch import device
 
@@ -38,6 +39,7 @@ class StereoDataLoader(Dataset):
     This dataloader loads the files according to the options set.
     With an input stereo + mono, specify the geometry on the camera disposition
     """
+
     def __init__(self, setup: CameraSetup, config):
         super(StereoDataLoader, self).__init__()
         self.__update_conf__(config)
@@ -64,16 +66,23 @@ class StereoDataLoader(Dataset):
         else:
             self.nb = int(config["dataset"]["number_of_sample"])
         # If the data needs to be shuffled
+        idx = config["dataset"]["indexes"]
+        if idx is not None:
+            idx = idx % len(self.files[setup.camera_ref])
         self.shuffle = config["dataset"]["shuffle"]
         if config["dataset"]["shuffle"]:
-            idx = np.arange(0, len(self.files[setup.camera_ref]))
+            idx = np.arange(0, len(self.files[setup.camera_ref])) if idx is None else idx
             random.shuffle(idx)
             idx = idx[:self.nb]
             for key, f in self.files.items():
                 self.files[key] = [self.files[key][i] for i in idx]
         else:
             for key, f in self.files.items():
-                self.files[key] = self.files[key][:self.nb]
+                if self.nb < len(self.files[setup.camera_ref]):
+                    self.files[key] = self.files[key][:self.nb] if idx is None else self.files[key][idx]
+                else:
+                    self.files[key] = self.files[key] if idx is None else self.files[key][idx]
+
 
         self.samples = []
         self.camera_used = []
@@ -123,6 +132,6 @@ class StereoDataLoader(Dataset):
     def save_conf(self, output_path):
         name = os.path.join(output_path, "dataset.yaml")
         dataset_conf = OrderedDict({'Number of sample': len(self),
-                                    'Files': {key: p for key, p in self.files.items()}})
+                                    'Files': list_to_dict(self.samples)})
         with open(name, "w") as file:
             yaml.dump(dataset_conf, file)

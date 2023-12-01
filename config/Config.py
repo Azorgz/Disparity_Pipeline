@@ -1,5 +1,6 @@
 import argparse
 import os
+from glob import glob
 from pathlib import Path
 
 from kornia.utils import get_cuda_device_if_available
@@ -8,13 +9,16 @@ from Networks.UniMatch.parser import get_args_parser_depth
 import yaml
 import torch
 from utils import transforms as transforms
+from utils.misc import update
 
 
 class ConfigPipe(dict):
-    def __init__(self):
+    def __init__(self, config_file: dict = None):
         super(ConfigPipe, self).__init__()
         with open('config/config.yml', 'r') as file:
             config = yaml.safe_load(file)
+        if config_file is not None:
+            update(config, config_file)
         self["save_inputs"] = config["save_inputs"]
         self["print_info"] = config["print_info"]
         self["save_disp"] = config["save_disp"]
@@ -31,7 +35,7 @@ class ConfigPipe(dict):
         self.config_reconstruction(config["reconstruction"])
         self.config_validation(config["validation"])
         # self.config_pointCLoud(config['pointsCloud'])
-        self["output_path"] = config["output_path"] + '/' + config["name_experiment"]
+        self["output_path"] = f'{os.getcwd()}/{config["output_path"]}/{config["name_experiment"]}'
         self["name_experiment"] = config["name_experiment"]
         # self["output_path"], self["name_experiment"] = check_path(self)
 
@@ -51,12 +55,23 @@ class ConfigPipe(dict):
         # Creation of the dataset dictionary
         self["dataset"] = {}
         self["dataset"]["shuffle"] = config["shuffle"]
-        self["dataset"]["number_of_sample"] = config["number_of_sample"]
-        self["dataset"]["save_file_list_in_conf"] = config["save_file_list_in_conf"]
+        if config["indexes"] is not None:
+            self["dataset"]["number_of_sample"] = len(config["indexes"])
+            self["dataset"]["indexes"] = config["indexes"]
+        else:
+            self["dataset"]["number_of_sample"] = config["number_of_sample"]
+            self["dataset"]["indexes"] = None
+        # self["dataset"]["save_file_list_in_conf"] = config["save_file_list_in_conf"]
 
     def config_setup(self, config):
         self["setup"] = {}
-        self["setup"]['path'] = config['path']
+
+        if os.path.isdir(config['path']):
+            self["setup"]['path'] = sorted(glob(config['path'] + '/*.yaml'))
+            self["setup"]['multi'] = True
+        else:
+            self["setup"]['path'] = config['path']
+            self["setup"]['multi'] = False
 
     def config_disparity_network(self, config):
         self["disparity_network"] = {}

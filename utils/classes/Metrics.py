@@ -71,7 +71,7 @@ class Metric_ssim_tensor(BaseMetric_Tensor):
                          reduction=None,
                          data_range=None,
                          k1=0.01, k2=0.03,
-                         return_full_image=False,
+                         return_full_image=True,
                          return_contrast_sensitivity=False).to(self.device)
         self.metric = "SSIM"
         self.commentary = "The higher, the better"
@@ -79,9 +79,15 @@ class Metric_ssim_tensor(BaseMetric_Tensor):
     def __call__(self, im1, im2, *args, mask=None, **kwargs):
         super().__call__(im1, im2, *args, mask=mask, **kwargs)
         if mask is None:
-            self.value = self.ssim(self.image_test, self.image_true)
+            self.value, temp = self.ssim(self.image_test, self.image_true)
+            self.ssim.reset()
+            del temp
         else:
-            self.value = self.ssim(self.image_test * mask, self.image_true * mask)
+            temp, image = self.ssim(self.image_test, self.image_true)
+            self.value = image[mask].mean()
+            self.ssim.reset()
+            del temp
+            # self.value = self.ssim(self.image_test * mask, self.image_true * mask)
         return self.value
 
     def scale(self):
@@ -108,6 +114,9 @@ class MultiScaleSSIM_tensor(BaseMetric_Tensor):
             self.value = self.ms_ssim(self.image_test, self.image_true)
         else:
             self.value = self.ms_ssim(self.image_test*mask, self.image_true*mask)
+            nb_pixel_im = self.image_test.shape[-2] * self.image_test.shape[-1]
+            nb_pixel_mask = (~mask).to(torch.float32).sum()
+            self.value = (self.value*nb_pixel_im - nb_pixel_mask) / (nb_pixel_im - nb_pixel_mask)
         return self.value
 
     def scale(self):

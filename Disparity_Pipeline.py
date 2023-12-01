@@ -3,7 +3,7 @@ import warnings
 import oyaml as yaml
 import torch
 from tqdm import tqdm
-
+from alive_progress import alive_bar
 # Config
 from config.Config import ConfigPipe
 from module.DataLoader import StereoDataLoader
@@ -53,9 +53,9 @@ class Pipe:
         # The different modules of the Pipe are initialized ###############
         self.modules = {}
         self._init_setup_()
-        self._init_dataloader_()
+        self._init_dataloader_(self.setup[0])
         self._init_network_()
-        self._init_wrapper_()
+        self._init_wrapper_(self.setup[0])
         self._init_saver_()
         self._init_validation_()
         # self._init_pointsCloud_()
@@ -69,20 +69,27 @@ class Pipe:
         if process is not None:
             process.init_process(self)
             for name_experiment, experiment in process.items():
-                for idx, sample in tqdm(enumerate(self.dataloader),
-                                        total=len(self.dataloader),
-                                        desc=f"Nombre d'itérations for {name_experiment}: "):
-                    experiment(sample)
-                if self.timeit:
-                    self.save_timers(experiment)
-                    self.reset_timers()
-                if self.save_inputs:
-                    self.dataloader.save_conf(experiment.path)
-                self.validation.statistic()
-                self.validation.save(experiment.path)
-                self.validation.reset()
-            gen = CSV_Generator(os.getcwd() + self.path_output)
-            gen.save(os.getcwd() + self.path_output + "/Results.xlsx")
+                name = None
+                for i, s in enumerate(self.setup):
+                    if i > 0:
+                        self._init_dataloader_(s)
+                        self.dataloader.camera_used = process.camera_used
+                        self._init_wrapper_(s)
+                        name = s.name
+                    for idx, sample in tqdm(enumerate(self.dataloader),
+                                            total=len(self.dataloader),
+                                            desc=f"Nombre d'itérations for {name_experiment}: "):
+                        experiment(sample)
+                    if self.timeit:
+                        self.save_timers(experiment, name)
+                        self.reset_timers()
+                    if self.save_inputs:
+                        self.dataloader.save_conf(experiment.path)
+                    self.validation.statistic()
+                    self.validation.save(experiment.path, name)
+                    self.validation.reset()
+                # gen = CSV_Generator(self.path_output)
+                # gen.save(self.path_output + "/Results.xlsx")
 
         else:
             for idx, sample in tqdm(enumerate(self.dataloader),
@@ -133,7 +140,7 @@ class Pipe:
             # if self.timeit:
             #     self.save_timers()
 
-    def save_timers(self, experiment=None):
+    def save_timers(self, experiment=None, filename=None):
         path = experiment.path
         time_dict = {"1. Sample Number": len(self.dataloader),
                      "2. Total Execution time": {experiment.name: "0"},
@@ -153,7 +160,10 @@ class Pipe:
         time_dict["2. Total Execution time"][experiment.name] = time2str(tot)
         if path is None:
             path = self.path_output
-        name = os.path.join(path, "Execution_time.yaml")
+        if filename is not None:
+            name = os.path.join(path, f"Execution_time_{filename}.yaml")
+        else:
+            name = os.path.join(path, "Execution_time.yaml")
         with open(name, "w") as file:
             yaml.dump(time_dict, file)
 
@@ -164,11 +174,17 @@ class Pipe:
     @torch.no_grad()
     def _init_setup_(self):
         assert self.config["setup"]['path'] is not None
-        self.setup = CameraSetup(from_file=self.config["setup"]['path'], device=self.device)
+        if self.config["setup"]['multi']:
+            self.setup = [CameraSetup(from_file=p, device=self.device) for p in
+                          tqdm(self.config["setup"]['path'],
+                               total=len(self.config["setup"]['path']),
+                               desc=f"Configuration of the different Setup")]
+        else:
+            self.setup = [CameraSetup(from_file=self.config["setup"]['path'], device=self.device)]
 
     @torch.no_grad()
-    def _init_dataloader_(self):
-        self.dataloader = StereoDataLoader(self.setup, self.config)
+    def _init_dataloader_(self, setup):
+        self.dataloader = StereoDataLoader(setup, self.config)
         self.modules['dataloader'] = self.dataloader
 
     @torch.no_grad()
@@ -177,12 +193,12 @@ class Pipe:
         self.modules['network'] = self.network
 
     @torch.no_grad()
-    def _init_wrapper_(self):
-        self.wrapper = ImageWrapper(self.config, self.setup)
+    def _init_wrapper_(self, setup):
+        self.wrapper = ImageWrapper(self.config, setup)
         self.modules['wrapper'] = self.wrapper
 
     def _init_saver_(self):
-        self.saver = ImageSaver(config)
+        self.saver = ImageSaver(self.config)
         self.modules['saver'] = self.saver
 
     @torch.no_grad()
@@ -202,8 +218,8 @@ class Pipe:
 
 if __name__ == '__main__':
     warnings.filterwarnings('ignore')
-    Process = Process(os.getcwd() + '/Process.yaml')
-    config = ConfigPipe()
+    Process = Process(os.getcwd() + '/Process_resolution.yaml')
+    config = ConfigPipe(Process.option)
     pipe = Pipe(config)
     pipe.run(Process)
     print('Done !')

@@ -1,5 +1,6 @@
 import time
 from collections.abc import Iterable
+from typing import Union
 
 import cv2 as cv
 import numpy as np
@@ -62,11 +63,23 @@ def random_noise(mean, std, *args):
     else:
         noise = (np.random.random([len(args)]) - 0.5) * 2
         noise -= noise.mean() + mean
-        noise = noise / (noise**2).sum() * std
+        noise = noise / (noise ** 2).sum() * std
     if len(args) == 1:
         args = float(args[0])
         noise = float(noise[0])
-    return noise+args
+    return noise + args
+
+
+def list_to_dict(list_of_dict):
+    res = {}
+    for d in list_of_dict:
+        if d.keys() == res.keys():
+            for key in d.keys():
+                res[key].append(d[key])
+        else:
+            for key in d.keys():
+                res[key] = [d[key]]
+    return res
 
 
 def merge_dict(dict1: dict, dict2: dict, *args):
@@ -93,9 +106,11 @@ def merge_dict(dict1: dict, dict2: dict, *args):
                 #         res[k][idx] = [r1, *r2]
                 #     else:
                 #         res[k][idx] = [r1, r2]
-            elif isinstance(res[k], list) and (isinstance(dict2[k], float) or isinstance(dict2[k], int)):
+            elif (isinstance(res[k], list) and
+                  (isinstance(dict2[k], float) or isinstance(dict2[k], int) or isinstance(dict2[k], str))):
                 res[k] = [*res[k], dict2[k]]
-            elif (isinstance(res[k], float)  or isinstance(dict2[k], int)) and isinstance(dict2[k], list):
+            elif ((isinstance(res[k], float) or isinstance(res[k], int) or isinstance(res[k], str)) and
+                  isinstance(dict2[k], list)):
                 res[k] = [res[k], *dict2[k]]
             else:
                 res[k] = [res[k], dict2[k]]

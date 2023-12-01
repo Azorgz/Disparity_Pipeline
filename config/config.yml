@@ -11,7 +11,7 @@ reset_images_name: True # Change the images original name for an incremental nam
 
 
 # General option if there is no Process specified
-name_experiment: Camera_position
+name_experiment: methods_comparison
 save_inputs: True # Save the input images paths
 save_disp: True # Save all the disparity images computed
 save_reg_images: True # Save the final Registered image
@@ -19,14 +19,17 @@ save_reg_images: True # Save the final Registered image
 
 # Cameras Setup #########
 setup: # Paths to the config file of the pre-calibrated camera's setup
-  path: Setup_Camera/error_5e-2_5e-4.yaml
+  path: Setup_Camera.yaml
+
 
 # Dataset #########
 dataset:
-  number_of_sample: 100
+  number_of_sample: 0
+  indexes: null
   shuffle: True # True if the data need to be randomly picked
   save_dataset_conf: True # If a conf is loaded it won't be erased even if this option is true
   save_file_list_in_conf: False  # If the conf is saved the list of file is saved only if this option is true
+
 
 # Disparity Network #########
 disparity_network:
@@ -42,6 +45,7 @@ disparity_network:
     match_shape: False # If the entrance images need to have matching shape / number of channels
     normalize: True # If a boolean is given, the mean and std will be automatically set. Other possibility : (mean, std)
 
+
 # Depth Network #########
 depth_network:
   name: unimatch # Possibilities : unimatch, custom
@@ -56,11 +60,13 @@ depth_network:
     match_shape: False # If the entrance images need to have matching shape / number of channels
     normalize: True # If a boolean is given, the mean and std will be automatically set. Other possibility : (mean, std)
 
+
 # Reconstruction
 reconstruction:
   remove_occlusion: True # If True the occluded pixels will be suppressed of the resampled image
   post_process_depth: 5 # If method_3d is >0 a median blurring and a dilation for disparity will be done
   post_process_image: 3
+
 
 # Validation of the result #######
 validation:

@@ -25,66 +25,85 @@
 #  valid:
 #  save:
 
-#Depth-Depth:
-#  depth:
-#    cameras: [RGB, RGB2]
-#    option: []
-#  wrap:
-#    cameras: [RGB2, RGB]
-#    method: disparity
-#    source: pred_depth
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [RGB2, RGB]
-##  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]
-#
-#Depth-Disparity:
-#  depth:
-#    cameras: [RGB, RGB2]
-#    option: []
-#  wrap:
-#    cameras: [RGB2, RGB]
-#    method: disparity
-#    source: pred_depth
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [RGB2, RGB]
-##  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]
-#
-#Disparity-Disparity:
-#  disparity:
-#    cameras: [RGB, RGB2]
-#    option: []
-#  wrap:
-#    cameras: [RGB2, RGB]
-#    method: disparity
-#    source: pred_disp
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [RGB2, RGB]
-##  save: [pred_disp, image_reg, disp_reg, inputs, occlusion]
-#
-#Disparity-Depth:
-#  disparity:
-#    cameras: [RGB, RGB2]
-#    option: []
-#  wrap:
-#    cameras: [RGB2, RGB]
-#    method: depth
-#    source: pred_disp
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [RGB2, RGB]
-##  save: [pred_disp, image_reg, disp_reg, inputs, occlusion]
+Option:
+  name_experiment: Test
+  setup: # Paths to the config file of the pre-calibrated camera's setup
+    path: Setup_Camera.yaml
+  dataset:
+    number_of_sample: 10
+    shuffle: False
 
 
-Disparity-HD_5e-2_5e-4:
+Depth-Depth:
+  depth:
+    cameras: [RGB, RGB2]
+    option: []
+  wrap:
+    cameras: [IR, RGB]
+    method: depth
+    source: pred_depth
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [IR, RGB]
+  save: [pred_depth, image_reg, depth_reg, occlusion]
+
+Depth-Disparity:
+  depth:
+    cameras: [RGB, RGB2]
+    option: []
+  wrap:
+    cameras: [IR, RGB]
+    method: disparity
+    source: pred_depth
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [IR, RGB]
+  save: [pred_depth, image_reg, depth_reg, occlusion]
+
+Disparity-Disparity:
   disparity:
     cameras: [RGB, RGB2]
-    option: [inference_size: [640, 960]]
+    option: []
   wrap:
-    cameras: [RGB2, RGB]
+    cameras: [IR, RGB]
     method: disparity
     source: pred_disp
     option: [return_depth_reg, return_occlusion, []]
-  valid: [RGB2, RGB]
+  valid: [IR, RGB]
   save: [pred_disp, image_reg, disp_reg, occlusion]
+
+Disparity-Depth:
+  disparity:
+    cameras: [RGB, RGB2]
+    option: []
+  wrap:
+    cameras: [IR, RGB]
+    method: depth
+    source: pred_disp
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [IR, RGB]
+  save: [pred_disp, image_reg, disp_reg, occlusion]
+#Depth:
+#  depth:
+#    cameras: [RGB, RGB2]
+#    option: [inference_size: [960, 1280]]
+#  wrap:
+#    cameras: [RGB2, RGB]
+#    method: depth
+#    source: pred_depth
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [RGB2, RGB]
+##  save: [pred_depth, image_reg, depth_reg, occlusion]
+
+#Disparity:
+#  disparity:
+#    cameras: [RGB, RGB2]
+#    option: [inference_size: [640, 960]]
+#  wrap:
+#    cameras: [RGB2, RGB]
+#    method: disparity
+#    source: pred_disp
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [RGB2, RGB]
+##  save: [pred_disp, image_reg, disp_reg, occlusion]
 
 #Disparity-LD:
 #  disparity:
@@ -98,17 +117,6 @@ Disparity-HD_5e-2_5e-4:
 #  valid: [RGB2, RGB]
 ##  save: [pred_disp, image_reg, disp_reg, occlusion]
 #
-Depth-HD_5e-2_5e-4:
-  depth:
-    cameras: [RGB, RGB2]
-    option: [inference_size: [960, 1280]]
-  wrap:
-    cameras: [RGB2, RGB]
-    method: depth
-    source: pred_depth
-    option: [return_depth_reg, return_occlusion, []]
-  valid: [RGB2, RGB]
-  save: [pred_depth, image_reg, depth_reg, occlusion]
 #
 #Depth-LD:
 #  depth:

@@ -72,7 +72,7 @@ class DepthWrapper:
         cloud = torch.concatenate([points_2d_src, points_3d_src[:, :, :, -1:]], dim=-1)
 
         grid = Tensor(points_2d_src_norm).clone()
-        mask_valid = torch.ones(height*width).to(torch.bool).to(self.device)
+        mask_valid = torch.ones(h*w).to(torch.bool).to(self.device)
         res = {'image_reg': F.grid_sample(image_src, grid, align_corners=True)}
         if return_occlusion:
             res['occlusion'] = self.find_occlusion(cloud, [height, width])

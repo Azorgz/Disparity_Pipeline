@@ -60,15 +60,16 @@ class Validation(BaseModule):
         for key, n in self.norms.items():
             if key not in self.res[name].keys():
                 self.res[name][key] = {}
-            res_new = n(ref, new)
-            res_old = n(ref, old)
+            mask = new > 0
+            res_new = n(ref, new, mask=mask)
+            res_old = n(ref, old, mask=mask)
             if occlusion is not None:
                 res_occlusion = n(ref, new, mask=~occlusion)
             else:
                 res_occlusion = -1
-            res = {exp_name: {'ref': round(float(res_old), 3),
-                              'new': round(float(res_new), 3),
-                              'new_occ': round(float(res_occlusion), 3)}}
+            res = {'ref': round(float(res_old), 3),
+                   'new': round(float(res_new), 4),
+                   'new_occ': round(float(res_occlusion), 4)}
             if self.res[name][key] == {}:
                 self.res[name][key] = res
             else:
@@ -81,21 +82,23 @@ class Validation(BaseModule):
             for key_norms, n in norms.items():
                 self.res_stats[key][key_norms] = {}
                 for key_stat, stat in self.stats.items():
-                    sample = self.res[key][key_norms][self.exp_name]
+                    sample = self.res[key][key_norms]
                     res_stat = stat(np.array(sample['new']), 0).round(3)
                     ref_stat = stat(np.array(sample['ref']), 0).round(3)
                     occlusion_stat = stat(np.array(sample['new_occ']), 0).round(3)
-                    self.res_stats[key][key_norms][key_stat] = {self.exp_name: {'ref': float(res_stat),
-                                                                                'new': float(ref_stat),
-                                                                                'new_occ': float(
-                                                                                    occlusion_stat)}}
+                    self.res_stats[key][key_norms][key_stat] = {'ref': float(ref_stat),
+                                                                'new': float(res_stat),
+                                                                'new_occ': float(occlusion_stat)}
 
     def reset(self):
         self._update_conf(self.config)
 
     @deactivated
-    def save(self, path):
-        name = os.path.join(path, "Validation.yaml")
+    def save(self, path, name=None):
+        if name is None:
+            name = os.path.join(path, "Validation.yaml")
+        else:
+            name = os.path.join(path, f"Validation_{name}.yaml")
         stat_dict = {key: np.array(item).tolist() for key, item in self.res_stats.items()}
         res_dict = {key: np.array(item).tolist() for key, item in self.res.items()}
         # ref_dict = {key: np.array(item).tolist() for key, item in self.ref.items()}

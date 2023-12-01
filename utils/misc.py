@@ -1,4 +1,6 @@
+import collections.abc
 import math
+import ntpath
 import os
 import sys
 import stat
@@ -20,7 +22,7 @@ def name_generator(idx, max_number=10e4):
     k_str = str(idx)
     digits = 1 if max_number < 10 else int(math.log10(max_number)) + 1
     current_digits = 1 if idx < 10 else int(math.log10(idx)) + 1
-    for i in range(digits-current_digits):
+    for i in range(digits - current_digits):
         k_str = '0' + k_str
     return k_str
 
@@ -65,6 +67,28 @@ def update_name(path):
         path_exp = path + f"({i})"
         path_ok = not os.path.exists(path_exp)
     return path_exp
+
+
+def path_leaf(path):
+    if os.path.isdir(path):
+        res = ntpath.split(path)[-1]
+    else:
+        res = ntpath.split(path)[-1].split(".")[:-1]
+    if isinstance(res, list):
+        if len(res) > 1:
+            res = ''.join(res)
+        else:
+            res = res[0]
+    return res
+
+
+def update(d, u):
+    for k, v in u.items():
+        if isinstance(v, collections.abc.Mapping):
+            d[k] = update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
 
 
 def count_parameter(model):
@@ -143,7 +167,6 @@ def form_cloud_data(sample, pred_disp, image_reg, new_disp, config):
             cloud_disp['other'] = new_disp.copy()
         cloud_sample = {key: im.copy() for key, im in sample.items()}
     return cloud_sample, cloud_disp
-
 
 # def save_command(save_path, filename='command_train.txt'):
 #     check_path(save_path)

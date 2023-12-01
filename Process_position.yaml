@@ -1,0 +1,31 @@
+Option:
+  name_experiment: camera_position
+  setup: # Paths to the config file of the pre-calibrated camera's setup
+    path: Setup_Camera
+  dataset:
+    number_of_sample: 0
+    shuffle: False
+
+Depth:
+  depth:
+    cameras: [RGB, RGB2]
+    option: [inference_size: [960, 1280]]
+  wrap:
+    cameras: [RGB2, RGB]
+    method: depth
+    source: pred_depth
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [RGB2, RGB]
+#  save: [pred_depth, image_reg, depth_reg, occlusion]
+
+Disparity:
+  disparity:
+    cameras: [RGB, RGB2]
+    option: [inference_size: [640, 960]]
+  wrap:
+    cameras: [RGB2, RGB]
+    method: disparity
+    source: pred_disp
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [RGB2, RGB]
+#  save: [pred_disp, image_reg, disp_reg, occlusion]
