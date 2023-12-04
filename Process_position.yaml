@@ -4,28 +4,55 @@ Option:
     path: Setup_Camera
   dataset:
     number_of_sample: 0
+    indexes: [218, 544, 1153, 1633, 1773, 2372, 2452, 2901, 3248, 3506]
     shuffle: False
 
-Depth:
-  depth:
-    cameras: [RGB, RGB2]
-    option: [inference_size: [960, 1280]]
+Disparity-Depth:
+  disparity:
+    cameras: [ RGB, RGB2 ]
+    option: [ inference_size: [ 320, 480 ] ]
   wrap:
-    cameras: [RGB2, RGB]
+    cameras: [ IR, RGB ]
     method: depth
-    source: pred_depth
-    option: [return_depth_reg, return_occlusion, []]
-  valid: [RGB2, RGB]
-#  save: [pred_depth, image_reg, depth_reg, occlusion]
+    source: pred_disp
+    option: [ return_depth_reg, [ ] ]
+  valid: [ IR, RGB ]
+  save: [ pred_disp, image_reg, disp_reg ]
 
-Disparity:
+
+Depth-Disparity:
+  depth:
+    cameras: [ RGB, RGB2 ]
+    option: [ inference_size: [ 480, 640 ] ]
+  wrap:
+    cameras: [ IR, RGB ]
+    method: disparity
+    source: pred_depth
+    option: [ return_depth_reg, [ ] ]
+  valid: [ IR, RGB ]
+  save: [ pred_depth, image_reg, depth_reg ]
+
+Disparity-Disparity:
   disparity:
     cameras: [RGB, RGB2]
-    option: [inference_size: [640, 960]]
+    option: [inference_size: [320, 480]]
   wrap:
-    cameras: [RGB2, RGB]
+    cameras: [IR, RGB]
     method: disparity
     source: pred_disp
-    option: [return_depth_reg, return_occlusion, []]
-  valid: [RGB2, RGB]
-#  save: [pred_disp, image_reg, disp_reg, occlusion]
+    option: [return_depth_reg, []]
+  valid: [IR, RGB]
+  save: [pred_disp, image_reg, disp_reg]
+
+
+Depth-Depth:
+  depth:
+    cameras: [RGB, RGB2]
+    option: [inference_size: [480, 640]]
+  wrap:
+    cameras: [IR, RGB]
+    method: depth
+    source: pred_depth
+    option: [return_depth_reg, []]
+  valid: [IR, RGB]
+  save: [pred_depth, image_reg, depth_reg]

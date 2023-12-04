@@ -6,9 +6,9 @@ from utils.classes.Cameras import RGBCamera, IRCamera
 from module.SetupCameras import CameraSetup
 from utils.manipulation_tools import random_noise
 
-path_RGB = '/home/godeta/PycharmProjects/Disparity_Pipeline/dataset/vis_left'
-path_IR = '/home/godeta/PycharmProjects/Disparity_Pipeline/dataset/ir_left'
-path_RGB2 = '/home/godeta/PycharmProjects/Disparity_Pipeline/dataset/vis_right'
+path_RGB = '/home/aurelien/Images/Images/Day/master/visible'
+path_RGB2 = '/home/aurelien/Images/Images/Day/slave/visible'
+path_IR = '/home/aurelien/Images/Images/Day/master/infrared_corrected'
 
 IR = IRCamera(None, None, path_IR, device=torch.device('cuda'), name='IR', f=14e-3, pixel_size=(16.4e-6, 16.4e-6),
               aperture=1.2)
@@ -47,4 +47,4 @@ for m_dist, s_dst, m_angle, s_angle in zip(mean_dist, std_dst, mean_angle, std_a
     R.calibration_for_depth('IR', 'RGB')
     R.calibration_for_depth('RGB', 'RGB2')
     name = f'Dist_err_{m_dist:.4e}_Angle_err_{m_dist:.5e}'.replace('.', '_') + '.yaml'
-    R.save('/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera', name)
+    R.save('/home/aurelien/PycharmProjects/Disparity_Pipeline/Setup_Camera', name)

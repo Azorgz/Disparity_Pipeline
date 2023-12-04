@@ -3,7 +3,6 @@ import warnings
 import oyaml as yaml
 import torch
 from tqdm import tqdm
-from alive_progress import alive_bar
 # Config
 from config.Config import ConfigPipe
 from module.DataLoader import StereoDataLoader
@@ -15,13 +14,8 @@ from module.SetupCameras import CameraSetup
 # module
 from module.SuperNetwork import SuperNetwork
 from module.Validation import Validation
-from utils.classes.CSV_Generator import CSV_Generator
 # Utils
 from utils.misc import time2str  # , form_cloud_data
-
-
-# from utils.disparity_tools import find_occluded_pixel
-
 
 # Networks
 

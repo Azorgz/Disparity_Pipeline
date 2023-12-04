@@ -6,7 +6,32 @@ Option:
     number_of_sample: 0
     shuffle: False
 
-Disparity-LD:
+Disparity-Depth LD:
+  disparity:
+    cameras: [ RGB, RGB2 ]
+    option: [ inference_size: [ 320, 480 ] ]
+  wrap:
+    cameras: [ IR, RGB ]
+    method: depth
+    source: pred_disp
+    option: [ return_depth_reg, return_occlusion, [ ] ]
+  valid: [ IR, RGB ]
+  save: [ pred_disp, image_reg, disp_reg, occlusion ]
+
+
+Depth-Disparity LD:
+  depth:
+    cameras: [ RGB, RGB2 ]
+    option: [ inference_size: [ 480, 640 ] ]
+  wrap:
+    cameras: [ IR, RGB ]
+    method: disparity
+    source: pred_depth
+    option: [ return_depth_reg, return_occlusion, [ ] ]
+  valid: [ IR, RGB ]
+  save: [ pred_depth, image_reg, depth_reg, occlusion ]
+
+Disparity-Disparity LD:
   disparity:
     cameras: [RGB, RGB2]
     option: [inference_size: [320, 480]]
@@ -19,7 +44,7 @@ Disparity-LD:
   save: [pred_disp, image_reg, disp_reg, occlusion]
 
 
-Depth-LD:
+Depth-Depth LD:
   depth:
     cameras: [RGB, RGB2]
     option: [inference_size: [480, 640]]

@@ -106,6 +106,9 @@ class ResultFrame:
     def delta_occ_full(self):
         return ValFrame(dict(self.values.T.delta_occ))
 
+    def display(self):
+        self._visu.run()
+
 
 class TimeFrame(DataFrame):
     """

@@ -327,5 +327,5 @@ class Visualizer:
 
 
 if __name__ == '__main__':
-    path = "/home/godeta/PycharmProjects/Disparity_Pipeline/results/methods_comparison"
+    path = "/home/aurelien/PycharmProjects/Disparity_Pipeline/results/resolution_comparison"
     Visualizer(path, search_exp=True).run()

@@ -17,4 +17,4 @@ def full_process(script_path):
 
 
 if __name__ == '__main__':
-    full_process('Test.yaml')
+    full_process('Process_resolution.yaml')

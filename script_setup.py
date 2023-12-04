@@ -6,10 +6,10 @@ from utils.classes.Cameras import RGBCamera, IRCamera
 from module.SetupCameras import CameraSetup
 from utils.manipulation_tools import random_noise
 noise = False
-path = '/home/godeta/PycharmProjects/LYNRED/Images/Day/master/visible'
-path2 = '/home/godeta/PycharmProjects/LYNRED/Images/Day/slave/visible'
-path1 = '/home/godeta/PycharmProjects/LYNRED/Images/Day/master/infrared_corrected'
-path3 = '/home/godeta/PycharmProjects/LYNRED/Images/Day/slave/infrared_corrected'
+path = '/home/aurelien/Images/Images/Day/master/visible'
+path2 = '/home/aurelien/Images/Images/Day/slave/visible'
+path1 = '/home/aurelien/Images/Images/Day/master/infrared_corrected'
+path3 = '/home/aurelien/Images/Images/Day/slave/infrared_corrected'
 
 IR = IRCamera(None, None, path1, device=torch.device('cuda'), name='IR', f=14e-3, pixel_size=(16.4e-6, 16.4e-6),
               aperture=1.2)
@@ -55,7 +55,7 @@ if not noise:
 
     R.calibration_for_depth('IR', 'IR2')
     R.calibration_for_depth('RGB', 'RGB2')
-    R.save('/home/godeta/PycharmProjects/Disparity_Pipeline/', 'Setup_Camera.yaml')
+    R.save('/home/aurelien/PycharmProjects/Disparity_Pipeline/', 'Setup_Camera.yaml')
 else:
     mean_dist = np.arange(0, 10**-1, 10**-3).tolist()
     std_dst = np.arange(0, 10**-2, 10**-4).tolist()
@@ -98,4 +98,4 @@ else:
         # R.calibration_for_depth('IR', 'IR2')
         R.calibration_for_depth('RGB', 'RGB2')
         name = f'Dist_err_{m_dist:.4e}_Angle_err_{m_dist:.5e}'.replace('.', '_') + '.yaml'
-        R.save('/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera', name)
+        R.save('/home/aurelien/PycharmProjects/Disparity_Pipeline/Setup_Camera', name)
