@@ -1,3 +1,4 @@
+import os
 import time
 
 import numpy as np
@@ -16,9 +17,9 @@ from Result_analysis.ResultFrame import ResultFrame
 #
 # from utils.registration_tools import SIFT
 # from utils.visualization import result_visualizer, visual_control
-base_path = "/home/aurelien/PycharmProjects/Disparity_Pipeline/results/"
-res = ResultFrame(base_path + "resolution_comparison/Depth-Depth LD")
-delta = res.delta
+base_path = os.getcwd() + "/results/"
+res = ResultFrame(base_path + "camera_position/Disparity-Depth")
+# delta = res.delta
 
 time.sleep(1)
 #
