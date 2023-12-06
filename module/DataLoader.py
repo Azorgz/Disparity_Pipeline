@@ -68,7 +68,7 @@ class StereoDataLoader(Dataset):
         # If the data needs to be shuffled
         idx = config["dataset"]["indexes"]
         if idx is not None:
-            idx = idx % len(self.files[setup.camera_ref])
+            idx = np.uint64(idx) % len(self.files[setup.camera_ref])
         self.shuffle = config["dataset"]["shuffle"]
         if config["dataset"]["shuffle"]:
             idx = np.arange(0, len(self.files[setup.camera_ref])) if idx is None else idx
@@ -79,9 +79,9 @@ class StereoDataLoader(Dataset):
         else:
             for key, f in self.files.items():
                 if self.nb < len(self.files[setup.camera_ref]):
-                    self.files[key] = self.files[key][:self.nb] if idx is None else self.files[key][idx]
+                    self.files[key] = self.files[key][:self.nb] if idx is None else np.array(self.files[key])[idx].tolist()
                 else:
-                    self.files[key] = self.files[key] if idx is None else self.files[key][idx]
+                    self.files[key] = self.files[key] if idx is None else np.array(self.files[key])[idx].tolist()
 
 
         self.samples = []

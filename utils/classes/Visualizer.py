@@ -327,5 +327,5 @@ class Visualizer:
 
 
 if __name__ == '__main__':
-    path = "/home/aurelien/PycharmProjects/Disparity_Pipeline/results/resolution_comparison"
-    Visualizer(path, search_exp=True).run()
+    path = "/home/godeta/PycharmProjects/Disparity_Pipeline/results/camera_position/Disparity-Depth"
+    Visualizer(path, search_exp=False).run()

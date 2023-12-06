@@ -14,8 +14,10 @@ from module.SetupCameras import CameraSetup
 # module
 from module.SuperNetwork import SuperNetwork
 from module.Validation import Validation
+from utils.manipulation_tools import merge_dict
 # Utils
 from utils.misc import time2str  # , form_cloud_data
+
 
 # Networks
 
@@ -63,27 +65,32 @@ class Pipe:
         if process is not None:
             process.init_process(self)
             for name_experiment, experiment in process.items():
-                name = None
-                for i, s in enumerate(self.setup):
-                    if i > 0:
-                        self._init_dataloader_(s)
-                        self.dataloader.camera_used = process.camera_used
-                        self._init_wrapper_(s)
-                        name = s.name
-                    for idx, sample in tqdm(enumerate(self.dataloader),
-                                            total=len(self.dataloader),
-                                            desc=f"Nombre d'itérations for {name_experiment}: "):
-                        experiment(sample)
-                    if self.timeit:
-                        self.save_timers(experiment, name)
-                        self.reset_timers()
-                    if self.save_inputs:
-                        self.dataloader.save_conf(experiment.path)
-                    self.validation.statistic()
-                    self.validation.save(experiment.path, name)
-                    self.validation.reset()
-                # gen = CSV_Generator(self.path_output)
-                # gen.save(self.path_output + "/Results.xlsx")
+                with tqdm(total=len(self.setup) * len(self.dataloader),
+                          desc=f"Nombre d'itérations for {name_experiment}: ", delay=1) as bar:
+                    name = None
+                    for i, s in enumerate(self.setup):
+                        if i > 0:
+                            self._init_dataloader_(s)
+                            self.dataloader.camera_used = process.camera_used
+                            self._init_wrapper_(s)
+                            # name = s.name
+                        for idx, sample in enumerate(self.dataloader):
+                            # tqdm(enumerate(self.dataloader),
+                            #      total=len(self.dataloader),
+                            #      desc=f"Nombre d'itérations for {name_experiment}: "):
+                            experiment(sample)
+                            bar.update(1)
+                        if self.timeit:
+                            self.save_timers(experiment, name, replace=True if i > 0 else False)
+                            self.reset_timers()
+                        if self.save_inputs and i == 0:
+                            self.dataloader.save_conf(experiment.path)
+                        self.validation.statistic()
+                        if i > 0:
+                            self.validation.save(experiment.path, 'Validation.yaml')
+                        else:
+                            self.validation.save(experiment.path)
+                        self.validation.reset()
 
         else:
             for idx, sample in tqdm(enumerate(self.dataloader),
@@ -134,7 +141,7 @@ class Pipe:
             # if self.timeit:
             #     self.save_timers()
 
-    def save_timers(self, experiment=None, filename=None):
+    def save_timers(self, experiment=None, filename=None, replace=False):
         path = experiment.path
         time_dict = {"1. Sample Number": len(self.dataloader),
                      "2. Total Execution time": {experiment.name: "0"},
@@ -158,6 +165,13 @@ class Pipe:
             name = os.path.join(path, f"Execution_time_{filename}.yaml")
         else:
             name = os.path.join(path, "Execution_time.yaml")
+        if replace:
+            try:
+                with open(name, 'r') as file:
+                    timer = yaml.safe_load(file)
+                time_dict = merge_dict(timer, time_dict)
+            except FileNotFoundError:
+                pass
         with open(name, "w") as file:
             yaml.dump(time_dict, file)
 
@@ -170,7 +184,7 @@ class Pipe:
         assert self.config["setup"]['path'] is not None
         if self.config["setup"]['multi']:
             self.setup = [CameraSetup(from_file=p, device=self.device) for p in
-                          tqdm(self.config["setup"]['path'],
+                          tqdm(sorted(self.config["setup"]['path']),
                                total=len(self.config["setup"]['path']),
                                desc=f"Configuration of the different Setup")]
         else:

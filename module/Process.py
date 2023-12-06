@@ -343,7 +343,7 @@ class Process(OrderedDict):
             else:
                 occlusion = None
             pipe.validation.activated = True
-            pipe.validation(im_reg.clone(), im_ref.clone(), im_old.clone(), name, exp_name, occlusion=occlusion.clone())
+            pipe.validation(im_reg.clone(), im_ref.clone(), im_old.clone(), name, exp_name, occlusion=occlusion)
 
         return _valid
 

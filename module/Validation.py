@@ -95,15 +95,18 @@ class Validation(BaseModule):
 
     @deactivated
     def save(self, path, name=None):
+        stat_dict = {key: np.array(item).tolist() for key, item in self.res_stats.items()}
+        res_dict = {key: np.array(item).tolist() for key, item in self.res.items()}
+        res = {"1. stats": stat_dict, "2. results": res_dict}
         if name is None:
             name = os.path.join(path, "Validation.yaml")
         else:
-            name = os.path.join(path, f"Validation_{name}.yaml")
-        stat_dict = {key: np.array(item).tolist() for key, item in self.res_stats.items()}
-        res_dict = {key: np.array(item).tolist() for key, item in self.res.items()}
-        # ref_dict = {key: np.array(item).tolist() for key, item in self.ref.items()}
+            name = os.path.join(path, name)
+            with open(name, 'r') as file:
+                validation = yaml.safe_load(file)
+            res = merge_dict(validation, res)
         with open(name, "w") as file:
-            yaml.dump({"1. stats": stat_dict, "2. results": res_dict}, file)
+            yaml.dump(res, file)
         self.activated = False
 
 #
