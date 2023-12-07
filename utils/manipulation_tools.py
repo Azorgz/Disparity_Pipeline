@@ -62,12 +62,21 @@ def random_noise(mean, std, *args):
         return
     else:
         noise = (np.random.random([len(args)]) - 0.5) * 2
-        noise -= noise.mean() + mean
         noise = noise / (noise ** 2).sum() * std
+        noise -= noise.mean() + mean
     if len(args) == 1:
         args = float(args[0])
         noise = float(noise[0])
     return noise + args
+
+
+def noise(mean, *args):
+    if args is None:
+        return
+    else:
+        if len(args) == 1:
+            args = float(args[0])
+    return mean + args
 
 
 def list_to_dict(list_of_dict):

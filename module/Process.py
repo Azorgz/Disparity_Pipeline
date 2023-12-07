@@ -4,6 +4,7 @@ from typing import Union
 
 import oyaml as yaml
 
+from module.SetupCameras import CameraSetup
 from utils.misc import path_leaf
 
 
@@ -43,7 +44,7 @@ class Process(OrderedDict):
 
     def init_process(self, pipe) -> None:
         if isinstance(pipe.setup, list):
-            setup = pipe.setup[0]
+            setup = CameraSetup(from_file=pipe.setup[0], device=pipe.device)
         else:
             setup = pipe.setup
         path_result = pipe.path_output

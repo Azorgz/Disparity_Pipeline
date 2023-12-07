@@ -16,7 +16,7 @@ from module.SuperNetwork import SuperNetwork
 from module.Validation import Validation
 from utils.manipulation_tools import merge_dict
 # Utils
-from utils.misc import time2str  # , form_cloud_data
+from utils.misc import time2str, update_name_tree  # , form_cloud_data
 
 
 # Networks
@@ -49,9 +49,10 @@ class Pipe:
         # The different modules of the Pipe are initialized ###############
         self.modules = {}
         self._init_setup_()
-        self._init_dataloader_(self.setup[0])
+        setup = CameraSetup(from_file=self.setup[0], device=self.device)
+        self._init_dataloader_(setup)
         self._init_network_()
-        self._init_wrapper_(self.setup[0])
+        self._init_wrapper_(setup)
         self._init_saver_()
         self._init_validation_()
         # self._init_pointsCloud_()
@@ -65,11 +66,12 @@ class Pipe:
         if process is not None:
             process.init_process(self)
             for name_experiment, experiment in process.items():
-                with tqdm(total=len(self.setup) * len(self.dataloader),
-                          desc=f"Nombre d'itérations for {name_experiment}: ", delay=1) as bar:
+                with tqdm(total=self.config["setup"]['multi'] * len(self.dataloader),
+                          desc=f"Nombre d'itérations for {name_experiment}: ", leave=False, position=0) as bar:
                     name = None
                     for i, s in enumerate(self.setup):
-                        if i > 0:
+                        if self.config["setup"]['multi']:
+                            s = CameraSetup(from_file=s, device=self.device)
                             self._init_dataloader_(s)
                             self.dataloader.camera_used = process.camera_used
                             self._init_wrapper_(s)
@@ -78,19 +80,21 @@ class Pipe:
                             # tqdm(enumerate(self.dataloader),
                             #      total=len(self.dataloader),
                             #      desc=f"Nombre d'itérations for {name_experiment}: "):
+                            update_name_tree(sample, s.name)
                             experiment(sample)
                             bar.update(1)
-                        if self.timeit:
+                        if self.timeit and i == 0:
                             self.save_timers(experiment, name, replace=True if i > 0 else False)
                             self.reset_timers()
                         if self.save_inputs and i == 0:
                             self.dataloader.save_conf(experiment.path)
-                        self.validation.statistic()
-                        if i > 0:
-                            self.validation.save(experiment.path, 'Validation.yaml')
-                        else:
+
+                        if i == self.config["setup"]['multi'] - 1:
+                            self.validation.statistic()
                             self.validation.save(experiment.path)
-                        self.validation.reset()
+                            self.validation.reset()
+                        #     self.validation.save(experiment.path, 'Validation.yaml')
+                        # else:
 
         else:
             for idx, sample in tqdm(enumerate(self.dataloader),
@@ -183,12 +187,13 @@ class Pipe:
     def _init_setup_(self):
         assert self.config["setup"]['path'] is not None
         if self.config["setup"]['multi']:
-            self.setup = [CameraSetup(from_file=p, device=self.device) for p in
-                          tqdm(sorted(self.config["setup"]['path']),
-                               total=len(self.config["setup"]['path']),
-                               desc=f"Configuration of the different Setup")]
+            self.setup = [p for p in tqdm(sorted(self.config["setup"]['path']),
+                                          total=len(self.config["setup"]['path']),
+                                          desc=f"Configuration of the different Setup")]
+            self.config["setup"]['multi'] = len(self.setup)
         else:
             self.setup = [CameraSetup(from_file=self.config["setup"]['path'], device=self.device)]
+            self.config["setup"]['multi'] = 0
 
     @torch.no_grad()
     def _init_dataloader_(self, setup):

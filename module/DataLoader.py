@@ -83,7 +83,6 @@ class StereoDataLoader(Dataset):
                 else:
                     self.files[key] = self.files[key] if idx is None else np.array(self.files[key])[idx].tolist()
 
-
         self.samples = []
         self.camera_used = []
         self.reset_images_name = config['reset_images_name']
@@ -131,7 +130,13 @@ class StereoDataLoader(Dataset):
 
     def save_conf(self, output_path):
         name = os.path.join(output_path, "dataset.yaml")
-        dataset_conf = OrderedDict({'Number of sample': len(self),
-                                    'Files': list_to_dict(self.samples)})
+        if self.config['setup']['multi']:
+            files = list_to_dict([s for s in self.samples for _ in range(self.config['setup']['multi'])])
+            nb = len(self) * self.config['setup']['multi']
+        else:
+            files = list_to_dict(self.samples)
+            nb = len(self)
+        dataset_conf = OrderedDict({'Number of sample': nb,
+                                    'Files': files})
         with open(name, "w") as file:
             yaml.dump(dataset_conf, file)

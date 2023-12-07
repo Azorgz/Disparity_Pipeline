@@ -7,7 +7,7 @@ Option:
     indexes: [218, 544, 1153, 1633, 1773, 2372, 2452, 2901, 3248, 3506]
     shuffle: False
 
-Disparity-Depth:
+Depth-Depth:
   disparity:
     cameras: [ RGB, RGB2 ]
     option: [ inference_size: [ 320, 480 ] ]

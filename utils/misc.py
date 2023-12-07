@@ -69,6 +69,12 @@ def update_name(path):
     return path_exp
 
 
+def update_name_tree(sample: dict, suffix):
+    for im in sample.values():
+        im.im_name += '-' + suffix
+    return sample
+
+
 def path_leaf(path):
     if os.path.isdir(path):
         res = ntpath.split(path)[-1]

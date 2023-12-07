@@ -83,12 +83,17 @@ class Validation(BaseModule):
                 self.res_stats[key][key_norms] = {}
                 for key_stat, stat in self.stats.items():
                     sample = self.res[key][key_norms]
-                    res_stat = stat(np.array(sample['new']), 0).round(3)
-                    ref_stat = stat(np.array(sample['ref']), 0).round(3)
-                    occlusion_stat = stat(np.array(sample['new_occ']), 0).round(3)
-                    self.res_stats[key][key_norms][key_stat] = {'ref': float(ref_stat),
-                                                                'new': float(res_stat),
-                                                                'new_occ': float(occlusion_stat)}
+                    if isinstance(sample['new'], list):
+                        res_stat = stat(np.array(sample['new']), 0).round(3)
+                        ref_stat = stat(np.array(sample['ref']), 0).round(3)
+                        occlusion_stat = stat(np.array(sample['new_occ']), 0).round(3)
+                        self.res_stats[key][key_norms][key_stat] = {'ref': float(ref_stat),
+                                                                    'new': float(res_stat),
+                                                                    'new_occ': float(occlusion_stat)}
+                    else:
+                        self.res_stats[key][key_norms][key_stat] = {'ref': float(np.array(sample['new']).round(3)),
+                                                                    'new': float(np.array(sample['ref']).round(3)),
+                                                                    'new_occ': float(np.array(sample['new_occ']).round(3))}
 
     def reset(self):
         self._update_conf(self.config)

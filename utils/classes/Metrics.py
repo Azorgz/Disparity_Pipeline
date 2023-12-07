@@ -177,11 +177,14 @@ class Metric_psnr_tensor(BaseMetric_Tensor):
 
     def __call__(self, im1, im2, *args, mask=None, **kwargs):
         super().__call__(im1, im2, *args, mask=mask, **kwargs)
-        if mask is None:
-            self.value = self.psnr(self.image_true, self.image_test)
-        else:
-            self.value = self.psnr(self.image_true[:, :, mask[0, 0, :, :]].flatten(),
-                                   self.image_test[:, :, mask[0, 0, :, :]].flatten())
+        try:
+            if mask is None:
+                self.value = self.psnr(self.image_true, self.image_test)
+            else:
+                self.value = self.psnr(self.image_true[:, :, mask[0, 0, :, :]].flatten(),
+                                       self.image_test[:, :, mask[0, 0, :, :]].flatten())
+        except RuntimeError:
+            self.value = -1
         return self.value
 
     def __add__(self, other):

@@ -8,7 +8,8 @@ import numpy as np
 import torch
 import yaml
 from kornia.geometry import find_fundamental, essential_from_fundamental, motion_from_essential_choose_solution, \
-    normalize_points_with_intrinsics, compute_correspond_epilines, relative_transformation
+    normalize_points_with_intrinsics, compute_correspond_epilines, relative_transformation, \
+    angle_axis_to_rotation_matrix, rotation_matrix_to_angle_axis
 from torch import Tensor
 from torch.linalg import vector_norm
 import cv2 as cv
@@ -159,7 +160,7 @@ class CameraSetup(object):
     _base2Ref = torch.eye(4)
     _coplanarity_tolerance = 0.15
 
-    def __init__(self, *args, device=None, from_file=False, model=None, **kwargs):
+    def __init__(self, *args, device=None, from_file=False, model=None, name=None, **kwargs):
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = model
         # self.registration = Registration(self.device, self.model)
@@ -169,7 +170,7 @@ class CameraSetup(object):
             self.name = path_leaf(from_file)
         else:
             self(*args, **kwargs)
-            self.name = 'Camera_Setup'
+            self.name = name if name is not None else 'Camera_Setup'
 
     def __new__(cls, *args, **kwargs):
         new = super(CameraSetup, cls).__new__(cls)
@@ -251,7 +252,7 @@ class CameraSetup(object):
             camera.update_name(k)
             k += 1
         self.cameras[camera.name] = camera
-        if len(self) == 1:
+        if self.nb_cameras == 1:
             self.update_camera_ref(camera.name)
         if isinstance(camera, IRCamera):
             self.cameras_IR[camera.name] = camera
@@ -405,9 +406,52 @@ class CameraSetup(object):
 
     def update_camera_relative_position(self, name, extrinsics=None, x=None, y=None, z=None, x_pix=None, y_pix=None,
                                         rx=None, ry=None, rz=None):
-        #  update the camera position in regard to the Ref Camera position
+        """
+        Update the camera position in regard to the Ref Camera position.
+        :param name: Name of the Camera to be moved
+        :param extrinsics: new extrinsics matrix (optional)
+        :param x: new x position in regard to the Cam_ref position
+        :param y: new y position in regard to the Cam_ref position
+        :param z: new z position in regard to the Cam_ref position
+        :param x_pix: new x position in pixel in regard to the Cam_ref position
+        :param y_pix: new y position in pixel in regard to the Cam_ref position
+        :param rx: new rx angle in regard to the Cam_ref position
+        :param ry: new ry angle in regard to the Cam_ref position
+        :param rz: new rz angle in regard to the Cam_ref position
+        :return: None
+        """
         if self._check_if_cam_is_in_setup_(name):
-            self.cameras[name].update_pos(extrinsics, x, y, z, x_pix, y_pix, rx, ry, rz)
+            if name != self.camera_ref or self.nb_cameras == 1:
+                self.cameras[name].update_pos(extrinsics, x, y, z, x_pix, y_pix, rx, ry, rz)
+            else:
+                for cam in self.cameras.keys():
+                    if cam != name:
+                        self.update_camera_ref(cam)
+                        self.cameras[name].update_pos(extrinsics, x, y, z, x_pix, y_pix, rx, ry, rz)
+                        self.update_camera_ref(name)
+                        break
+
+    def move_camera_from_its_position(self, name, dx=None, dy=None, dz=None, drx=None, dry=None, drz=None):
+        """
+        Move a Camera in the Setup from its position to its position + the given delta in each direction/angle
+        The units are meters/rad
+        :param name: Name of the Camera to be moved
+        :param dx: displacement in x direction in meter
+        :param dy: displacement in y direction in meter
+        :param dz: displacement in z direction in meter
+        :param drx: rotation around the x-axis in rad
+        :param dry: rotation around the y-axis in rad
+        :param drz: rotation around the z-axis in rad
+        :return: None
+        """
+        if self._check_if_cam_is_in_setup_(name):
+            if name == self.camera_ref:
+                self.update_camera_relative_position(name, x=dx, y=dy, z=dz, rx=drx, ry=dry, rz=drz)
+            else:
+                rx, ry, rz = rotation_matrix_to_angle_axis(self.cameras[name].extrinsics[:, :3, :3]).to(device='cpu').numpy()
+                x, y, z = self.cameras[name].translation_vector[0, :, 0].to(device='cpu').numpy()
+                self.update_camera_relative_position(name, x=dx + x, y=dy + y, z=dz + z,
+                                                     rx=drx + rx, ry=dry + ry, rz=drz + rz)
 
     def calibration_for_stereo(self, left, right, name=None):
         """
@@ -425,7 +469,7 @@ class CameraSetup(object):
             try:
                 assert self.is_coplanar(left, right)
             except AssertionError:
-                print("The chosen Cameras are not coplanar")
+                warnings.warn("The chosen Cameras are not coplanar")
                 return 0
             left = self.cameras[left]
             right = self.cameras[right]
@@ -435,7 +479,7 @@ class CameraSetup(object):
             if left.extrinsics[0, 0, -1] < right.extrinsics[0, 0, -1]:
                 left, right = right, left
             elif left.extrinsics[0, 0, -1] == right.extrinsics[0, 0, -1]:
-                print('The Camera are not spaced enough to compute disparity')
+                warnings.warn('The Camera are not spaced enough to compute disparity')
             s = StereoSetup(left, right, self.device, name)
             self.stereo_pair += s
 
@@ -450,22 +494,22 @@ class CameraSetup(object):
             if ref.extrinsics[0, 0, -1] < target.extrinsics[0, 0, -1]:
                 ref, target = target, ref
             elif torch.equal(ref.extrinsics[0, 0, -1], target.extrinsics[0, 0, -1]):
-                print('The Camera have the same pose, impossible to compute depth')
+                warnings.warn('The Camera have the same pose, impossible to compute depth')
                 return 0
             try:
                 assert ref.is_positioned and target.is_positioned
             except AssertionError:
-                print("The chosen Cameras are not Positioned")
+                warnings.warn("The chosen Cameras are not Positioned")
                 return 0
             try:
                 assert ref.im_type == target.im_type
             except AssertionError:
-                print("The chosen Cameras are not using the same modality")
+                warnings.warn("The chosen Cameras are not using the same modality")
                 return 0
             try:
                 assert torch.equal(ref.intrinsics, target.intrinsics)
             except AssertionError:
-                print("The chosen Cameras don't have the same intrinsics matrix")
+                warnings.warn("The chosen Cameras don't have the same intrinsics matrix")
                 return 0
             d = DepthSetup(ref, target, self.device, name=name)
             self.depth_pair += d
@@ -490,7 +534,7 @@ class CameraSetup(object):
             assert (self.cameras[cam1].is_positioned or self.cameras[cam1].is_ref) \
                    and (self.cameras[cam2].is_positioned or self.cameras[cam2].is_ref)
         except AssertionError:
-            print('The Camera position is not known')
+            warnings.warn('The Camera position is not known')
         x1 = self.cameras[cam1].extrinsics[0, :, 0]
         x1 /= (vector_norm(x1) if vector_norm(x1) != 0 else 1)
         y1 = self.cameras[cam1].extrinsics[0, :, 1]
@@ -504,7 +548,7 @@ class CameraSetup(object):
         try:
             assert self.is_parallel(cam1, cam2)
         except AssertionError:
-            print('The Cameras image plans are not Parallel')
+            warnings.warn('The Cameras image plans are not Parallel')
             return False
         tz1 = self.cameras[cam1].extrinsics[0, 2, 3]
         tz2 = self.cameras[cam2].extrinsics[0, 2, 3]
@@ -579,18 +623,6 @@ class CameraSetup(object):
     def model(self):
         self._model = None
         self.manual_calibration_available = False
-
-    # @property
-    # def cameras_calibration(self):
-    #     return self._cameras_calibration
-    #
-    # @cameras_calibration.setter
-    # def cameras_calibration(self, value):
-    #     self._cameras_calibration = value
-
-    # @cameras_calibration.deleter
-    # def cameras_calibration(self):
-    #     warnings.warn("The attribute can't be deleted")
 
     @property
     def camera_ref(self):
