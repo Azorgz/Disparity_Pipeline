@@ -12,14 +12,65 @@ from Result_analysis.ResultFrame import ResultFrame
 # from utils.classes.Visualizer import Visualizer
 
 # from utils.classes.Image import ImageTensor
-# import numpy as np
+import numpy as np
+
 # import cv2 as cv
 #
 # from utils.registration_tools import SIFT
 # from utils.visualization import result_visualizer, visual_control
 base_path = os.getcwd() + "/results/"
-res = ResultFrame(base_path + "camera_position/Disparity-Depth")
+res = ResultFrame(base_path + "camera_position_ir_finer/Depth-Disparity")
 # delta = res.delta
+z_coeff = 11
+y_coeff = 3 * z_coeff
+x_coeff = 11 * y_coeff
+
+
+def cal_idx(variable):
+    if variable == 'x':
+        y, z, a = np.arange(0, 5, 1) * y_coeff, np.arange(0, 5, 1) * z_coeff, np.arange(0, 5, 1)
+        x = np.arange(0, 11, 1) * x_coeff
+        result = [[y_+z_+a_ for y_ in y for z_ in z for a_ in a]+x_ for x_ in x]
+    elif variable == 'y':
+        x, z, a = np.arange(0, 11, 1) * x_coeff, np.arange(0, 5, 1) * z_coeff, np.arange(0, 5, 1)
+        y = np.arange(0, 5, 1) * y_coeff
+        result = [[x_ + z_ + a_ for x_ in x for z_ in z for a_ in a] + y_ for y_ in y]
+    elif variable == 'z':
+        x, y, a = np.arange(0, 11, 1) * x_coeff, np.arange(0, 5, 1) * y_coeff, np.arange(0, 5, 1)
+        z = np.arange(0, 5, 1) * z_coeff
+        result = [[y_ + x_ + a_ for y_ in y for x_ in x for a_ in a] + z_ for z_ in z]
+    elif variable == 'a':
+        x, y, z = np.arange(0, 11, 1) * x_coeff, np.arange(0, 5, 1) * y_coeff, np.arange(0, 5, 1) * z_coeff
+        a = np.arange(0, 5, 1)
+        result = [[x_ + y_ + z_ for x_ in x for y_ in y for z_ in z] + a_ for a_ in a]
+    else:
+        result = np.array(0).tolist()
+    return result
+
+
+idx_x = cal_idx('x')
+idx_y = cal_idx('y')
+idx_z = cal_idx('z')
+idx_a = cal_idx('a')
+
+val = res.delta_full.combine_column('nec-rmse+psnr+ms_ssim+ssim', 'sum').values
+
+v_x = val[idx_x].mean(1)
+
+v_y = val[idx_y].mean(1)
+
+v_z = val[idx_z].mean(1)
+
+v_a = val[idx_a].mean(1)
+
+
+plt.plot(np.arange(0, 11 * 1e-2, 1e-2), v_x)
+plt.plot(np.arange(0, 1e-1, 2e-2), v_y)
+plt.plot(np.arange(0, 1e-1, 2e-2), v_z)
+plt.plot(np.arange(0, 10, 2)/180*np.pi, v_a)
+plt.legend(['dx m', 'dy m', 'dz m', 'da rad'])
+plt.show()
+
 
 time.sleep(1)
 #
@@ -75,7 +126,6 @@ time.sleep(1)
 #         k_gen = KeypointsGenerator(device=torch.device('cuda'), detector=key, matcher=k)
 #         k_gen(img_src, img_dst, min_kpt=8, th=0.85, draw_result=True)
 #         print(key, k)
-
 
 
 # R2.cameras['RGB'].__getitem__(333).show()
@@ -143,5 +193,3 @@ time.sleep(1)
 # im = im.match_shape(im2)
 # print(im.__dict__, im.shape)
 # print(im2.__dict__, im2.shape)
-
-

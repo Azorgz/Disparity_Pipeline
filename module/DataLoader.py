@@ -132,11 +132,10 @@ class StereoDataLoader(Dataset):
         name = os.path.join(output_path, "dataset.yaml")
         if self.config['setup']['multi']:
             files = list_to_dict([s for s in self.samples for _ in range(self.config['setup']['multi'])])
-            nb = len(self) * self.config['setup']['multi']
         else:
             files = list_to_dict(self.samples)
-            nb = len(self)
-        dataset_conf = OrderedDict({'Number of sample': nb,
+        dataset_conf = OrderedDict({'Number of sample': len(self),
+                                    'Setup': sorted(self.config["setup"]['path']),
                                     'Files': files})
         with open(name, "w") as file:
             yaml.dump(dataset_conf, file)

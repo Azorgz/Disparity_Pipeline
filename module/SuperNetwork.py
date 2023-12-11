@@ -20,7 +20,7 @@ class SuperNetwork(BaseModule):
     To Run it, a normal Forward call with 2 images as inputs would do it.
     """
 
-    def __init__(self, config: ConfigPipe):  # model, args, name: str, timeit=False):
+    def __init__(self, config: ConfigPipe, *args, **kwargs):  # model, args, name: str, timeit=False):
         self.name_disparity = ''
         self.model_disparity = None
         self.model_depth = None
@@ -29,7 +29,7 @@ class SuperNetwork(BaseModule):
         self.preprocessing_depth = None
         self.pred_right = False
         self.pred_bidir = False
-        super(SuperNetwork, self).__init__(config)
+        super(SuperNetwork, self).__init__(config, *args, **kwargs)
 
     def _update_conf(self, config, *args, **kwargs):
         self.args_disparity = config['disparity_network']["network_args"]

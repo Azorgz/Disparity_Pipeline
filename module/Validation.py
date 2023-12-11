@@ -18,7 +18,7 @@ class Validation(BaseModule):
     A class which compute for each input sample the reconstruction error
     """
 
-    def __init__(self, config):
+    def __init__(self, config, *args, **kwargs):
         """
         :param config: Config from ConfigPipe
         the module compute two indices for each norm chosen:
@@ -26,7 +26,7 @@ class Validation(BaseModule):
         - The "new" : between the Ref and New
         """
         self.activated = False
-        super(Validation, self).__init__(config)
+        super(Validation, self).__init__(config, *args, **kwargs)
 
     def _update_conf(self, config, *args, **kwargs):
         self.activated = config["validation"]['activated']

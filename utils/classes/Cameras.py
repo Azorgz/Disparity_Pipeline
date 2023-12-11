@@ -105,7 +105,7 @@ class BaseCamera(PinholeCamera):
         except Exception as e:
             # print('There is no Calibration image, the calibration default image will be the 1st of '
             #       'the list')
-            im_path = f'{self.path}/{os.listdir(self.path)[0]}'
+            im_path = f'{self.path}/{sorted(os.listdir(self.path))[0]}'
             im_calib = ImageTensor(im_path)
         _, c, h, w = im_calib.shape
         if c == 1:

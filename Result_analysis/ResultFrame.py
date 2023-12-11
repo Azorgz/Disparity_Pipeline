@@ -1,4 +1,6 @@
 import os
+import re
+
 import cv2 as cv
 import numpy as np
 import oyaml as yaml
@@ -114,6 +116,7 @@ class TimeFrame(DataFrame):
     """
     A class based on Pandas Dataframe, part of the result Frame
     """
+
     def __init__(self, data):
         super().__init__(data)
 
@@ -130,14 +133,24 @@ class ValFrame(DataFrame):
         return ValFrame({k: vec[key] for k, vec in self.items()})
 
     def show(self, index=None, ref=0):
-        idx = {f'{k} delta': vec*100 for k, vec in self.items() if k == index}
+        idx = {f'{k} delta': vec * 100 for k, vec in self.items() if k == index}
         if f'{index} delta' in idx.keys():
-            idx['0%'] = ref*idx[f'{index} delta']
+            idx['0%'] = ref * idx[f'{index} delta']
             m = round(idx[f'{index} delta'].mean(), 3)
-            idx[f'mean : {m}%'] = m + 0*idx[f'{index} delta']
+            idx[f'mean : {m}%'] = m + 0 * idx[f'{index} delta']
         ValFrame(idx).plot()
 
     def get_column(self, index: str) -> ArrayLike:
-        idx = np.array([vec * 100 for k, vec in self.items() if k == index])
+        idx = np.array([vec for k, vec in self.items() if k == index])[0]
         return idx
 
+    def combine_column(self, str_combination: str, col_name='combination'):
+        """
+        Combine the column of the ValFrame following this layout :
+        formula(index)
+        """
+        val_dict = {}
+        for key in self.keys():
+            if str(key) in str_combination:
+                locals()[key] = np.nan_to_num(self.get_column(key))
+        return ValFrame({str_combination: eval(str_combination)})

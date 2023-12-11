@@ -10,7 +10,7 @@ from utils.manipulation_tools import random_noise, noise
 
 perso = '/home/aurelien/Images/Images/'
 pro = '/home/godeta/PycharmProjects/LYNRED/Images/'
-p = pro
+p = perso
 
 path_RGB = p + 'Day/master/visible'
 path_RGB2 = p + 'Day/slave/visible'
@@ -27,29 +27,29 @@ R = CameraSetup(RGB, IR, RGB2, print_info=True)
 d_calib = 5
 center_x, center_y, center_z = 341 * 1e-03, 1, 0
 
-vec_x = np.arange(0, 5 * 1e-2, 5*1e-3)
-vec_x = (vec_x - vec_x.max()/2).tolist()
-vec_z = np.arange(0, 5 * 1e-2, 1e-2)
-vec_z = (vec_z - vec_z.max()/2).tolist()
-vec_y = np.arange(0, 5 * 1e-2, 1e-2)
-vec_y = (vec_y - vec_y.max()/2).tolist()
-vec_alpha = np.arange(0, 2e-2, 4e-3)
-vec_alpha = (vec_alpha - vec_alpha.max()/2).tolist()
+vec_x = np.arange(0, 5 * 1e-2, 1e-2)
+vec_x = (vec_x - vec_x.max() / 2).tolist()
+vec_z = np.arange(0, 1.1e-1, 1e-2)
+vec_z = (vec_z - vec_z.max() / 2).tolist()
+vec_y = np.arange(0, 1.5e-1, 5e-2)
+vec_y = (vec_y - vec_y.max() / 2).tolist()
+vec_alpha = (np.arange(0, 3, 1) / 180 * np.pi)
+vec_alpha = (vec_alpha - vec_alpha.max() / 2).tolist()
 
-with tqdm(total=len(vec_x)*len(vec_y)*len(vec_z)*len(vec_alpha), desc='Setups saving') as bar:
+with tqdm(total=len(vec_x) * len(vec_y) * len(vec_z) * len(vec_alpha), desc='Setups saving') as bar:
     for i, dx in enumerate(vec_x):
         for j, dy in enumerate(vec_y):
             for k, dz in enumerate(vec_z):
                 for h, da in enumerate(vec_alpha):
-                    x, y, z = 0.127, 0, 0
+                    x, y, z = 0.127 + dx, 0 + dy, 0 + dz
                     rx = math.atan((center_y - y) / d_calib) - math.atan(center_y / d_calib)
                     ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
-                    rz = 0
+                    rz = 0 + da
                     R.update_camera_relative_position('IR', x=x, y=y, z=z, ry=ry, rx=rx, rz=rz)
 
-                    x, y, z = 0.127 + 0.214 + dx, 0 + dy, 0 + dz
+                    x, y, z = 0.127 + 0.214, 0, 0
                     rx = math.atan((center_y - y) / d_calib) - math.atan(center_y / d_calib)
-                    ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib) + da
+                    ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
                     rz = 0
                     R.update_camera_relative_position('RGB2', x=x, y=y, z=z, ry=ry, rx=rx, rz=rz)
 
@@ -57,8 +57,9 @@ with tqdm(total=len(vec_x)*len(vec_y)*len(vec_z)*len(vec_alpha), desc='Setups sa
                     R.calibration_for_stereo('IR', 'RGB')
                     R.calibration_for_depth('IR', 'RGB')
                     R.calibration_for_depth('RGB', 'RGB2')
-                    name = f'dx_{i}_dy_{j}dz_{k}_da_{h}.yaml'
+                    name = (f'_dx_{i if i >= 10 else str(0) + str(i)}_dy_{j if j >= 10 else str(0) + str(j)}'
+                            f'_dz_{k if k >= 10 else str(0) + str(k)}_da_{h if h >= 10 else str(0) + str(h)}_.yaml')
                     home = '/home/aurelien/PycharmProjects/Disparity_Pipeline/'
                     pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/'
-                    R.save(pro + 'Setup_Camera/Setup_Camera_postion_rgb', name)
+                    R.save(home + 'Setup_Camera/position_ir_finer', name)
                     bar.update(n=1)

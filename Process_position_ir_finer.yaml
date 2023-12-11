@@ -1,7 +1,7 @@
 Option:
-  name_experiment: camera_position_rgb
+  name_experiment: camera_position_ir_finer
   setup: # Paths to the config file of the pre-calibrated camera's setup
-    path: Setup_Camera/position_rgb
+    path: Setup_Camera/position_ir_finer
   dataset:
     number_of_sample: 1
     indexes: [1773]
@@ -31,17 +31,17 @@ Option:
 #  valid: [ IR, RGB ]
 #  save: [ pred_depth, image_reg, depth_reg ]
 #
-Disparity-Depth:
-  disparity:
+Depth-Disparity:
+  depth:
     cameras: [RGB, RGB2]
-    option: [inference_size: [320, 480]]
+    option: [inference_size: [480, 640]]
   wrap:
     cameras: [IR, RGB]
-    method: depth
-    source: pred_disp
+    method: disparity
+    source: pred_depth
     option: [return_depth_reg, []]
   valid: [IR, RGB]
-  save: [pred_disp, image_reg, disp_reg]
+  save: [pred_depth, image_reg, depth_reg]
 
 Depth-Depth:
   depth:

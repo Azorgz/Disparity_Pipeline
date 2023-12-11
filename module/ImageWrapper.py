@@ -19,8 +19,8 @@ class ImageWrapper(BaseModule):
     This block implement the reconstruction methods following the reconstruction options
     """
 
-    def __init__(self, config: ConfigPipe, setup: CameraSetup):
-        super(ImageWrapper, self).__init__(config)
+    def __init__(self, config: ConfigPipe, setup: CameraSetup, *args, **kwargs):
+        super(ImageWrapper, self).__init__(config, *args, **kwargs)
         self.setup = setup
         # If the DisparityPipe need to measure the execution time of each block, this parameter will be set to True.
         self.depth_wrapper = DepthWrapper(self.device)

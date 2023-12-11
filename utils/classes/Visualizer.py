@@ -45,6 +45,7 @@ class Visualizer:
         To show/hide the overlay of disparity press d
         To show/hide the validation indexes (only available with the validation done) press v
         """
+        self.multi_setup = False
         if path is None or search_exp:
             if path is None:
                 p = "/home/godeta/PycharmProjects/Disparity_Pipeline/results"
@@ -79,6 +80,7 @@ class Visualizer:
                     dataset = yaml.safe_load(file)
                 target_path, target_list = '', dataset['Files'][target]
                 ref_path, ref_list = '', dataset['Files'][ref]
+                self.multi_setup = True if len(dataset['Setup']) > 1 else False
             else:
                 target_path, ref_path = None, None
             try:
@@ -93,11 +95,16 @@ class Visualizer:
                 self.experiment[p]['target_list'] = [target_path + '/' + n for n in target_list]
                 self.experiment[p]['ref_list'] = [ref_path + '/' + n for n in ref_list]
                 self.experiment[p]['inputs_available'] = True
+
             else:
                 self.experiment[p]['target_list'], self.experiment[p]['ref_list'] = None, None
                 print(f'Inputs images wont be available for experiment {p}')
                 self.experiment[p]['inputs_available'] = False
             self.experiment[p]['new_list'] = [new_path + '/' + n for n in sorted(new_list)]
+            if self.multi_setup:
+                self.dx_max, self.dy_max, self.dz_max, self.da_max = 0, 0, 0, 0
+                self.dx, self.dy, self.dz, self.da = 0, 0, 0, 0
+                self.define_delta(self.experiment[p]['new_list'][-1], init_max=True)
             try:
                 self.experiment[p]['target_disp_path'], _, target_disp_list = os.walk(
                     f'{P}/pred_disp/{target}').__next__()
@@ -164,6 +171,31 @@ class Visualizer:
             self.idx = self.idx % self.experiment[exp]['idx_max']
         cv.destroyAllWindows()
 
+    def define_delta(self, name, init_max=False):
+        name = name.split('_')
+        if init_max:
+            self.dx_max, self.dy_max, self.dz_max, self.da_max = 0, 0, 0, 0
+            for i, mot in enumerate(name):
+                if mot == 'dx':
+                    self.dx_max = int(name[i + 1]) + 1
+                elif mot == 'dy':
+                    self.dy_max = int(name[i + 1]) + 1
+                elif mot == 'dz':
+                    self.dz_max = int(name[i + 1]) + 1
+                elif mot == 'da':
+                    self.da_max = int(name[i + 1]) + 1
+        else:
+            self.dx, self.dy, self.dz, self.da = 0, 0, 0, 0
+            for i, mot in enumerate(name):
+                if mot == 'dx':
+                    self.dx = int(name[i + 1])
+                elif mot == 'dy':
+                    self.dy = int(name[i + 1])
+                elif mot == 'dz':
+                    self.dz = int(name[i + 1])
+                elif mot == 'da':
+                    self.da = int(name[i + 1])
+
     def _execute_cmd(self, exp):
         i = 0
         experiment = self.experiment[exp]
@@ -174,9 +206,9 @@ class Visualizer:
             if self.key == ord('\r'):
                 self.idx = i
                 self.key = -1
-        if self.key == ord('-'):  # +
+        if self.key == ord('-'):  # -
             self.idx -= 1
-        if self.key == ord('+'):  # -
+        if self.key == ord('+'):  # +
             self.idx += 1
         if self.key == ord('d'):  # d
             self.show_disp_overlay += 1
@@ -196,11 +228,34 @@ class Visualizer:
             self.tensor = not self.tensor
         if self.key == ord('o') and experiment['occlusion_ok']:
             self.show_occlusion = not self.show_occlusion
+        if self.multi_setup:
+            if self.key == ord('x'):
+                self.dx = (self.dx + 1) % self.dx_max
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da)
+            elif self.key == ord('y'):
+                self.dy = (self.dy + 1) % self.dy_max
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da)
+            elif self.key == ord('z'):
+                self.dz = (self.dz + 1) % self.dz_max
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da)
+            elif self.key == ord('a'):
+                self.da = (self.da + 1) % self.da_max
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da)
 
     def _create_visual(self, exp):
         experiment = self.experiment[exp]
         new_im = ImageTensor(f'{experiment["new_list"][self.idx]}').RGB()
         if experiment["inputs_available"]:
+            if self.multi_setup:
+                self.define_delta(experiment["new_list"][self.idx])
             target_im = ImageTensor(f'{experiment["target_list"][self.idx]}').RGB()
             ref_im = ImageTensor(f'{experiment["ref_list"][self.idx]}').RGB().match_shape(target_im)
         else:
@@ -236,7 +291,10 @@ class Visualizer:
         if self.show_idx:
             visu = cv.putText(visu, f'idx : {self.idx}', self.org_idx, self.font, self.fontScale, self.color,
                               self.thickness, cv.LINE_AA)
-
+        if self.multi_setup:
+            org = self.org_idx[0], self.org_idx[1] + 15
+            visu = cv.putText(visu, f'dx : {self.dx}, dy : {self.dy}, dz : {self.dz}, da : {self.da}',
+                              org, self.font, self.fontScale, self.color, self.thickness, cv.LINE_AA)
         if self.show_grad_im:
             org = self.org_idx[0] + w, self.org_idx[1]
             visu = cv.putText(visu, f'Image grad : {"with tensor" if self.tensor else "with numpy"}', org,
@@ -268,16 +326,17 @@ class Visualizer:
         if len(self.video_array) > 2:
             self.video_array = self.video_array[2:]
         self.video_array = sorted(self.video_array)
-        org = self.org_idx[0], self.org_idx[1] + 20
+        delta = 20 if self.multi_setup else 0
+        org = self.org_idx[0], self.org_idx[1] + 20 + delta
         visu = cv.putText(visu, f'Starting video frame : {self.video_array[0]}', org, self.font, self.fontScale,
                           self.color,
                           self.thickness, cv.LINE_AA)
         if len(self.video_array) == 2:
-            org = self.org_idx[0], self.org_idx[1] + 40
+            org = self.org_idx[0], self.org_idx[1] + 40 + delta
             visu = cv.putText(visu, f'Ending video frame : {self.video_array[1]}', org, self.font,
                               self.fontScale, self.color,
                               self.thickness, cv.LINE_AA)
-            org = self.org_idx[0], self.org_idx[1] + 60
+            org = self.org_idx[0], self.org_idx[1] + 60 + delta
             visu = cv.putText(visu, f'Choose your format and press "Enter"', org, self.font,
                               self.fontScale, self.color,
                               self.thickness, cv.LINE_AA)
@@ -327,5 +386,7 @@ class Visualizer:
 
 
 if __name__ == '__main__':
-    path = "/home/godeta/PycharmProjects/Disparity_Pipeline/results/camera_position_rgb/Disparity-Depth"
+    pro = '/home/godeta/'
+    perso = '/home/aurelien/'
+    path = perso + "PycharmProjects/Disparity_Pipeline/results/camera_position_rgb/Depth-Depth"
     Visualizer(path, search_exp=False).run()

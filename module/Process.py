@@ -280,15 +280,16 @@ class Process(OrderedDict):
         return proc
 
     @staticmethod
-    def disparity(pipe, cam1, cam2, pred_bidir, pred_right, cut_roi_max, cut_roi_min, inference_size, setup, **kwargs):
-        def _disparity(sample, res):
+    def disparity(pipe, cam1, cam2, pred_bidir, pred_right, cut_roi_max, cut_roi_min, inference_size, setup, **kwargs0):
+        def _disparity(sample, res, **kwargs):
             pipe.network.update_pred_bidir(activate=pred_bidir)
             pipe.network.update_pred_right(activate=pred_right)
             if inference_size is not None:
                 pipe.network.update_size(inference_size, network='disparity')
             else:
                 pipe.network.update_size(pipe.config['disparity_network']["network_args"].inference_size)
-            setup_ = setup.stereo_pair(cam1, cam2)
+            setup_ = kwargs['setup'] if 'setup' in kwargs.keys() else setup
+            setup_ = setup_.stereo_pair(cam1, cam2)
             new_sample = setup_(sample, cut_roi_min=cut_roi_min, cut_roi_max=cut_roi_max)
             output = pipe.network(new_sample)
             output = setup_(output, reverse=True)
@@ -297,15 +298,16 @@ class Process(OrderedDict):
         return _disparity
 
     @staticmethod
-    def depth(pipe, cam1, cam2, pred_bidir, pred_right, inference_size, setup, **kwargs):
-        def _depth(sample, res):
+    def depth(pipe, cam1, cam2, pred_bidir, pred_right, inference_size, setup, **kwargs0):
+        def _depth(sample, res, **kwargs):
             pipe.network.update_pred_bidir(activate=pred_bidir)
             pipe.network.update_pred_right(activate=pred_right)
             if inference_size is not None:
                 pipe.network.update_size(inference_size, network='depth')
             else:
                 pipe.network.update_size(pipe.config['depth_network']["network_args"].inference_size, network='depth')
-            setup_ = setup.depth_pair(cam1, cam2)
+            setup_ = kwargs['setup'] if 'setup' in kwargs.keys() else setup
+            setup_ = setup_.depth_pair(cam1, cam2)
             new_sample = setup_(sample)
             output = pipe.network(**new_sample)
             res['pred_depth'].update(setup_(output, reverse=True))
@@ -313,14 +315,15 @@ class Process(OrderedDict):
         return _depth
 
     @staticmethod
-    def wrap(pipe, cam_src, cam_dst, depth_tensors, depth, return_depth_reg, return_occlusion, cams, **kwargs):
+    def wrap(pipe, cam_src, cam_dst, depth_tensors, depth, return_depth_reg, return_occlusion, cams, **kwargs0):
 
-        def _wrap(sample, res):
+        def _wrap(sample, res, **kwargs):
             pred_depth = res[depth_tensors]
-            result = pipe.wrapper(pred_depth, sample, cam_src, cam_dst, *cams,
-                                  depth=depth,
-                                  return_depth_reg=return_depth_reg,
-                                  return_occlusion=return_occlusion)
+            wrapper = kwargs['wrapper'] if 'wrapper' in kwargs.keys() else pipe.wrapper
+            result = wrapper(pred_depth, sample, cam_src, cam_dst, *cams,
+                             depth=depth,
+                             return_depth_reg=return_depth_reg,
+                             return_occlusion=return_occlusion)
             if return_depth_reg:
                 if depth_tensors == 'pred_depth':
                     res['depth_reg'].update({cam_src: result['depth_reg']})
@@ -333,8 +336,8 @@ class Process(OrderedDict):
         return _wrap
 
     @staticmethod
-    def valid(pipe, cam_reg, cam_ref, exp_name):
-        def _valid(sample, res):
+    def valid(pipe, cam_reg, cam_ref, exp_name, **kwargs0):
+        def _valid(sample, res, **kwargs):
             name = f'{cam_reg}_to_{cam_ref}'
             im_reg = res['image_reg'][name]
             im_ref = sample[cam_ref]
@@ -349,9 +352,9 @@ class Process(OrderedDict):
         return _valid
 
     @staticmethod
-    def save(pipe, variable_name, path, **kwargs):
+    def save(pipe, variable_name, path, **kwargs0):
 
-        def _save(sample, res):
+        def _save(sample, res, **kwargs):
             path_res = f'{path}/{variable_name}'
             if variable_name == 'inputs':
                 var = sample
@@ -360,58 +363,6 @@ class Process(OrderedDict):
             pipe.saver(var, path_res)
 
         return _save
-
-    # @staticmethod
-    # def _make_process_dict_v1(process) -> list:
-    #     proc = []
-    #     for p in process:
-    #         key = p[0].upper()
-    #         if key == 'DISPARITY' or key == 'DEPTH':
-    #             assert len(p) >= 3, \
-    #                 'The DISPARITY and DEPTH instructions need 2 positional arguments : cam_src, cam_dst'
-    #             option = {'cam1': p[1], 'cam2': p[2], 'pred_bidir': False, 'pred_right': False,
-    #                       'cut_roi_max': False, 'cut_roi_min': False}
-    #             for p_ in p[3:]:
-    #                 if p_.upper() == 'PRED_BIDIR':
-    #                     option['pred_bidir'] = True
-    #                 elif p_.upper() == 'PRED_RIGHT':
-    #                     option['pred_right'] = True
-    #                 elif p_.upper() == 'CUT_ROI_MAX':
-    #                     option['cut_roi_max'] = True
-    #                 elif p_.upper() == 'CUT_ROI_MIN':
-    #                     option['cut_roi_min'] = True
-    #                 else:
-    #                     pass
-    #             proc.append([key, option])
-    #         elif key == 'WRAP':
-    #             assert len(p) >= 4, \
-    #                 'The WRAP instruction needs 3 positionnal arguments : cam_src, cam_dst, depth_tensors'
-    #             assert p[3] in ['pred_depth', 'pred_disp', 'depth_reg', 'disp_reg'], \
-    #                 'The chosen WRAP tensor name is not allowed, choice:[pred_depth, pred_disp, depth_reg, disp_reg]'
-    #             option = {'cam_src': p[1], 'cam_dst': p[2], 'depth_tensors': p[3], 'depth': False,
-    #                       'return_depth_reg': False, 'cams': []}
-    #             for idx, p_ in enumerate(p[4:]):
-    #                 if p_.upper() == 'DEPTH':
-    #                     option['depth'] = True
-    #                 elif p_.upper() == 'RETURN_DEPTH_REG':
-    #                     option['return_depth_reg'] = True
-    #                 else:
-    #                     option['cams'].append(*p[4 + idx:])
-    #                     break
-    #             proc.append([key, option])
-    #         elif key == 'VALID':
-    #             assert len(p) >= 2, 'The VALID instruction needs 2 positional argument : cam_reg, cam_ref'
-    #             option = {'cam_reg': p[1], 'cam_ref': p[2]}
-    #             proc.append([key, option])
-    #         elif key == 'SAVE':
-    #             assert len(p) >= 2, 'The SAVE instruction needs 1 positional argument : name_variable'
-    #             assert p[1] in ['inputs', 'pred_depth', 'pred_disp', 'image_reg', 'depth_reg', 'disp_reg'], \
-    #                 'The chosen variable has to be in this list: ' \
-    #                 '[pred_depth, pred_disp, image_reg, depth_reg, disp_reg, inputs]'
-    #             option = {'variable_name': p[1]}
-    #             proc.append([key, option])
-    #
-    #     return proc
 
 
 class Experiment(list):
@@ -427,7 +378,7 @@ class Experiment(list):
     def __call__(self, sample, *args, **kwargs):
         res = {'pred_disp': {}, 'pred_depth': {}, 'image_reg': {}, 'depth_reg': {}, 'disp_reg': {}, 'occlusion': {}}
         for instruction in self:
-            instruction(sample, res)
+            instruction(sample, res, **kwargs)
 
 
 if __name__ == '__main__':

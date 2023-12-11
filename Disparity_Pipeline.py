@@ -52,9 +52,11 @@ class Pipe:
         setup = CameraSetup(from_file=self.setup[0], device=self.device)
         self._init_dataloader_(setup)
         self._init_network_()
-        self._init_wrapper_(setup)
-        self._init_saver_()
+        self._init_wrapper_(setup, verbose=False)
+        self._init_saver_(verbose=False)
         self._init_validation_()
+        if self.print_info:
+            print(f'\n############# Start Processes ###########')
         # self._init_pointsCloud_()
 
         # self.time_consistency_block = Time_consistency_block(config.time_consistency_block)
@@ -67,21 +69,21 @@ class Pipe:
             process.init_process(self)
             for name_experiment, experiment in process.items():
                 with tqdm(total=self.config["setup"]['multi'] * len(self.dataloader),
-                          desc=f"Nombre d'itérations for {name_experiment}: ", leave=False, position=0) as bar:
+                          desc=f"Nombre d'itérations for {name_experiment}: ", leave=True, position=0) as bar:
                     name = None
                     for i, s in enumerate(self.setup):
                         if self.config["setup"]['multi']:
                             s = CameraSetup(from_file=s, device=self.device)
                             self._init_dataloader_(s)
                             self.dataloader.camera_used = process.camera_used
-                            self._init_wrapper_(s)
+                            self._init_wrapper_(s, verbose=False)
                             # name = s.name
                         for idx, sample in enumerate(self.dataloader):
                             # tqdm(enumerate(self.dataloader),
                             #      total=len(self.dataloader),
                             #      desc=f"Nombre d'itérations for {name_experiment}: "):
                             update_name_tree(sample, s.name)
-                            experiment(sample)
+                            experiment(sample, setup=s, wrapper=self.wrapper)
                             bar.update(1)
                         if self.timeit and i == 0:
                             self.save_timers(experiment, name, replace=True if i > 0 else False)
@@ -201,22 +203,22 @@ class Pipe:
         self.modules['dataloader'] = self.dataloader
 
     @torch.no_grad()
-    def _init_network_(self):
-        self.network = SuperNetwork(self.config)
+    def _init_network_(self, *args, **kwargs):
+        self.network = SuperNetwork(self.config, *args, **kwargs)
         self.modules['network'] = self.network
 
     @torch.no_grad()
-    def _init_wrapper_(self, setup):
-        self.wrapper = ImageWrapper(self.config, setup)
+    def _init_wrapper_(self, setup, *args, **kwargs):
+        self.wrapper = ImageWrapper(self.config, setup, *args, **kwargs)
         self.modules['wrapper'] = self.wrapper
 
-    def _init_saver_(self):
-        self.saver = ImageSaver(self.config)
+    def _init_saver_(self, *args, **kwargs):
+        self.saver = ImageSaver(self.config, *args, **kwargs)
         self.modules['saver'] = self.saver
 
     @torch.no_grad()
-    def _init_validation_(self):
-        self.validation = Validation(self.config)
+    def _init_validation_(self, *args, **kwargs):
+        self.validation = Validation(self.config, *args, **kwargs)
         self.modules['validation'] = self.validation
 
     # def _initialize_features_extraction_(self):
