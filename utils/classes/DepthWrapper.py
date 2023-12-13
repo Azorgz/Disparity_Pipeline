@@ -77,9 +77,6 @@ class DepthWrapper:
         if return_occlusion:
             res['occlusion'] = self.find_occlusion(cloud, [height, width])
             res['occlusion'].im_name = image_src.im_name + '_occlusion'
-            # res[:, :, mask_occlusion[0, 0, :, :]] = 0
-            # mask_valid = (~res['occlusion']).flatten()
-            # grid[0, mask_occlusion[0, 0, :, :], :] -= 2
         if return_depth_reg:
             depth_reg = self.compute_depth_src(cloud, [height, width], mask_valid,
                                                post_process_depth=post_process_depth)

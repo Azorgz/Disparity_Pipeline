@@ -39,9 +39,9 @@ Disparity-Depth:
     cameras: [IR, RGB]
     method: depth
     source: pred_disp
-    option: [return_depth_reg, []]
+    option: [return_depth_reg, return_occlusion, []]
   valid: [IR, RGB]
-  save: [pred_disp, image_reg, disp_reg]
+  save: [pred_disp, image_reg, disp_reg, occlusion]
 
 Depth-Depth:
   depth:
@@ -51,6 +51,6 @@ Depth-Depth:
     cameras: [IR, RGB]
     method: depth
     source: pred_depth
-    option: [return_depth_reg, []]
+    option: [return_depth_reg, return_occlusion, []]
   valid: [IR, RGB]
-  save: [pred_depth, image_reg, depth_reg]
+  save: [pred_depth, image_reg, depth_reg, occlusion]

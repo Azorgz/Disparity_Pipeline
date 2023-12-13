@@ -144,7 +144,7 @@ class ValFrame(DataFrame):
         idx = np.array([vec for k, vec in self.items() if k == index])[0]
         return idx
 
-    def combine_column(self, str_combination: str, col_name='combination'):
+    def combine_column(self, str_combination: str):
         """
         Combine the column of the ValFrame following this layout :
         formula(index)
