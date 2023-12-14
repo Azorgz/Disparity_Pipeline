@@ -49,7 +49,10 @@ class Pipe:
         # The different modules of the Pipe are initialized ###############
         self.modules = {}
         self._init_setup_()
-        setup = CameraSetup(from_file=self.setup[0], device=self.device)
+        if self.config["setup"]['multi'] == 0:
+            setup = self.setup[0]
+        else:
+            setup = CameraSetup(from_file=self.setup[0], device=self.device)
         self._init_dataloader_(setup)
         self._init_network_()
         self._init_wrapper_(setup, verbose=False)
@@ -68,7 +71,7 @@ class Pipe:
         if process is not None:
             process.init_process(self)
             for name_experiment, experiment in process.items():
-                with tqdm(total=self.config["setup"]['multi'] * len(self.dataloader),
+                with tqdm(total=len(self.setup) * len(self.dataloader),
                           desc=f"Nombre d'itérations for {name_experiment}: ", leave=True, position=0) as bar:
                     name = None
                     for i, s in enumerate(self.setup):

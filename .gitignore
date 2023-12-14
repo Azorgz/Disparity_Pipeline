@@ -25,4 +25,8 @@ config/__pycache__/
 module/__pycache__/
 utils/__pycache__/
 utils/classes/__pycache__/
+Setup_Camera_test.yaml
+Test.yaml
+script_setup_test.py
+
 

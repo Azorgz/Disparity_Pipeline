@@ -72,7 +72,7 @@ class DepthWrapper:
         cloud = torch.concatenate([points_2d_src, points_3d_src[:, :, :, -1:]], dim=-1)
 
         grid = Tensor(points_2d_src_norm).clone()
-        mask_valid = torch.ones(h*w).to(torch.bool).to(self.device)
+        mask_valid = torch.ones(h * w).to(torch.bool).to(self.device)
         res = {'image_reg': F.grid_sample(image_src, grid, align_corners=True)}
         if return_occlusion:
             res['occlusion'] = self.find_occlusion(cloud, [height, width])
@@ -88,12 +88,12 @@ class DepthWrapper:
         # Put all the point into a H*W x 3 vector
         c = torch.tensor(cloud.flatten(start_dim=0, end_dim=2))[mask_valid]  # H*W x 3
         # Remove the point landing outside the image
-        mask = ((c[:, 0] < 0) + (c[:, 0] >= size_image[1]-1) + (c[:, 1] < 0) + (c[:, 1] >= size_image[0]-1)) == 0
+        mask = ((c[:, 0] < 0) + (c[:, 0] >= size_image[1] - 1) + (c[:, 1] < 0) + (c[:, 1] >= size_image[0] - 1)) == 0
         c = c[mask]
         # Transform the landing positions in accurate pixels
         c_ = torch.round(c[:, :2]).to(torch.int)
         # Create a picture with for pixel value the depth of the point landing in
-        result = torch.zeros([1, 1, size_image[0], size_image[1]]).to(cloud.dtype).to(self.device) # *(c[:, 2].max()+1)
+        result = torch.zeros([1, 1, size_image[0], size_image[1]]).to(cloud.dtype).to(self.device)  # *(c[:, 2].max()+1)
         result[0, 0, c_[:, 1], c_[:, 0]] = c[:, 2]
         # mask = result == 0
         # if post_process_depth:
@@ -111,8 +111,8 @@ class DepthWrapper:
     def find_occlusion(self, cloud, size_image):
         # Put all the point into a H*W x 3 vector
         c = torch.tensor(cloud.flatten(start_dim=0, end_dim=2))  # H*W x 3
-        c[:, 0] = c[:, 0] * cloud.shape[1]/size_image[0]
-        c[:, 1] = c[:, 1] * cloud.shape[2]/size_image[1]
+        c[:, 0] = c[:, 0] * cloud.shape[1] / size_image[0]
+        c[:, 1] = c[:, 1] * cloud.shape[2] / size_image[1]
         # create a unique index for each point according where they land in the src frame and their depth
         M = torch.round(c[:, 2].max() + 1)
         max_u = torch.round(c[:, 0].max() + 1)
@@ -129,7 +129,7 @@ class DepthWrapper:
         c_depth = torch.round(c[indexes, 2])
         # Trick to find the point landing in the same pixel, only the closer is removed
         c_[1:] -= c_[:-1].clone()
-        c_depth[1:] = 1 - c_depth[:-1].clone()/c_depth[1:].clone()
+        c_depth[1:] = 1 - c_depth[:-1].clone() / c_depth[1:].clone()
 
         idx = torch.nonzero((c_ == 0) * (c_depth > 0.03) + mask[indexes])
         # Use the indexes found to create a mask of the occluded point
@@ -145,7 +145,6 @@ class DepthWrapper:
         # result = opening(result, kernel_small)
         # result = dilation(result, kernel_small)
         return ImageTensor(result).to(torch.bool)
-
 
     # def grid_sample_3d(self, image, depth, grid, step, post_process_depth=False, post_process_image=False):
     #     if isinstance(image, DepthTensor) and post_process_depth:
