@@ -16,13 +16,16 @@ from utils.manipulation_tools import extract_roi_from_map
 
 
 class StereoSetup(StereoCamera):
+    """
+    A class which add a few properties to the Kornia class StereoCamera
+    """
     _left = None
     _right = None
     _name = 'StereoSetup'
     _ROI = [0, 0, 0, 0]
 
     def __init__(self, left: Union[IRCamera, RGBCamera], right: Union[IRCamera, RGBCamera],
-                 device: torch.device, name: str = None, accuracy=0.1, z_min=3):
+                 device: torch.device, name: str = None, accuracy=0.25, z_min=0.5):
 
         self._left = left
         self._right = right
@@ -175,14 +178,15 @@ class StereoSetup(StereoCamera):
                 new_sample[right] = self.cut_to_original(temp, side='right')
         return new_sample
 
-    def disparity_to_depth(self, sample, *args):
+    def disparity_to_depth(self, sample: dict, *args):
         for key, t in sample.items():
-            mask = t == 0
-            t_ = t.clone()
-            t_[mask] = 1
-            sample[key] = self.reproject_disparity_to_3D(t_.put_channel_at(-1))
-            sample[key] = sample[key][:, :, :, -1].unsqueeze(1)
-            sample[key][mask] = 0
+            # mask = t == 0
+            # t_ = t.clone()
+            # t_[mask] = 1
+            t = self.reproject_disparity_to_3D((t + 1e-8).put_channel_at(-1))
+            t = t[:, :, :, -1].unsqueeze(1)
+            sample[key] = torch.clip(t, self.depth_min, self.depth_max)
+            # sample[key][mask] = 0
             # new_sample[key] = torch.clamp(new_sample[key], self.depth_min, self.depth_max)
             sample[key].pass_attr(t)
         return sample
@@ -192,7 +196,7 @@ class StereoSetup(StereoCamera):
         t_ = depth.clone()
         t_[mask] = 1
         disp = self.tx / t_ * self.fx
-        disp[mask] = 0
+        disp[mask] = self.depth_min
         return disp
 
     @staticmethod

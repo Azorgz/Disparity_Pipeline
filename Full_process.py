@@ -14,4 +14,4 @@ def full_process(script_path):
 
 
 if __name__ == '__main__':
-    full_process('Process_position_ir_finer.yaml')
+    full_process('Test.yaml')

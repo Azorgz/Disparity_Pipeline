@@ -43,10 +43,10 @@ class Process(OrderedDict):
                 self[key] = self._make_process_dict_(p)
 
     def init_process(self, pipe) -> None:
-        if isinstance(pipe.setup, list):
+        if len(pipe.setup) > 1:
             setup = CameraSetup(from_file=pipe.setup[0], device=pipe.device)
         else:
-            setup = pipe.setup
+            setup = pipe.setup[0]
         path_result = pipe.path_output
         if not os.path.exists(path_result):
             os.makedirs(path_result, exist_ok=True)
