@@ -1,4 +1,4 @@
- .idea/
+.idea/
 Networks/ACVNet/models/__pycache__/
 Networks/UniMatch/__pycache__/
 Networks/UniMatch/unimatch/__pycache__/
