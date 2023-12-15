@@ -26,7 +26,6 @@ class StereoSetup(StereoCamera):
 
     def __init__(self, left: Union[IRCamera, RGBCamera], right: Union[IRCamera, RGBCamera],
                  device: torch.device, name: str = None, accuracy=0.25, z_min=0.5):
-
         self._left = left
         self._right = right
         # Needed parameter for the calibration left-right
@@ -191,7 +190,7 @@ class StereoSetup(StereoCamera):
         t_ = depth.clone()
         t_[mask] = 1
         disp = self.tx / t_ * self.fx
-        disp[mask] = self.depth_min
+        disp[mask] = self.tx / self.depth_min * self.fx
         return disp
 
     @staticmethod

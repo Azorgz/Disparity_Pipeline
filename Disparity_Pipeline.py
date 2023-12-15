@@ -54,6 +54,7 @@ class Pipe:
         else:
             setup = CameraSetup(from_file=self.setup[0], device=self.device)
         self._init_dataloader_(setup)
+        self._init_dataloader_(setup)
         self._init_network_()
         self._init_wrapper_(setup, verbose=False)
         self._init_saver_(verbose=False)
