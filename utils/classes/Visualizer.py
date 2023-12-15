@@ -386,7 +386,7 @@ class Visualizer:
 
 
 if __name__ == '__main__':
-    pro = '/home/godeta/'
-    perso = '/home/aurelien/'
-    path = perso + "PycharmProjects/Disparity_Pipeline/results/camera_position_rgb/Depth-Depth"
+    pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/results/'
+    perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/results/'
+    path = perso + "camera_position_rgb/Disparity-Depth"
     Visualizer(path, search_exp=False).run()

@@ -95,7 +95,7 @@ class Pipe:
                         if self.save_inputs and i == 0:
                             self.dataloader.save_conf(experiment.path)
 
-                        if i == self.config["setup"]['multi'] - 1:
+                        if i == len(self.setup) - 1:
                             self.validation.statistic()
                             self.validation.save(experiment.path)
                             self.validation.reset()
