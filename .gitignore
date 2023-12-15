@@ -1,0 +1,16 @@
+ .idea/
+Networks/ACVNet/models/__pycache__/
+Networks/UniMatch/__pycache__/
+Networks/UniMatch/unimatch/__pycache__/
+Networks/__pycache__/
+Result_analysis/__pycache__/
+Setup_Camera/position_ir/
+Setup_Camera/position_ir_finer/
+Setup_Camera/position_rgb/
+__pycache__/
+config/__pycache__/
+module/__pycache__/
+results/
+utils/__pycache__/
+utils/classes/__pycache__/
+test.py
