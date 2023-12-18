@@ -16,5 +16,6 @@ results/
 utils/__pycache__/
 utils/classes/__pycache__/
 test.py
+Full_process.py
 /results
 /dataset

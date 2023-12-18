@@ -239,20 +239,40 @@ class Visualizer:
         if self.multi_setup:
             if self.key == ord('x'):
                 self.dx = (self.dx + 1) % max(self.dx_max, 1)
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da +
+                            self.f * self.px_max + self.px)
             elif self.key == ord('y'):
                 self.dy = (self.dy + 1) % max(self.dy_max, 1)
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da +
+                            self.f * self.px_max + self.px)
             elif self.key == ord('z'):
                 self.dz = (self.dz + 1) % max(self.dz_max, 1)
-            elif self.key == ord('a'):
-                self.da = (self.da + 1) % max(self.da_max, 1)
-            elif self.key == ord('f'):
-                self.f = (self.f + 1) % max(self.f_max, 1)
-            elif self.key == ord('p'):
-                self.px = (self.px + 1) % max(self.px_max, 1)
-            self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
                         self.dy * self.dz_max * self.da_max +
                         self.dz * self.da_max + self.da +
                         self.f * self.px_max + self.px)
+            elif self.key == ord('a'):
+                self.da = (self.da + 1) % max(self.da_max, 1)
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da +
+                            self.f * self.px_max + self.px)
+            elif self.key == ord('f'):
+                self.f = (self.f + 1) % max(self.f_max, 1)
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da +
+                            self.f * self.px_max + self.px)
+            elif self.key == ord('p'):
+                self.px = (self.px + 1) % max(self.px_max, 1)
+                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da +
+                            self.f * self.px_max + self.px)
 
     def _create_visual(self, exp):
         experiment = self.experiment[exp]
