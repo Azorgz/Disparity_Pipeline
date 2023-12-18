@@ -14,6 +14,8 @@ def full_process(script_path):
 
 
 if __name__ == '__main__':
+    # full_process('Process_intrinsic_ir.yaml')
+    # full_process('Process_intrinsic_rgb.yaml')
     full_process('Process_position_rgb.yaml')
     full_process('Process_position_ir.yaml')
     full_process('Process_position_ir_finer.yaml')

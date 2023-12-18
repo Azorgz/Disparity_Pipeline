@@ -102,8 +102,8 @@ class Visualizer:
                 self.experiment[p]['inputs_available'] = False
             self.experiment[p]['new_list'] = [new_path + '/' + n for n in sorted(new_list)]
             if self.multi_setup:
-                self.dx_max, self.dy_max, self.dz_max, self.da_max = 0, 0, 0, 0
-                self.dx, self.dy, self.dz, self.da = 0, 0, 0, 0
+                self.dx_max, self.dy_max, self.dz_max, self.da_max, self.f_max, self.px_max = 0, 0, 0, 0, 0, 0
+                self.dx, self.dy, self.dz, self.da, self.f, self.px = 0, 0, 0, 0, 0, 0
                 self.define_delta(self.experiment[p]['new_list'][-1], init_max=True)
             try:
                 self.experiment[p]['target_disp_path'], _, target_disp_list = os.walk(
@@ -174,7 +174,7 @@ class Visualizer:
     def define_delta(self, name, init_max=False):
         name = name.split('_')
         if init_max:
-            self.dx_max, self.dy_max, self.dz_max, self.da_max = 0, 0, 0, 0
+            self.dx_max, self.dy_max, self.dz_max, self.da_max, self.f_max, self.px_max = 0, 0, 0, 0, 0, 0
             for i, mot in enumerate(name):
                 if mot == 'dx':
                     self.dx_max = int(name[i + 1]) + 1
@@ -184,8 +184,12 @@ class Visualizer:
                     self.dz_max = int(name[i + 1]) + 1
                 elif mot == 'da':
                     self.da_max = int(name[i + 1]) + 1
+                elif mot == 'f':
+                    self.f_max = int(name[i + 1]) + 1
+                elif mot == 'px':
+                    self.px_max = int(name[i + 1]) + 1
         else:
-            self.dx, self.dy, self.dz, self.da = 0, 0, 0, 0
+            self.dx, self.dy, self.dz, self.da, self.f, self.px = 0, 0, 0, 0, 0, 0
             for i, mot in enumerate(name):
                 if mot == 'dx':
                     self.dx = int(name[i + 1])
@@ -195,6 +199,10 @@ class Visualizer:
                     self.dz = int(name[i + 1])
                 elif mot == 'da':
                     self.da = int(name[i + 1])
+                elif mot == 'f':
+                    self.f = int(name[i + 1])
+                elif mot == 'px':
+                    self.px = int(name[i + 1])
 
     def _execute_cmd(self, exp):
         i = 0
@@ -230,25 +238,21 @@ class Visualizer:
             self.show_occlusion = not self.show_occlusion
         if self.multi_setup:
             if self.key == ord('x'):
-                self.dx = (self.dx + 1) % self.dx_max
-                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
-                            self.dy * self.dz_max * self.da_max +
-                            self.dz * self.da_max + self.da)
+                self.dx = (self.dx + 1) % max(self.dx_max, 1)
             elif self.key == ord('y'):
-                self.dy = (self.dy + 1) % self.dy_max
-                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
-                            self.dy * self.dz_max * self.da_max +
-                            self.dz * self.da_max + self.da)
+                self.dy = (self.dy + 1) % max(self.dy_max, 1)
             elif self.key == ord('z'):
-                self.dz = (self.dz + 1) % self.dz_max
-                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
-                            self.dy * self.dz_max * self.da_max +
-                            self.dz * self.da_max + self.da)
+                self.dz = (self.dz + 1) % max(self.dz_max, 1)
             elif self.key == ord('a'):
-                self.da = (self.da + 1) % self.da_max
-                self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
-                            self.dy * self.dz_max * self.da_max +
-                            self.dz * self.da_max + self.da)
+                self.da = (self.da + 1) % max(self.da_max, 1)
+            elif self.key == ord('f'):
+                self.f = (self.f + 1) % max(self.f_max, 1)
+            elif self.key == ord('p'):
+                self.px = (self.px + 1) % max(self.px_max, 1)
+            self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
+                        self.dy * self.dz_max * self.da_max +
+                        self.dz * self.da_max + self.da +
+                        self.f * self.px_max + self.px)
 
     def _create_visual(self, exp):
         experiment = self.experiment[exp]
@@ -293,7 +297,12 @@ class Visualizer:
                               self.thickness, cv.LINE_AA)
         if self.multi_setup:
             org = self.org_idx[0], self.org_idx[1] + 15
-            visu = cv.putText(visu, f'dx : {self.dx}, dy : {self.dy}, dz : {self.dz}, da : {self.da}',
+            visu = cv.putText(visu, f'{f"dx : {self.dx}," if self.dx_max>0 else ""}'
+                                    f'{f"dy : {self.dy}," if self.dy_max>0 else ""}'
+                                    f'{f"dz : {self.dz}," if self.dz_max>0 else ""}'
+                                    f'{f"da : {self.da}," if self.da_max>0 else ""}'
+                                    f'{f"df : {self.f}," if self.f_max>0 else ""}'
+                                    f'{f"dpx : {self.px}," if self.px_max>0 else ""}',
                               org, self.font, self.fontScale, self.color, self.thickness, cv.LINE_AA)
         if self.show_grad_im:
             org = self.org_idx[0] + w, self.org_idx[1]
