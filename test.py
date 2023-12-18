@@ -21,7 +21,7 @@ import numpy as np
 
 
 base_path = os.getcwd() + "/results/"
-res = ResultFrame(base_path + "camera_position_ir_finer/Depth-Disparity")
+res = ResultFrame(base_path + "camera_position_ir_finer/Depth-Depth")
 cam = 'IR'
 setup = 'fine test'
 
@@ -38,11 +38,11 @@ if setup == 'raw test':
     vec_px = np.arange(0.75, 2, 0.25) * px_size_ * 1e6
 
 elif setup == 'fine test':
-    vec_x = np.arange(0, 11 * 1e-2, 1e-2)
+    vec_x = np.arange(0, 9 * 1e-2, 1e-2)
     vec_x = (vec_x - vec_x.max() / 2)
-    vec_z = np.arange(-1e-2, 6.5e-2, 5e-3)
+    vec_z = np.arange(-6e-2, 1.5e-2, 5e-3)
     vec_z = (vec_z - vec_z.max() / 2)
-    vec_y = np.arange(0, 1.5e-1, 5e-2)
+    vec_y = np.arange(0, 1.5e-1, 2.5e-2)
     vec_y = (vec_y - vec_y.max() / 2)
     vec_alpha = (np.arange(0, 3, 1) / 180 * np.pi)
     vec_alpha = (vec_alpha - vec_alpha.max() / 2)
@@ -142,7 +142,19 @@ plt.show()
 
 
 time.sleep(1)
-#
+
+# Best Depth 1186 / dz=5, dx=4, dy=2, da=1
+# Best Depth 1984 / dz=1, dx=7, dy=2, da=1
+
+
+
+
+
+
+
+
+
+
 # name = '/home/godeta/PycharmProjects/Disparity_Pipeline/results/Vis/Validation.yaml'
 # with open(name, "r") as file:
 #     val = yaml.safe_load(file)
