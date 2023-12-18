@@ -9,7 +9,10 @@ from utils.classes.Cameras import RGBCamera, IRCamera
 from module.SetupCameras import CameraSetup
 from utils.manipulation_tools import random_noise, noise
 
-name_path = 'Setup_Camera/position_ir_finer'
+cam = 'IR'
+setup = 'raw'
+name_path = f'Setup_Camera/position_{"ir" if cam=="IR" else "rgb"}{"_finer" if setup == "fine" else ""}'
+
 perso = '/home/aurelien/Images/Images/'
 pro = '/home/godeta/PycharmProjects/LYNRED/Images/'
 p = pro if 'godeta' in os.getcwd() else perso
@@ -19,17 +22,17 @@ path_RGB2 = p + 'Day/slave/visible'
 path_IR = p + 'Day/master/infrared_corrected'
 
 ####### POSITION PARAMETERS ###################
-setup = 'fine test'
+
 d_calib = 5
 center_x, center_y, center_z = 341 * 1e-03, 1, 0
 
-if setup == 'raw test':
+if setup == 'raw':
     vec_x = np.arange(0, 8 * 1e-2, 1e-2).tolist()
     vec_z = np.arange(0, 6e-2, 1e-2).tolist()
     vec_y = np.arange(0, 6e-2, 1e-2).tolist()
     vec_alpha = (np.arange(0, 4, 1) / 180 * np.pi).tolist()
 
-elif setup == 'fine test':
+elif setup == 'fine':
     vec_x = np.arange(0, 11 * 1e-2, 1e-2)
     vec_x = (vec_x - vec_x.max() / 2).tolist()
     vec_z = np.arange(-1e-2, 6.5e-2, 5e-3)
@@ -44,16 +47,14 @@ else:
     vec_z = [0]
     vec_y = [0]
     vec_alpha = [0]
-# vec_y = [0]
-# vec_alpha = [0]
 
 
 IR = IRCamera(None, None, path_IR, device=torch.device('cuda'), name='IR', f=14e-3, pixel_size=(16.4e-6, 16.4e-6),
-              aperture=1.2)
+                  aperture=1.2)
 RGB = RGBCamera(None, None, path_RGB, device=torch.device('cuda'), name='RGB', f=6e-3, pixel_size=(3.45e-6, 3.45e-6),
-                aperture=1.4)
+                    aperture=1.4)
 RGB2 = RGBCamera(None, None, path_RGB2, device=torch.device('cuda'), name='RGB2', f=6e-3, pixel_size=(3.45e-6, 3.45e-6),
-                 aperture=1.4)
+                     aperture=1.4)
 R = CameraSetup(RGB, IR, RGB2, print_info=True)
 
 with tqdm(total=len(vec_x) * len(vec_y) * len(vec_z) * len(vec_alpha), desc='Setups saving') as bar:
