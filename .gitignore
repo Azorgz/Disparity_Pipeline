@@ -7,6 +7,8 @@ Result_analysis/__pycache__/
 Setup_Camera/position_ir/
 Setup_Camera/position_ir_finer/
 Setup_Camera/position_rgb/
+Setup_Camera/intrinsics_ir
+Setup_Camera/intrinsics_rgb
 __pycache__/
 config/__pycache__/
 module/__pycache__/
