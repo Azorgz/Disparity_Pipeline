@@ -12,7 +12,6 @@ Setup_Camera/intrinsics_rgb
 __pycache__/
 config/__pycache__/
 module/__pycache__/
-results/
 utils/__pycache__/
 utils/classes/__pycache__/
 test.py
