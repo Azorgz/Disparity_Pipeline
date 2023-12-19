@@ -9,7 +9,7 @@ from utils.classes.Cameras import RGBCamera, IRCamera
 from module.SetupCameras import CameraSetup
 from utils.manipulation_tools import random_noise, noise
 
-cam = 'RGB'
+cam = 'IR'
 setup = 'raw'
 name_path = f'Setup_Camera/position_{"ir" if cam=="IR" else "rgb"}{"_finer" if setup == "fine" else ""}'
 

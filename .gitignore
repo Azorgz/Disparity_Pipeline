@@ -18,3 +18,8 @@ test.py
 Full_process.py
 /results
 /dataset
+Setup_Camera_test.yaml
+Test.yaml
+bin/
+lib/
+script_setup_test.py

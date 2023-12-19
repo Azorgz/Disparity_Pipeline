@@ -149,12 +149,6 @@ time.sleep(1)
 
 
 
-
-
-
-
-
-
 # name = '/home/godeta/PycharmProjects/Disparity_Pipeline/results/Vis/Validation.yaml'
 # with open(name, "r") as file:
 #     val = yaml.safe_load(file)
