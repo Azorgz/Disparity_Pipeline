@@ -59,8 +59,7 @@ class Pipe:
         self._init_wrapper_(setup, verbose=False)
         self._init_saver_(verbose=False)
         self._init_validation_()
-        if self.print_info:
-            print(f'\n############# Start Processes ###########')
+
         # self._init_pointsCloud_()
 
         # self.time_consistency_block = Time_consistency_block(config.time_consistency_block)
@@ -71,6 +70,8 @@ class Pipe:
     def run(self, process=None):
         if process is not None:
             process.init_process(self)
+            if self.print_info:
+                print(process)
             for name_experiment, experiment in process.items():
                 with tqdm(total=len(self.setup) * len(self.dataloader),
                           desc=f"Nombre d'itérations for {name_experiment}: ", leave=True, position=0) as bar:

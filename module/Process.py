@@ -1,6 +1,9 @@
+import inspect
+import ntpath
 import os
 from collections import OrderedDict
-from typing import Union
+from types import FrameType
+from typing import Union, cast
 
 import oyaml as yaml
 
@@ -12,6 +15,7 @@ class Process(OrderedDict):
 
     def __init__(self, path: str = None, process_dict: dict = None):
         super(Process, self).__init__()
+        self.isInit = False
         self.path = path
         self.camera_used = []
         self.option = {}
@@ -26,23 +30,39 @@ class Process(OrderedDict):
         for experiment in self.values():
             experiment(sample)
 
+    def __str__(self):
+        if self.isInit:
+            string = f'\n############# Process {self.name} ###########'
+            for experiment in self.values():
+                string += f'{experiment.__str__()}'
+        else:
+            string = self.name
+        return string
+
     def _create_from_dict(self, process_dict: dict) -> None:
+        self.name = "New_process_from_dict"
         for key, p in process_dict.items():
             if key.upper() == 'OPTION':
                 self.option = p
+            elif key.upper() == 'NAME':
+                self.name = p
             else:
                 self[key] = self._make_process_dict_(p)
 
     def _create_from_path(self, path: str) -> None:
         with open(path, 'r') as file:
             process = yaml.safe_load(file)
+        self.name = ntpath.basename(path).split('.')[0]
         for key, p in process.items():
             if key.upper() == 'OPTION':
                 self.option = p
+            elif key.upper() == 'NAME':
+                self.name = p
             else:
                 self[key] = self._make_process_dict_(p)
 
     def init_process(self, pipe) -> None:
+        self.isInit = True
         if len(pipe.setup) > 1:
             setup = CameraSetup(from_file=pipe.setup[0], device=pipe.device)
         else:
@@ -295,7 +315,7 @@ class Process(OrderedDict):
             output = setup_(output, reverse=True)
             res['pred_disp'].update(setup_.disparity_to_depth(output))
 
-        return _disparity
+        return _disparity, [cam1, cam2]
 
     @staticmethod
     def depth(pipe, cam1, cam2, pred_bidir, pred_right, inference_size, setup, **kwargs0):
@@ -312,7 +332,7 @@ class Process(OrderedDict):
             output = pipe.network(**new_sample)
             res['pred_depth'].update(setup_(output, reverse=True))
 
-        return _depth
+        return _depth, [cam1, cam2]
 
     @staticmethod
     def wrap(pipe, cam_src, cam_dst, depth_tensors, depth, return_depth_reg, return_occlusion, cams, **kwargs0):
@@ -333,7 +353,7 @@ class Process(OrderedDict):
                 res['occlusion'].update({f'{cam_src}_to_{cam_dst}': result['occlusion']})
             res['image_reg'].update({f'{cam_src}_to_{cam_dst}': result['image_reg']})
 
-        return _wrap
+        return _wrap, ['with depth' if depth else 'with disparity']
 
     @staticmethod
     def valid(pipe, cam_reg, cam_ref, exp_name, **kwargs0):
@@ -349,7 +369,7 @@ class Process(OrderedDict):
             pipe.validation.activated = True
             pipe.validation(im_reg.clone(), im_ref.clone(), im_old.clone(), name, exp_name, occlusion=occlusion)
 
-        return _valid
+        return _valid, []
 
     @staticmethod
     def save(pipe, variable_name, path, **kwargs0):
@@ -362,7 +382,19 @@ class Process(OrderedDict):
                 var = res[variable_name]
             pipe.saver(var, path_res)
 
-        return _save
+        return _save, [variable_name]
+
+    @property
+    def isInit(self):
+        return self._isInit
+
+    @isInit.setter
+    def isInit(self, value):
+        """Only settable by the _update_camera_ref_, _del_camera_, _set_default_new_ref_  methods"""
+        # Ref: https://stackoverflow.com/a/57712700/
+        name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+        if name == 'init_process' or name == '__new__' or name == '__init__':
+            self._isInit = value
 
 
 class Experiment(list):
@@ -375,10 +407,14 @@ class Experiment(list):
         else:
             self.name = name
 
+    def __str__(self):
+        space = ' '
+        return f'\n{self.name} : {" / ".join([f"{instruction[0].__name__[1:].capitalize()} {space.join(instruction[1])}" for instruction in self])}'
+
     def __call__(self, sample, *args, **kwargs):
         res = {'pred_disp': {}, 'pred_depth': {}, 'image_reg': {}, 'depth_reg': {}, 'disp_reg': {}, 'occlusion': {}}
         for instruction in self:
-            instruction(sample, res, **kwargs)
+            instruction[0](sample, res, **kwargs)
 
 
 if __name__ == '__main__':
