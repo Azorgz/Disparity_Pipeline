@@ -3,7 +3,6 @@ Option:
   setup: # Paths to the config file of the pre-calibrated camera's setup
     path: Setup_Camera/position_ir_finer
   dataset:
-    number_of_sample: 1
     indexes: [1773]
     shuffle: False
 

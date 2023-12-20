@@ -21,9 +21,10 @@ import numpy as np
 
 
 base_path = os.getcwd() + "/results/"
-res = ResultFrame(base_path + "camera_position_ir_finer/Depth-Depth")
+res = ResultFrame(base_path + "camera_position_ir/Depth-Depth")
+# res1 = ResultFrame(base_path + "camera_position_ir_finer/Depth-Depth")
 cam = 'IR'
-setup = 'fine test'
+setup = 'raw test'
 
 if setup == 'raw test':
     vec_x = np.arange(0, 8 * 1e-2, 1e-2)
@@ -38,13 +39,13 @@ if setup == 'raw test':
     vec_px = np.arange(0.75, 2, 0.25) * px_size_ * 1e6
 
 elif setup == 'fine test':
-    vec_x = np.arange(0, 9 * 1e-2, 1e-2)
+    vec_x = np.arange(0, 9 * 1e-2, 9e-2)
     vec_x = (vec_x - vec_x.max() / 2)
-    vec_z = np.arange(-6e-2, 1.5e-2, 5e-3)
+    vec_z = np.arange(-6e-2, 1.5e-2, 5e-4)
     vec_z = (vec_z - vec_z.max() / 2)
-    vec_y = np.arange(0, 1.5e-1, 2.5e-2)
+    vec_y = np.arange(0, 1.25e-1, 2.5e-1)
     vec_y = (vec_y - vec_y.max() / 2)
-    vec_alpha = (np.arange(0, 3, 1) / 180 * np.pi)
+    vec_alpha = (np.arange(0, 3, 4) / 180 * np.pi)
     vec_alpha = (vec_alpha - vec_alpha.max() / 2)
     if cam == 'IR':
         f_, px_size_ = 14e-3, 16.4e-6
@@ -108,7 +109,9 @@ idx_a = cal_idx('a')
 idx_f = cal_idx('f')
 idx_px = cal_idx('px')
 
+
 val = res.delta_full.combine_column('nec-rmse+psnr+ms_ssim+ssim').values
+# val1 = res1.delta_full.combine_column('nec-rmse+psnr+ms_ssim+ssim').values
 
 v_x = val[idx_x].mean(1)
 v_y = val[idx_y].mean(1)
@@ -122,7 +125,10 @@ plt.plot(vec_y, v_y)
 plt.plot(vec_z, v_z)
 plt.plot(vec_alpha, v_a)
 plt.vlines(0, m, M, colors='k', linestyles='solid', label='delta = 0')
+# plt.vlines(vec_z[(val).argmax()], m, M, colors='k', linestyles='solid', label=f'delta = {vec_z[(val).argmax()]}')
+# plt.legend(['dz m'])
 plt.legend(['dx m', 'dy m', 'dz m', 'da rad'])
+
 #
 # v_f = val[idx_f].mean(1)
 # v_px = val[idx_px].mean(1)
