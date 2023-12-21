@@ -18,4 +18,4 @@ test.py
 Full_process.py
 /results
 /dataset
-Networks/My_NN/pretrained/network-disparity.pytorch
+Networks/KenburnDepth/pretrained/network-disparity.pytorch

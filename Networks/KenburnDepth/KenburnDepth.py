@@ -12,10 +12,10 @@ from utils.classes import ImageTensor
 from utils.classes.Image import DepthTensor
 
 
-class my_NN(nn.Module):
+class KenburnDepth(nn.Module):
 
     def __init__(self, path):
-        super(my_NN, self).__init__()
+        super(KenburnDepth, self).__init__()
         self.netSemantics = Semantics().cuda().eval()
         self.netDisparity = Disparity().cuda().eval()
         self.netDisparity.load_state_dict({strKey.replace('module', 'net'): tenWeight for strKey, tenWeight in
@@ -133,7 +133,7 @@ class my_NN(nn.Module):
 
 if __name__ == '__main__':
 
-    NN = my_NN("/home/godeta/PycharmProjects/decifer_autozoom/My_NN/pretrained")
+    NN = my_NN("/home/godeta/PycharmProjects/decifer_autozoom/KenburnDepth/pretrained")
     im_path = "/home/godeta/PycharmProjects/LYNRED/Images/Day/master/visible/"
     for file in os.listdir(im_path):
         if file.split('.')[-1] == 'md':

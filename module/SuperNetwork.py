@@ -2,6 +2,7 @@ import warnings
 
 from torch import Tensor
 
+from Networks.KenburnDepth.KenburnDepth import KenburnDepth
 from config.Config import ConfigPipe
 from Networks.ACVNet.models import ACVNet
 from Networks.UniMatch.unimatch.unimatch import UniMatch
@@ -118,6 +119,18 @@ class SuperNetwork(BaseModule):
                              num_transformer_layers=self.args_depth.num_transformer_layers,
                              reg_refine=self.args_depth.reg_refine,
                              task='depth').to(self.device)
+            if torch.cuda.device_count() > 1:
+                print('Use %d GPUs' % torch.cuda.device_count())
+                model.model = torch.nn.DataParallel(model.model)
+            if self.config['depth_network']["path_checkpoint"]:
+                checkpoint = torch.load(self.config['depth_network']["path_checkpoint"], map_location=self.device_index)
+                model_dict = self.model_depth.state_dict()
+                pre_dict = {k: v for k, v in checkpoint['model'].items() if k in model_dict}
+                model_dict.update(pre_dict)
+                self.model_depth.load_state_dict(model_dict)
+        elif config['depth_network']["name"] == "KenBurnDepth":
+            self.name_depth = "KenBurnDepth"
+            model = KenburnDepth(self.config['depth_network']["path_checkpoint"])
         elif config['depth_network']["name"] == "custom":
             self.name_depth = "custom"
             # self.feature_extraction = self._initialize_features_extraction_(self.config['network'])
@@ -128,15 +141,6 @@ class SuperNetwork(BaseModule):
         else:
             model = None
         self.model_depth = model.eval()
-        if torch.cuda.device_count() > 1:
-            print('Use %d GPUs' % torch.cuda.device_count())
-            model.model = torch.nn.DataParallel(model.model)
-        if self.config['depth_network']["path_checkpoint"]:
-            checkpoint = torch.load(self.config['depth_network']["path_checkpoint"], map_location=self.device_index)
-            model_dict = self.model_depth.state_dict()
-            pre_dict = {k: v for k, v in checkpoint['model'].items() if k in model_dict}
-            model_dict.update(pre_dict)
-            self.model_depth.load_state_dict(model_dict)
         self.preprocessing_depth = Preprocessing(config["depth_network"]["preprocessing"], self.device, task='depth',
                                                  pred_right=self.pred_right, pred_bidir=False)
 
@@ -212,6 +216,8 @@ class SuperNetwork(BaseModule):
                                        pred_bidir_depth=self.pred_bidir,
                                        depth_from_argmax=self.args_depth.depth_from_argmax,
                                        task='depth')['flow_preds'][-1]  # [1, H, W]
+            elif self.name_disparity == "KenBurnDepth":
+                res = self.model_depth(Tensor(img_ref), pred_bidir=self.pred_bidir)
             else:
                 warnings.warn('This Network is not implemented')
                 return 0
