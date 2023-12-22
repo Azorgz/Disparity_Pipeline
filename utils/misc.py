@@ -133,6 +133,16 @@ def timeit(func):
     return wrapper
 
 
+def time_fct(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        res = func(*args, **kwargs)
+        print(f"\nFunction {func.__name__} executed in : {time.time() - start} seconds")
+        return res
+
+    return wrapper
+
+
 def deactivated(func):
     def wrapper(*args, **kwargs):
         self = args[0]

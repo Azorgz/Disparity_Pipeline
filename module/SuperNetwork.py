@@ -12,7 +12,7 @@ from utils.classes.Image import ImageTensor, DepthTensor
 from utils.misc import timeit, count_parameter
 import torch
 
-Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch']}
+Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch', 'Kenburn']}
 
 
 class SuperNetwork(BaseModule):
@@ -66,7 +66,7 @@ class SuperNetwork(BaseModule):
 
     def disparity_network_init(self, config):
         # Disparity Network initialization
-        if config['disparity_network']["name"] == ('unimatch' or 'uni' or 'Uni' or 'Unimatch'):
+        if config['disparity_network']["name"].upper() == ('UNI' or 'UNIMATCH'):
             self.name_disparity = 'unimatch'
             model = UniMatch(feature_channels=self.args_disparity.feature_channels,
                              num_scales=self.args_disparity.num_scales,
@@ -76,7 +76,7 @@ class SuperNetwork(BaseModule):
                              num_transformer_layers=self.args_disparity.num_transformer_layers,
                              reg_refine=self.args_disparity.reg_refine,
                              task=self.args_disparity.task).to(self.device)
-        elif config['disparity_network']["name"] == ("acvNet" or 'acv' or 'avc' or 'avcNet'):
+        elif config['disparity_network']["name"].upper() == ("ACVNET" or 'ACV' or 'AVC'):
             self.name_disparity = 'acvNet'
             torch.manual_seed(1)
             torch.cuda.manual_seed(1)
@@ -92,7 +92,7 @@ class SuperNetwork(BaseModule):
         else:
             model = None
         self.model_disparity = model.eval()
-        if torch.cuda.device_count() > 1 or self.name_disparity == ("acvNet" or 'acv' or 'avc' or 'avcNet'):
+        if torch.cuda.device_count() > 1 or self.name_disparity.upper() == ("ACVNET" or 'ACV' or 'AVC'):
             print('Use %d GPUs' % torch.cuda.device_count())
             model.model = torch.nn.DataParallel(model.model)
 
@@ -109,7 +109,7 @@ class SuperNetwork(BaseModule):
     def depth_network_init(self, config):
         # Disparity Network initialization
 
-        if config['depth_network']["name"] == ('unimatch' or 'uni' or 'Uni' or 'Unimatch'):
+        if config['depth_network']["name"].upper() == ('UNI' or 'UNIMATCH'):
             self.name_depth = config['depth_network']["name"]
             model = UniMatch(feature_channels=self.args_depth.feature_channels,
                              num_scales=self.args_depth.num_scales,
@@ -128,9 +128,9 @@ class SuperNetwork(BaseModule):
                 pre_dict = {k: v for k, v in checkpoint['model'].items() if k in model_dict}
                 model_dict.update(pre_dict)
                 self.model_depth.load_state_dict(model_dict)
-        elif config['depth_network']["name"] == "KenBurnDepth":
+        elif config['depth_network']["name"].upper() == ('KENBURNDEPTH' or 'KENBURN' or 'KEN'):
             self.name_depth = "KenBurnDepth"
-            model = KenburnDepth(self.config['depth_network']["path_checkpoint"])
+            model = KenburnDepth(self.config['depth_network'])
         elif config['depth_network']["name"] == "custom":
             self.name_depth = "custom"
             # self.feature_extraction = self._initialize_features_extraction_(self.config['network'])
