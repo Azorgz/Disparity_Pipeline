@@ -1,3 +1,6 @@
 test.py merge=ours
 Full_process.py merge=ours
 Quick_process.py merge=ours
+Test.yaml merge=ours
+Setup_Camera_test.yaml merge=ours
+script_setup_test merge=ours

@@ -55,7 +55,7 @@ class ConfigPipe(dict):
         # Creation of the dataset dictionary
         self["dataset"] = {}
         self["dataset"]["shuffle"] = config["shuffle"]
-        if config["indexes"] is not None:
+        if config["indexes"]:
             self["dataset"]["number_of_sample"] = len(config["indexes"])
             self["dataset"]["indexes"] = config["indexes"]
         else:
