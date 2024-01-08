@@ -12,10 +12,10 @@ pro = '/home/godeta/PycharmProjects/LYNRED/Images/'
 
 p = pro if 'godeta' in os.getcwd() else perso
 
-path_RGB = p + 'Day/master/visible'
-path_RGB2 = p + 'Day/slave/visible'
-path_IR = p + 'Day/master/infrared_corrected'
-path_IR2 = p + 'Day/slave/infrared_corrected'
+path_RGB = p + 'Night/master/visible'
+path_RGB2 = p + 'Night/slave/visible'
+path_IR = p + 'Night/master/infrared_corrected'
+path_IR2 = p + 'Night/slave/infrared_corrected'
 
 IR = IRCamera(None, None, path_IR, device=torch.device('cuda'), name='IR', f=14e-3, pixel_size=(16.4e-6, 16.4e-6),
               aperture=1.2)
@@ -65,4 +65,4 @@ perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/'
 pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/'
 p = pro if 'godeta' in os.getcwd() else perso
 path_result = p + name_path
-R.save(path_result, 'Setup_Camera.yaml')
+R.save(path_result, 'Setup_Camera_night.yaml')

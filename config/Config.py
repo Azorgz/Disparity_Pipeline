@@ -139,10 +139,7 @@ class ConfigPipe(dict):
             transform = [transforms.ToFloatTensor(),
                          transforms.Pad(self[target]["network_args"].inference_size, keep_ratio=True)]
         elif config['name'].upper() == 'KENBURN':
-            IMAGENET_MEAN = [0.485, 0.456, 0.406]
-            IMAGENET_STD = [0.229, 0.224, 0.225]
-            transform = [transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-                         transforms.Resize(self[target]["network_args"].inference_size, 0)]
+            transform = [transforms.Resize(self[target]["network_args"].inference_size, 0)]
         # else:
         #     if isinstance(config["preprocessing"]["normalize"], tuple or list):
         #         m, std = config["preprocessing"]["normalize"]

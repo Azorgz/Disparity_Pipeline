@@ -13,10 +13,7 @@ class Preprocessing:
     def __init__(self, transform, device, task='disparity', pred_right=False, pred_bidir=False):
         if isinstance(transform[-1], DispSide):
             transform = transform[:-1]
-        if task != 'depth':
-            transform.append(DispSide(pred_right, pred_bidir))
-        else:
-            transform.append(DispSide(pred_right, False))
+        transform.append(DispSide(pred_right, pred_bidir))
         self.config = {'pred_right': pred_right, 'pred_bidir': pred_bidir}
         self.transforms = Compose(transform, device)
         self.task = task
