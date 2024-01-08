@@ -109,7 +109,7 @@ class DisparityWrapper:
             res['depth_reg'] = setup.disparity_to_depth({cam_src: disparity_src})[cam_src]
         return res
 
-    def compute_disp_src(self, disparity, post_process_depth=3, **kwargs):
+    def compute_disp_src(self, disparity, post_process_depth=0, **kwargs):
         h, w = disparity.shape[-2:]
         grid = kornia.utils.create_meshgrid(h, w, normalized_coordinates=False, device=self.device).to(
             disparity.dtype)  # [1 H W 2]
