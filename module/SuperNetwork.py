@@ -111,7 +111,7 @@ class SuperNetwork(BaseModule):
         # Disparity Network initialization
         self.name_depth = config['depth_network']["name"].upper()
         if self.name_depth == 'UNI' or self.name_depth == 'UNIMATCH':
-            self.name_depth = config['depth_network']["name"]
+            self.name_depth = "unimatch"
             model = UniMatch(feature_channels=self.args_depth.feature_channels,
                              num_scales=self.args_depth.num_scales,
                              upsample_factor=self.args_depth.upsample_factor,
@@ -119,10 +119,11 @@ class SuperNetwork(BaseModule):
                              ffn_dim_expansion=self.args_depth.ffn_dim_expansion,
                              num_transformer_layers=self.args_depth.num_transformer_layers,
                              reg_refine=self.args_depth.reg_refine,
-                             task='depth').to(self.device)
+                             task='depth')
+            self.model_depth = model.to(device=self.device)
             if torch.cuda.device_count() > 1:
                 print('Use %d GPUs' % torch.cuda.device_count())
-                model.model = torch.nn.DataParallel(model.model)
+                self.model_depth.model = torch.nn.DataParallel(self.model_depth.model)
             if self.config['depth_network']["path_checkpoint"]:
                 checkpoint = torch.load(self.config['depth_network']["path_checkpoint"], map_location=self.device_index)
                 model_dict = self.model_depth.state_dict()
@@ -132,7 +133,7 @@ class SuperNetwork(BaseModule):
         elif self.name_depth == 'KENBURNDEPTH' or self.name_depth == 'KENBURN' or self.name_depth == 'KEN':
             self.name_depth = "KenBurnDepth"
             model = KenburnDepth(self.config['depth_network'], device=self.device)
-            self.model_depth = model.to(device=self.device).eval()
+            self.model_depth = model.to(device=self.device)
         elif config['depth_network']["name"] == "custom":
             self.name_depth = "custom"
             # self.feature_extraction = self._initialize_features_extraction_(self.config['network'])

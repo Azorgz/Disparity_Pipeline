@@ -30,7 +30,8 @@ class KenburnDepth(nn.Module):
                                            torch.load(path + "/network-disparity.pytorch").items()})
         if self.semantic_adjustment:
             if self.semantic_network == 'YOLO':
-                self.netMaskrcnn = YOLO('pretrained/yolov8s-seg.pt').to(device=self.device)
+                self.netMaskrcnn = YOLO(os.getcwd() + '/' + path + '/yolov8s-seg.pt').to(device=self.device)
+                self.netMaskrcnn.training = False
             else:
                self.netMaskrcnn = maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT).to(device=self.device).eval()
         self.netRefine = Refine().cuda().eval()
@@ -63,7 +64,7 @@ class KenburnDepth(nn.Module):
         tenMasks = []
 
         if self.semantic_network == 'YOLO':
-            objPredictions = self.model(source=im)[0]
+            objPredictions = self.netMaskrcnn(source=im)[0]
             # Iter over the masks found
             idx_yolo = [0, 1, 3, 13, *np.arange(24, len(objPredictions.names)).tolist()]
             for intMask in range(objPredictions.masks.shape[0]):

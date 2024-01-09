@@ -9,8 +9,8 @@ from utils.classes.Cameras import RGBCamera, IRCamera
 from module.SetupCameras import CameraSetup
 from utils.manipulation_tools import random_noise, noise
 
-cam = 'IR'
-setup = 'fine'
+cam = 'RGB'
+setup = 'raw'
 name_path = f'Setup_Camera/position_{"ir" if cam=="IR" else "rgb"}{"_finer" if setup == "fine" else ""}'
 
 perso = '/home/aurelien/Images/Images/'
@@ -75,13 +75,13 @@ with tqdm(total=len(vec_x) * len(vec_y) * len(vec_z) * len(vec_alpha), desc=f'Se
             for k, dz in enumerate(vec_z):
                 for h, da in enumerate(vec_alpha):
                     x, y, z = (0.127 + dx, 0 + dy, 0 + dz) if cam == 'IR' else (0.127, 0, 0)
-                    rx = math.atan((center_y - y) / d_calib) - math.atan(center_y / d_calib)
+                    rx = da if cam == 'IR' else 0
                     ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
-                    rz = 0 + da
+                    rz = 0
                     R.update_camera_relative_position('IR', x=x, y=y, z=z, ry=ry, rx=rx, rz=rz)
 
                     x, y, z = (0.127 + 0.214 + dx, 0 + dy, 0 + dz) if cam == 'RGB' else (0.127 + 0.214, 0, 0)
-                    rx = math.atan((center_y - y) / d_calib) - math.atan(center_y / d_calib)
+                    rx = da if cam == 'RGB' else 0
                     ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
                     rz = 0
                     R.update_camera_relative_position('RGB2', x=x, y=y, z=z, ry=ry, rx=rx, rz=rz)

@@ -1,12 +1,12 @@
 Option:
   name_experiment: Test
   setup: # Paths to the config file of the pre-calibrated camera's setup
-    path: Setup_Camera_night.yaml
+    path: Setup_Camera.yaml
   dataset:
     number_of_sample: 10
     shuffle: True
   depth_network:
-    name: kenburn
+    name: Unimatch
 
 
 Depth-Depth:

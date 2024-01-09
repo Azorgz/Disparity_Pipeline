@@ -21,7 +21,7 @@ import numpy as np
 
 
 base_path = os.getcwd() + "/results/"
-res = ResultFrame(base_path + "Test/Depth-Depth")
+res = ResultFrame(base_path + "Test/Depth-Disparity")
 # # res1 = ResultFrame(base_path + "camera_position_ir_finer/Depth-Depth")
 # cam = 'IR'
 # setup = 'raw test'
