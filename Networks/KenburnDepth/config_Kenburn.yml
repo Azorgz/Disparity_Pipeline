@@ -1,0 +1,5 @@
+#inference_size: [960, 1280]
+path_checkpoint: Networks/KenburnDepth/pretrained
+upsample_factor: 8
+min_depth: 1
+max_depth: 64
