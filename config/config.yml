@@ -48,7 +48,7 @@ disparity_network:
 
 # Depth Network #########
 depth_network:
-  name: unimatch # Possibilities : unimatch, custom
+  name: kenburn # Possibilities : unimatch, kenburn
   backbone: null # Possibilities : null for now (to be set in case of custom Network)
   transformer: null # Possibilities : null for now (to be set in case of custom Network)
   detection_head: null # Possibilities : null for now (to be set in case of custom Network)

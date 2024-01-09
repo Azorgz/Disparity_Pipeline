@@ -12,7 +12,7 @@ from utils.classes.Image import ImageTensor, DepthTensor
 from utils.misc import timeit, count_parameter
 import torch
 
-Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch']}
+Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch', 'Kenburn']}
 
 
 class SuperNetwork(BaseModule):
@@ -66,7 +66,8 @@ class SuperNetwork(BaseModule):
 
     def disparity_network_init(self, config):
         # Disparity Network initialization
-        if config['disparity_network']["name"] == ('unimatch' or 'uni' or 'Uni' or 'Unimatch'):
+        self.name_disparity = config['disparity_network']["name"].upper()
+        if self.name_disparity == 'UNI' or self.name_disparity == 'UNIMATCH':
             self.name_disparity = 'unimatch'
             model = UniMatch(feature_channels=self.args_disparity.feature_channels,
                              num_scales=self.args_disparity.num_scales,
@@ -76,7 +77,7 @@ class SuperNetwork(BaseModule):
                              num_transformer_layers=self.args_disparity.num_transformer_layers,
                              reg_refine=self.args_disparity.reg_refine,
                              task=self.args_disparity.task).to(self.device)
-        elif config['disparity_network']["name"] == ("acvNet" or 'acv' or 'avc' or 'avcNet'):
+        elif self.name_disparity == "ACVNET" or self.name_disparity == 'ACV' or self.name_disparity == 'AVC':
             self.name_disparity = 'acvNet'
             torch.manual_seed(1)
             torch.cuda.manual_seed(1)
@@ -92,7 +93,7 @@ class SuperNetwork(BaseModule):
         else:
             model = None
         self.model_disparity = model.eval()
-        if torch.cuda.device_count() > 1 or self.name_disparity == ("acvNet" or 'acv' or 'avc' or 'avcNet'):
+        if torch.cuda.device_count() > 1 or self.name_disparity.upper() == ("ACVNET" or 'ACV' or 'AVC'):
             print('Use %d GPUs' % torch.cuda.device_count())
             model.model = torch.nn.DataParallel(model.model)
 
@@ -108,9 +109,9 @@ class SuperNetwork(BaseModule):
 
     def depth_network_init(self, config):
         # Disparity Network initialization
-
-        if config['depth_network']["name"] == ('unimatch' or 'uni' or 'Uni' or 'Unimatch'):
-            self.name_depth = config['depth_network']["name"]
+        self.name_depth = config['depth_network']["name"].upper()
+        if self.name_depth == 'UNI' or self.name_depth == 'UNIMATCH':
+            self.name_depth = "unimatch"
             model = UniMatch(feature_channels=self.args_depth.feature_channels,
                              num_scales=self.args_depth.num_scales,
                              upsample_factor=self.args_depth.upsample_factor,
@@ -118,19 +119,21 @@ class SuperNetwork(BaseModule):
                              ffn_dim_expansion=self.args_depth.ffn_dim_expansion,
                              num_transformer_layers=self.args_depth.num_transformer_layers,
                              reg_refine=self.args_depth.reg_refine,
-                             task='depth').to(self.device)
+                             task='depth')
+            self.model_depth = model.to(device=self.device)
             if torch.cuda.device_count() > 1:
                 print('Use %d GPUs' % torch.cuda.device_count())
-                model.model = torch.nn.DataParallel(model.model)
+                self.model_depth.model = torch.nn.DataParallel(self.model_depth.model)
             if self.config['depth_network']["path_checkpoint"]:
                 checkpoint = torch.load(self.config['depth_network']["path_checkpoint"], map_location=self.device_index)
                 model_dict = self.model_depth.state_dict()
                 pre_dict = {k: v for k, v in checkpoint['model'].items() if k in model_dict}
                 model_dict.update(pre_dict)
                 self.model_depth.load_state_dict(model_dict)
-        elif config['depth_network']["name"] == "KenBurnDepth":
+        elif self.name_depth == 'KENBURNDEPTH' or self.name_depth == 'KENBURN' or self.name_depth == 'KEN':
             self.name_depth = "KenBurnDepth"
-            model = KenburnDepth(self.config['depth_network']["path_checkpoint"])
+            model = KenburnDepth(self.config['depth_network'], device=self.device)
+            self.model_depth = model.to(device=self.device)
         elif config['depth_network']["name"] == "custom":
             self.name_depth = "custom"
             # self.feature_extraction = self._initialize_features_extraction_(self.config['network'])
@@ -140,7 +143,6 @@ class SuperNetwork(BaseModule):
             pass
         else:
             model = None
-        self.model_depth = model.eval()
         self.preprocessing_depth = Preprocessing(config["depth_network"]["preprocessing"], self.device, task='depth',
                                                  pred_right=self.pred_right, pred_bidir=False)
 
@@ -156,7 +158,7 @@ class SuperNetwork(BaseModule):
 
     @torch.no_grad()
     @timeit
-    def __call__(self, sample, *args, depth=False, intrinsics=None, pose=None, **kwargs):
+    def __call__(self, sample, *args, depth=False, intrinsics=None, pose=None, focal=0, **kwargs):
         if not depth:
             sample = self.preprocessing_disparity(sample.copy())
             im_left, im_right = sample['left'], sample['right']
@@ -213,11 +215,13 @@ class SuperNetwork(BaseModule):
                                        min_depth=1. / self.args_depth.max_depth,
                                        max_depth=1. / self.args_depth.min_depth,
                                        num_depth_candidates=self.args_depth.num_depth_candidates,
-                                       pred_bidir_depth=self.pred_bidir,
+                                       pred_bidir_depth=False,
                                        depth_from_argmax=self.args_depth.depth_from_argmax,
                                        task='depth')['flow_preds'][-1]  # [1, H, W]
-            elif self.name_disparity == "KenBurnDepth":
-                res = self.model_depth(Tensor(img_ref), pred_bidir=self.pred_bidir)
+            elif self.name_depth == "KenBurnDepth":
+                res = self.model_depth(Tensor(img_ref), Tensor(img_tgt),
+                                       focal=focal, baseline=torch.abs(pose[0, 0, -1]),
+                                       pred_bidir=self.pred_bidir)
             else:
                 warnings.warn('This Network is not implemented')
                 return 0

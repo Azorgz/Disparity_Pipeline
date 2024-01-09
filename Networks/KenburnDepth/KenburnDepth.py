@@ -1,26 +1,39 @@
 import os
 import time
-
+import numba
+import numpy as np
 import torch
+from kornia.utils import get_cuda_device_if_available
 from torch import nn, tensor
 from torchvision.models.detection import MaskRCNN_ResNet50_FPN_Weights, maskrcnn_resnet50_fpn
 
-from estimation import Semantics, Disparity
-from refinement import Refine
+from .estimation import Semantics, Disparity
+from .refinement import Refine
 
 from utils.classes import ImageTensor
 from utils.classes.Image import DepthTensor
+from utils.misc import time_fct
+from ultralytics import YOLO
 
 
 class KenburnDepth(nn.Module):
 
-    def __init__(self, path):
+    def __init__(self, config, device=None):
         super(KenburnDepth, self).__init__()
-        self.netSemantics = Semantics().cuda().eval()
-        self.netDisparity = Disparity().cuda().eval()
+        path = config["path_checkpoint"]
+        self.semantic_adjustment = config['network_args'].semantic_adjustment
+        self.semantic_network = config['network_args'].semantic_network
+        self.device = device if device is not None else get_cuda_device_if_available()
+        self.netSemantics = Semantics().to(device=self.device).eval()
+        self.netDisparity = Disparity().to(device=self.device).eval()
         self.netDisparity.load_state_dict({strKey.replace('module', 'net'): tenWeight for strKey, tenWeight in
                                            torch.load(path + "/network-disparity.pytorch").items()})
-        self.netMaskrcnn = maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT).cuda().eval()
+        if self.semantic_adjustment:
+            if self.semantic_network == 'YOLO':
+                self.netMaskrcnn = YOLO(os.getcwd() + '/' + path + '/yolov8s-seg.pt').to(device=self.device)
+                self.netMaskrcnn.training = False
+            else:
+               self.netMaskrcnn = maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT).to(device=self.device).eval()
         self.netRefine = Refine().cuda().eval()
         self.netRefine.load_state_dict({strKey.replace('module', 'net'): tenWeight for strKey, tenWeight in
                                         torch.load(path + "/network-refinement.pytorch").items()})
@@ -50,52 +63,91 @@ class KenburnDepth(nn.Module):
         boolUsed = {}
         tenMasks = []
 
-        objPredictions = self.netMaskrcnn([im[0, [2, 0, 1], :, :]])[0]
-
-        for intMask in range(objPredictions['masks'].shape[0]):
-            if intMask in boolUsed:
-                continue
-
-            elif objPredictions['scores'][intMask].item() < 0.7:
-                continue
-
-            elif objPredictions['labels'][intMask].item() not in [1, 3, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-                                                                  25]:
-                continue
-
-            # end
-
-            boolUsed[intMask] = True
-            tenMask = (objPredictions['masks'][(intMask + 0):(intMask + 1), :, :, :] > 0.5).float()
-
-            if tenMask.sum().item() < 64:
-                continue
-            # end
-
-            for intMerge in range(objPredictions['masks'].shape[0]):
-                if intMerge in boolUsed:
+        if self.semantic_network == 'YOLO':
+            objPredictions = self.netMaskrcnn(source=im)[0]
+            # Iter over the masks found
+            idx_yolo = [0, 1, 3, 13, *np.arange(24, len(objPredictions.names)).tolist()]
+            for intMask in range(objPredictions.masks.shape[0]):
+                if intMask in boolUsed:
                     continue
 
-                elif objPredictions['scores'][intMerge].item() < 0.7:
+                elif objPredictions.boxes.conf[intMask] < 0.7:
                     continue
 
-                elif objPredictions['labels'][intMerge].item() not in [2, 4, 27, 28, 31, 32, 33]:
+                elif objPredictions.boxes.cls[intMask] not in [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 25]:
                     continue
 
-                # end
+                boolUsed[intMask] = True
+                tenMask = (objPredictions.masks.data[(intMask + 0):(intMask + 1), :, :]).unsqueeze(0)
 
-                tenMerge = (objPredictions['masks'][(intMerge + 0):(intMerge + 1), :, :, :] > 0.5).float()
-
-                if ((tenMask + tenMerge) > 1.0).sum().item() < 0.03 * tenMerge.sum().item():
+                if tenMask.sum() < 64:
                     continue
                 # end
+                if objPredictions.boxes.cls[intMask] in idx_yolo:
+                    for intMerge in range(intMask, objPredictions.masks.shape[0], 1):
+                        if intMerge in boolUsed:
+                            continue
 
-                boolUsed[intMerge] = True
-                tenMask = (tenMask + tenMerge).clip(0.0, 1.0)
+                        elif objPredictions.boxes.conf[intMerge] < 0.7:
+                            continue
+
+                        elif objPredictions.boxes.cls[intMerge] not in idx_yolo:
+                            continue
+
+                        # end
+
+                        tenMerge = (objPredictions.masks.data[(intMerge + 0):(intMerge + 1), :, :]).unsqueeze(0)
+
+                        if ((tenMask + tenMerge) > 1.0).sum().item() < 0.03 * tenMerge.sum().item():
+                            continue
+                        # end
+
+                        boolUsed[intMerge] = True
+                        tenMask = (tenMask + tenMerge).clip(0.0, 1.0)
+                tenMasks.append(tenMask)
             # end
+        else:
+            objPredictions = self.netMaskrcnn([im[0, [2, 0, 1], :, :]])[0]
+            for intMask in range(objPredictions['masks'].shape[0]):
+                if intMask in boolUsed:
+                    continue
 
-            tenMasks.append(tenMask)
-        # end
+                elif objPredictions['scores'][intMask].item() < 0.7:
+                    continue
+
+                elif objPredictions['labels'][intMask].item() not in [1, 3, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+                                                                      25]:
+                    continue
+
+                boolUsed[intMask] = True
+                tenMask = (objPredictions['masks'][(intMask + 0):(intMask + 1), :, :, :] > 0.5).float()
+
+                if tenMask.sum().item() < 64:
+                    continue
+
+                for intMerge in range(objPredictions['masks'].shape[0]):
+                    if intMerge in boolUsed:
+                        continue
+
+                    elif objPredictions['scores'][intMerge].item() < 0.7:
+                        continue
+
+                    elif objPredictions['labels'][intMerge].item() not in [2, 4, 27, 28, 31, 32, 33]:
+                        continue
+
+                    # end
+
+                    tenMerge = (objPredictions['masks'][(intMerge + 0):(intMerge + 1), :, :, :] > 0.5).float()
+
+                    if ((tenMask + tenMerge) > 1.0).sum().item() < 0.03 * tenMerge.sum().item():
+                        continue
+                    # end
+
+                    boolUsed[intMerge] = True
+                    tenMask = (tenMask + tenMerge).clip(0.0, 1.0)
+                # end
+                tenMasks.append(tenMask)
+
         tenAdjusted = torch.nn.functional.interpolate(input=disparity, size=(im.shape[2], im.shape[3]),
                                                       mode='bilinear', align_corners=False)
 
@@ -108,9 +160,9 @@ class KenburnDepth(nn.Module):
             if tenPlane.sum().item() == 0:
                 continue
 
-            intLeft = (tenPlane.sum([2], True) > 0.0).flatten().nonzero()[0].item()
+            # intLeft = (tenPlane.sum([2], True) > 0.0).flatten().nonzero()[0].item()
             intTop = (tenPlane.sum([3], True) > 0.0).flatten().nonzero()[0].item()
-            intRight = (tenPlane.sum([2], True) > 0.0).flatten().nonzero()[-1].item()
+            # intRight = (tenPlane.sum([2], True) > 0.0).flatten().nonzero()[-1].item()
             intBottom = (tenPlane.sum([3], True) > 0.0).flatten().nonzero()[-1].item()
 
             tenAdjusted = ((1.0 - tenAdjust) * tenAdjusted) + (
@@ -125,25 +177,44 @@ class KenburnDepth(nn.Module):
         return self.netRefine(im, disparity)
 
     @torch.no_grad()
-    def forward(self, im):
-        disparity = self._disparity_estimation(im)
-        disparity = self._disparity_adjustment(im, disparity)
-        return self._disparity_refinement(im, disparity)
+    def forward(self, im, *args, focal=6, baseline=340, pred_bidir=False, **kwargs):
+        images = [im]
+        depth = []
+        baseline *= 1000
+        focal *= 1000
+        if pred_bidir:
+            assert len(args) >= 1
+            images.append(args[0])
+        for image in images:
+            disparity = self._disparity_estimation(image)
+            if self.semantic_adjustment:
+                disparity = self._disparity_adjustment(image, disparity)
+            disparity = self._disparity_refinement(image, disparity)
+            disparity = disparity / disparity.max() * baseline
+            tenDepth = (focal * baseline) / (disparity + 0.0000001)
+            depth.append(tenDepth)
+
+        return depth
 
 
-if __name__ == '__main__':
-
-    NN = my_NN("/home/godeta/PycharmProjects/decifer_autozoom/KenburnDepth/pretrained")
-    im_path = "/home/godeta/PycharmProjects/LYNRED/Images/Day/master/visible/"
-    for file in os.listdir(im_path):
-        if file.split('.')[-1] == 'md':
-            continue
-        image = ImageTensor(im_path + file).RGB()
-        start = time.time()
-        depth_im = DepthTensor(NN(image))
-        print(depth_im.max_value)
-        print(f'time : {time.time() - start}')
-        depth_im.show()
+# if __name__ == '__main__':
+#     cpt = 'perso' if os.getcwd().split('/')[2] == 'aurelien' else 'pro'
+#     if cpt == 'pro':
+#         im_path = "/home/godeta/PycharmProjects/LYNRED/Images/"
+#     else:
+#         im_path = "/home/aurelien/Images/Images/"
+#     NN = KenburnDepth(os.getcwd() + "/pretrained")
+#     im_path = im_path + "Day/master/visible/"
+#     for file in os.listdir(im_path):
+#         if file.split('.')[-1] == 'md':
+#             continue
+#         image = ImageTensor(im_path + file).RGB().pyrDown()
+#         start = time.time()
+#         depth_im = NN(image)
+#         print(f'time : {time.time() - start}')
+#         depth_im = DepthTensor(depth_im).pyrUp()
+#         print(depth_im.max_value)
+#         depth_im.show()
 
 
 

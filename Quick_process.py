@@ -1,6 +1,8 @@
 import os
 import shutil
 import warnings
+
+import numpy as np
 import oyaml as yaml
 from Disparity_Pipeline import Pipe
 from config.Config import ConfigPipe
@@ -18,7 +20,10 @@ def quick_process(idx, script_path):
 
     process_dict['Option']["output_path"] = '/'
     process_dict['Option']["name_experiment"] = 'temp'
-    process_dict['Option']["dataset"]["indexes"] = idx if isinstance(idx, list) else [idx]
+    if idx is not None:
+        process_dict['Option']["dataset"]["indexes"] = idx if isinstance(idx, list) else [idx]
+    else:
+        process_dict['Option']["dataset"]["indexes"] = None
     for k in process_dict.keys():
         if k.upper() != 'OPTION':
             proc = process_dict[k]
@@ -35,4 +40,5 @@ def quick_process(idx, script_path):
 
 
 if __name__ == '__main__':
-    quick_process([1324, 2159, 2543, 3493], 'Process_methods.yaml')
+    quick_process(None, 'Process_test.yaml')
+    #[1324, 2159, 2543, 3493]

@@ -55,7 +55,7 @@ class ConfigPipe(dict):
         # Creation of the dataset dictionary
         self["dataset"] = {}
         self["dataset"]["shuffle"] = config["shuffle"]
-        if config["indexes"] is not None:
+        if config["indexes"]:
             self["dataset"]["number_of_sample"] = len(config["indexes"])
             self["dataset"]["indexes"] = config["indexes"]
         else:
@@ -77,7 +77,7 @@ class ConfigPipe(dict):
         self["disparity_network"] = {}
         self['disparity_network']["use_bidir_disp"] = config["use_bidir_disp"]
         self["disparity_network"]["name"] = config["name"]
-        if self["disparity_network"]["name"] == "unimatch":
+        if self["disparity_network"]["name"].upper() == "UNIMATCH":
             from Networks.UniMatch.parser import get_args_parser_disparity
             parser = get_args_parser_disparity()
             args = configure_parser(parser,
@@ -85,10 +85,11 @@ class ConfigPipe(dict):
                                     path_config='Networks/UniMatch/config_unimatch_disparity.yml',
                                     dict_vars=self["dataset"])
             self["disparity_network"]["network_args"] = args
-        elif self["disparity_network"]["name"] == "acvNet":
+        elif self["disparity_network"]["name"].upper() == "ACVNET":
             from Networks.ACVNet.parser import get_args_parser
             parser = get_args_parser()
             args = configure_parser(parser,
+                                    config["preprocessing"],
                                     path_config='Networks/ACVNet/config_acvNet.yml',
                                     dict_vars=self["dataset"])
             self["disparity_network"]["network_args"] = args
@@ -104,12 +105,18 @@ class ConfigPipe(dict):
         self["depth_network"] = {}
         self['depth_network']["use_bidir_depth"] = config["use_bidir_depth"]
         self["depth_network"]["name"] = config["name"]
-        if self["depth_network"]["name"] == "unimatch":
+        if self["depth_network"]["name"].upper() == "UNIMATCH":
             from Networks.UniMatch.parser import get_args_parser_disparity
             parser = get_args_parser_depth()
             args = configure_parser(parser,
                                     config["preprocessing"],
                                     path_config='Networks/UniMatch/config_unimatch_depth.yml',
+                                    dict_vars=self["dataset"])
+            self["depth_network"]["network_args"] = args
+        elif self["depth_network"]["name"].upper() == "KENBURN":
+            args = configure_parser(None,
+                                    config["preprocessing"],
+                                    path_config='Networks/KenburnDepth/config_Kenburn.yml',
                                     dict_vars=self["dataset"])
             self["depth_network"]["network_args"] = args
         else:
@@ -122,15 +129,17 @@ class ConfigPipe(dict):
 
     def config_preprocessing(self, config, target='disparity_network'):
         transform = []
-        if config['name'] == 'unimatch':
+        if config['name'].upper() == 'UNIMATCH':
             IMAGENET_MEAN = [0.485, 0.456, 0.406]
             IMAGENET_STD = [0.229, 0.224, 0.225]
             transform = [transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                          transforms.Resize(self[target]["network_args"].inference_size,
                                            self[target]["network_args"].padding_factor)]
-        elif config['name'] == 'acvNet':
+        elif config['name'].upper() == 'ACVNET':
             transform = [transforms.ToFloatTensor(),
                          transforms.Pad(self[target]["network_args"].inference_size, keep_ratio=True)]
+        elif config['name'].upper() == 'KENBURN':
+            transform = [transforms.Resize(self[target]["network_args"].inference_size, 0)]
         # else:
         #     if isinstance(config["preprocessing"]["normalize"], tuple or list):
         #         m, std = config["preprocessing"]["normalize"]
@@ -163,7 +172,7 @@ class ConfigPipe(dict):
 
 
 def configure_parser(parser, config, path_config=None, dict_vars=None):
-    dict_pars = vars(parser.parse_args())
+    dict_pars = vars(parser.parse_args()) if parser is not None else {}
     config_vars = {}
     if path_config:
         if isinstance(path_config, str or os.path):

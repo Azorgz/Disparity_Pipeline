@@ -312,6 +312,7 @@ class DepthSetup:
             return {'sample': {'ref': sample[self.ref.name].clone(), 'target': sample[self.target.name].clone()},
                     'intrinsics': self.intrinsics,
                     'pose': self._pose,
+                    'focal': self.ref.f,
                     'depth': True}
         else:
             res = {}

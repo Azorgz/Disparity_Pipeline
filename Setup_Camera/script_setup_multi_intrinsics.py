@@ -9,8 +9,8 @@ from utils.classes.Cameras import RGBCamera, IRCamera
 from module.SetupCameras import CameraSetup
 from utils.manipulation_tools import random_noise, noise
 
-cam = 'RGB'
-setup = 'raw test'
+cam = 'IR'
+setup = 'fine test'
 name_path = f'Setup_Camera/intrinsics_{"ir" if cam == "IR" else "rgb"}{"_finer" if setup == "fine" else ""}'
 
 perso = '/home/aurelien/Images/Images/'
@@ -32,15 +32,15 @@ if setup == 'raw test':
         f_, px_size_ = 14e-3, 16.4e-6
     else:
         f_, px_size_ = 6e-3, 3.45e-6
-    f = (np.arange(0.75, 2, 0.25) * f_).tolist()
-    px_size = (np.arange(0.75, 2, 0.25) * px_size_).tolist()
+    f = (np.arange(0.85, 1.2, 0.05) * f_).tolist()
+    px_size = (np.arange(1, 1.1, 0.25) * px_size_).tolist()
 else:
     if cam == 'IR':
         f_, px_size_ = 14e-3, 16.4e-6
     else:
         f_, px_size_ = 6e-3, 3.45e-6
-    f = (np.arange(0.75, 2, 0.05) * f_).tolist()
-    px_size = (np.arange(0.75, 2, 0.05) * px_size_).tolist()
+    f = (np.arange(0.85, 1.2, 0.005) * f_).tolist()
+    px_size = (np.arange(1, 1.1, 0.25) * px_size_).tolist()
 
 with tqdm(total=len(f) * len(px_size), desc='Setups saving') as bar:
     for i, f_ in enumerate(f):

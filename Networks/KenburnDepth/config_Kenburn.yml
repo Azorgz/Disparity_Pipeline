@@ -1,5 +1,4 @@
-#inference_size: [960, 1280]
+inference_size: [240, 320]
 path_checkpoint: Networks/KenburnDepth/pretrained
-upsample_factor: 8
-min_depth: 1
-max_depth: 64
+semantic_adjustment : False
+semantic_network : YOLO # RESNET
