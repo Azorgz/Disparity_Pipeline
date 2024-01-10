@@ -1,23 +1,22 @@
+import time
 import warnings
 
+import torch
 from torch import Tensor
-
-from Networks.KenburnDepth.KenburnDepth import KenburnDepth
-from config.Config import ConfigPipe
 from Networks.ACVNet.models import ACVNet
+from Networks.KenburnDepth.KenburnDepth import KenburnDepth
 from Networks.UniMatch.unimatch.unimatch import UniMatch
+from config.Config import ConfigPipe
 from module.BaseModule import BaseModule
 from module.Preprocessing import Preprocessing
-from utils.classes.Image import ImageTensor, DepthTensor
+from utils.classes.Image import DepthTensor
 from utils.misc import timeit, count_parameter
-import torch
-
-Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch', 'Kenburn']}
 
 
 class SuperNetwork(BaseModule):
+    Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch', 'Kenburn']}
     """
-    This class add a layer for the data post-processing & the inputs args according each Network.
+    This class add a layer for the data post-processing & the inputs args according each Network implemented.
     To Run it, a normal Forward call with 2 images as inputs would do it.
     """
 
@@ -206,22 +205,22 @@ class SuperNetwork(BaseModule):
                 intrinsics[0, 1, 0] /= self.preprocessing_depth.ori_size[0] / img_ref.shape[-2]
 
                 res = self.model_depth(Tensor(img_ref), Tensor(img_tgt),
-                                       attn_type=self.args_depth.attn_type,
-                                       attn_splits_list=self.args_depth.attn_splits_list,
-                                       prop_radius_list=self.args_depth.prop_radius_list,
-                                       num_reg_refine=self.args_depth.num_reg_refine,
-                                       intrinsics=intrinsics,
-                                       pose=pose,
-                                       min_depth=1. / self.args_depth.max_depth,
-                                       max_depth=1. / self.args_depth.min_depth,
-                                       num_depth_candidates=self.args_depth.num_depth_candidates,
-                                       pred_bidir_depth=False,
-                                       depth_from_argmax=self.args_depth.depth_from_argmax,
-                                       task='depth')['flow_preds'][-1]  # [1, H, W]
+                                                 attn_type=self.args_depth.attn_type,
+                                                 attn_splits_list=self.args_depth.attn_splits_list,
+                                                 prop_radius_list=self.args_depth.prop_radius_list,
+                                                 num_reg_refine=self.args_depth.num_reg_refine,
+                                                 intrinsics=intrinsics,
+                                                 pose=pose,
+                                                 min_depth=1. / self.args_depth.max_depth,
+                                                 max_depth=1. / self.args_depth.min_depth,
+                                                 num_depth_candidates=self.args_depth.num_depth_candidates,
+                                                 pred_bidir_depth=False,
+                                                 depth_from_argmax=self.args_depth.depth_from_argmax,
+                                                 task='depth')['flow_preds'][-1]  # [1, H, W]
             elif self.name_depth == "KenBurnDepth":
                 res = self.model_depth(Tensor(img_ref), Tensor(img_tgt),
-                                       focal=focal, baseline=torch.abs(pose[0, 0, -1]),
-                                       pred_bidir=self.pred_bidir)
+                                                 focal=focal, baseline=torch.abs(pose[0, 0, -1]),
+                                                 pred_bidir=self.pred_bidir)
             else:
                 warnings.warn('This Network is not implemented')
                 return 0

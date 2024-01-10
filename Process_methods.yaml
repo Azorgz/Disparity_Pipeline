@@ -6,6 +6,10 @@ Option:
   dataset:
     number_of_sample: 0
     shuffle: False
+  depth_network:
+    name: unimatch
+  disparity_network:
+    name: unimatch
 
 
 Depth-Depth:

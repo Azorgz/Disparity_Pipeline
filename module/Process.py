@@ -189,10 +189,9 @@ class Process(OrderedDict):
                             os.mkdir(path)
                             os.chmod(path, 0o777)
                         elif os.listdir(path):
-                            # resp = input(
-                            #     f'The specified output path ({path}) is not empty, do we clear the data? (y/n)')
-                            # if resp == "y" or resp == "Y":
-                            if 1:
+                            resp = input(
+                                f'The specified output path ({path}) is not empty, do we clear the data? (y/n)')
+                            if resp == "y" or resp == "Y":
                                 from utils.misc import clear_folder
                                 clear_folder(path)
                             else:

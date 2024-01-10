@@ -16,7 +16,7 @@ from module.SuperNetwork import SuperNetwork
 from module.Validation import Validation
 from utils.manipulation_tools import merge_dict
 # Utils
-from utils.misc import time2str, update_name_tree  # , form_cloud_data
+from utils.misc import time2str, update_name_tree # , form_cloud_data
 
 
 # Networks
@@ -84,9 +84,6 @@ class Pipe:
                             self._init_wrapper_(s, verbose=False)
                             # name = s.name
                         for idx, sample in enumerate(self.dataloader):
-                            # tqdm(enumerate(self.dataloader),
-                            #      total=len(self.dataloader),
-                            #      desc=f"Nombre d'itérations for {name_experiment}: "):
                             update_name_tree(sample, s.name)
                             experiment(sample, setup=s, wrapper=self.wrapper)
                             bar.update(1)
@@ -100,8 +97,6 @@ class Pipe:
                             self.validation.statistic()
                             self.validation.save(experiment.path)
                             self.validation.reset()
-                        #     self.validation.save(experiment.path, 'Validation.yaml')
-                        # else:
 
         else:
             for idx, sample in tqdm(enumerate(self.dataloader),
