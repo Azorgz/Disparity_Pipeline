@@ -6,7 +6,7 @@ cameras:
     - - 0.9996794744390487
       - 0.0
       - 0.025316959246993065
-      - -0.12591370940208435
+      - -0.12695930898189545
     - - 0.0
       - 1.0
       - 0.0
@@ -14,7 +14,7 @@ cameras:
     - - -0.025316958452140388
       - 0.0
       - 0.9996795654296875
-      - 0.04450201988220215
+      - 0.003215253818780184
     - - 0.0
       - 0.0
       - 0.0
@@ -41,7 +41,7 @@ cameras:
     is_positioned: true
     is_ref: false
     name: IR
-    path: /home/aurelien/Images/Images/Day/master/infrared_corrected
+    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/master/infrared_corrected
     pixel_size:
     - 1.64e-05
     - 1.64e-05
@@ -86,7 +86,7 @@ cameras:
     is_positioned: true
     is_ref: false
     name: IR2
-    path: /home/aurelien/Images/Images/Day/slave/infrared_corrected
+    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/slave/infrared_corrected
     pixel_size:
     - 1.64e-05
     - 1.64e-05
@@ -131,7 +131,7 @@ cameras:
     is_positioned: true
     is_ref: true
     name: RGB
-    path: /home/aurelien/Images/Images/Day/master/visible
+    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/master/visible
     pixel_size:
     - 3.45e-06
     - 3.45e-06
@@ -176,7 +176,7 @@ cameras:
     is_positioned: true
     is_ref: false
     name: RGB2
-    path: /home/aurelien/Images/Images/Day/slave/visible
+    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/slave/visible
     pixel_size:
     - 3.45e-06
     - 3.45e-06

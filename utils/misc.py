@@ -137,7 +137,10 @@ def time_fct(func):
     def wrapper(*args, **kwargs):
         start = time.time()
         res = func(*args, **kwargs)
-        print(f"\nFunction {func.__name__} executed in : {time.time() - start} seconds")
+        try:
+            print(f"\nFunction {func.__name__} executed in : {time.time() - start} seconds")
+        except AttributeError:
+            print(f"\nFunction {func.__class__.__name__} executed in : {time.time() - start} seconds")
         return res
 
     return wrapper
@@ -157,6 +160,27 @@ def deactivated(func):
             return res
 
     return wrapper
+
+
+class ClassAnalyzer:
+    def __init__(self, c):
+        self.call = 0
+        self.c = c
+        self.cum_time = 0
+
+    def __call__(self, *args, **kwargs):
+        self.call += 1
+        t = time.time()
+        res = self.c(*args, **kwargs)
+        self.cum_time += time.time() - t
+        return res
+
+    @property
+    def average(self):
+        if self.c != 0:
+            return self.cum_time / self.c
+        else:
+            return 0
 
 
 def form_cloud_data(sample, pred_disp, image_reg, new_disp, config):

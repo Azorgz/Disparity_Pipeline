@@ -70,18 +70,23 @@ class StereoSetup(StereoCamera):
         distCoeffs1 = np.array([0, 0, 0, 0])
         cameraMatrix2 = self.right.intrinsics[0, :3, :3].cpu().numpy()
         distCoeffs2 = np.array([0, 0, 0, 0])
-        imageSize_left = np.array(self.left.im_calib.shape[-2:])
-        imageSize_right = np.array(self.right.im_calib.shape[-2:])
 
         # Transformation map
         self.map_right = np.zeros([2, *self.new_shape])
         self.map_right[0], self.map_right[1] = \
-            cv.initUndistortRectifyMap(cameraMatrix2, distCoeffs2, R2, P2, (self.new_shape[1], self.new_shape[0]),
+            cv.initUndistortRectifyMap(cameraMatrix2,
+                                       distCoeffs2,
+                                       R2, P2,
+                                       (self.new_shape[1], self.new_shape[0]),
                                        cv.CV_32FC1)
 
         self.map_left = np.zeros([2, *self.new_shape])
         self.map_left[0], self.map_left[1] = \
-            cv.initUndistortRectifyMap(cameraMatrix1, distCoeffs1, R1, P1, (self.new_shape[1], self.new_shape[0]),
+            cv.initUndistortRectifyMap(cameraMatrix1,
+                                       distCoeffs1,
+                                       R1,
+                                       P1,
+                                       (self.new_shape[1], self.new_shape[0]),
                                        cv.CV_32FC1)
 
         scale_im_right = cameraMatrix2[0, 0] / P2[0, 0], cameraMatrix2[1, 1] / P2[1, 1]
