@@ -35,11 +35,11 @@ class PostProcessing:
         # self.histo = None
 
     def __call__(self, sample, *args):
-        for key, disp in sample.items():
-            disp = self.transform(disp)
-            if self.config['pred_bidir'] and self.task != 'depth':
+        for size, (key, disp) in zip(self.ori_size, sample.items()):
+            disp = self.transform(disp, size=size)
+            if self.config['pred_bidir'] and self.task != 'depth' and self.task != 'monocular':
                 disp[1] = hflip(disp[1])
-            elif self.config['pred_right']:
+            elif self.config['pred_right'] and self.task != 'monocular':
                 disp = hflip(disp)
             sample[key] = disp
         return sample

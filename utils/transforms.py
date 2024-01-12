@@ -31,13 +31,9 @@ class Compose(object):
             raise AttributeError("There cannot be a Resize AND a Padding for Pre-processing")
         self.device = device
 
-    def __call__(self, sample):
-        # if not isinstance(sample, Tensor) and not isinstance(sample, ImageTensor):
-        #     sample_ = sample.copy()
-        # else:
-        #     sample_ = torch.tensor(sample)
+    def __call__(self, sample, *args, **kwargs):
         for t in self.transforms:
-            sample = t(sample, self.device)
+            sample = t(sample, self.device, **kwargs)
         return sample
 
 
@@ -314,9 +310,10 @@ class Resize(object):
     def __init__(self, inference_size, padding_factor):
         self.padding_factor = padding_factor
         self.inference_size = inference_size
-        self.ori_size = None
+        self.ori_size = []
 
     def __call__(self, sample, *args):
+        self.ori_size = []
         key_ref = list(sample.keys())[0]
         if self.inference_size is None:
             if self.padding_factor > 0:
@@ -325,14 +322,15 @@ class Resize(object):
                     int(np.ceil(sample[key_ref].size(-1) / self.padding_factor)) * self.padding_factor]
             else:
                 pass
-        self.ori_size = sample[key_ref].shape[-2:]
+
         if self.inference_size is not None:
-            if self.inference_size[0] != self.ori_size[0] or self.inference_size[1] != self.ori_size[1]:
-                for key in sample.keys():
+            for key in sample.keys():
+                ori_size = sample[key].shape[-2:]
+                self.ori_size.append(ori_size)
+                if self.inference_size[0] != ori_size[0] or self.inference_size[1] != ori_size[1]:
                     sample[key] = F1.interpolate(sample[key], size=self.inference_size,
                                                  mode='bilinear',
                                                  align_corners=True)
-
         else:
             self.inference_size = self.ori_size
         return sample
@@ -347,13 +345,14 @@ class ResizeDepth(object):
         else:
             self.size = 0
 
-    def __call__(self, depth, device, *args):
+    def __call__(self, depth, device, *args, size=None):
         h, w = depth.shape[-2:]
-        if self.size == 0:
+        size = size if size is not None else self.size
+        if size == 0:
             pass
-        elif h != self.size[0] or w != self.size[1]:
+        elif h != size[0] or w != size[1]:
             # resize back
-            return F1.interpolate(depth, size=self.size,
+            return F1.interpolate(depth, size=size,
                                   mode='bilinear',
                                   align_corners=True)  # [1, H, W]
         else:
@@ -369,16 +368,17 @@ class ResizeDisp(object):
         else:
             self.size = 0
 
-    def __call__(self, disp, device, *args):
+    def __call__(self, disp, device, *args, size=None):
         h, w = disp.shape[-2:]
-        if self.size == 0:
+        size = size if size is not None else self.size
+        if size == 0:
             pass
-        elif h != self.size[0] or w != self.size[1]:
+        elif h != size[0] or w != size[1]:
             # resize back
-            disp = F1.interpolate(disp, size=self.size,
+            disp = F1.interpolate(disp, size=size,
                                   mode='bilinear',
                                   align_corners=True)  # [1, H, W]
-            return disp * self.size[1] / float(w)
+            return disp * size[1] / float(w)
         else:
             return disp
 

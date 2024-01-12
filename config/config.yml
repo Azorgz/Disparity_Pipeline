@@ -48,7 +48,7 @@ disparity_network:
 
 # Depth Network #########
 depth_network:
-  name: unimatch # Possibilities : unimatch, kenburn
+  name: unimatch # Possibilities : unimatch
   backbone: null # Possibilities : null for now (to be set in case of custom Network)
   transformer: null # Possibilities : null for now (to be set in case of custom Network)
   detection_head: null # Possibilities : null for now (to be set in case of custom Network)
@@ -60,6 +60,18 @@ depth_network:
     match_shape: False # If the entrance images need to have matching shape / number of channels
     normalize: True # If a boolean is given, the mean and std will be automatically set. Other possibility : (mean, std)
 
+# Monocular Depth Network #########
+monocular_depth_network:
+  name: kenburn # Possibilities : kenburn
+  backbone: null # Possibilities : null for now (to be set in case of custom Network)
+  transformer: null # Possibilities : null for now (to be set in case of custom Network)
+  detection_head: null # Possibilities : null for now (to be set in case of custom Network)
+  path_checkpoint: null # If "null" is given the Network will be initialized randomly or with the Network configuration file
+# Data Preparation ########
+  preprocessing: # The preprocessing is automatically set for a no-custom network. If a new network is added, you have to add the associated transformation in the pre_processing class
+    inference_size: [960, 1280] # If a resize is needed
+    match_shape: False # If the entrance images need to have matching shape / number of channels
+    normalize: True # If a boolean is given, the mean and std will be automatically set. Other possibility : (mean, std)
 
 # Reconstruction
 reconstruction:

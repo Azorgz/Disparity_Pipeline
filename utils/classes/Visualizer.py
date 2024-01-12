@@ -109,18 +109,17 @@ class Visualizer:
                 self.experiment[p]['target_disp_path'], _, target_disp_list = os.walk(
                     f'{P}/pred_disp/{target}').__next__()
                 self.experiment[p]['ref_disp_path'], _, ref_disp_list = os.walk(f'{P}/disp_reg/{ref}').__next__()
-                self.experiment[p]['target_disp_list'], self.experiment[p]['ref_disp_list'] = \
-                    sorted(target_disp_list), sorted(ref_disp_list)
+                self.experiment[p]['target_disp_list'] = sorted(target_disp_list)
+                self.experiment[p]['ref_disp_list'] = sorted(ref_disp_list)
                 self.experiment[p]['disp_ok'] = True
             except StopIteration:
                 self.experiment[p]['disp_ok'] = False
                 print(f'Disparity images wont be available for the {p} couple')
             try:
-                self.experiment[p]['target_depth_path'], _, target_depth_list = os.walk(
-                    f'{P}/pred_depth/{target}').__next__()
+                self.experiment[p]['target_depth_path'], _, target_depth_list = os.walk(f'{P}/pred_depth/{target}').__next__()
                 self.experiment[p]['ref_depth_path'], _, ref_depth_list = os.walk(f'{P}/depth_reg/{ref}').__next__()
-                self.experiment[p]['target_depth_list'], self.experiment[p]['ref_depth_list'] = \
-                    sorted(target_depth_list), sorted(ref_depth_list)
+                self.experiment[p]['target_depth_list'] = sorted(target_depth_list)
+                self.experiment[p]['ref_depth_list'] = sorted(ref_depth_list)
                 self.experiment[p]['depth_ok'] = True
             except StopIteration:
                 self.experiment[p]['depth_ok'] = False
@@ -214,18 +213,20 @@ class Visualizer:
             if self.key == ord('\r'):
                 self.idx = i
                 self.key = -1
-        if self.key == ord('-'):  # -
+        if self.key == ord('-'):
             self.idx -= 1
-        if self.key == ord('+'):  # +
+        if self.key == ord('+'):
             self.idx += 1
-        if self.key == ord('d'):  # d
+        if self.key == ord('d'):
             self.show_disp_overlay += 1
             if self.show_disp_overlay == 1:
                 if not experiment['disp_ok']:
                     self.show_disp_overlay += 1
-            if self.show_disp_overlay >= 2:
+            if self.show_disp_overlay == 2:
                 if not experiment['depth_ok']:
                     self.show_disp_overlay = 0
+            if self.show_disp_overlay > 2:
+                self.show_disp_overlay = 0
         if self.key == ord('i'):
             self.show_idx = not self.show_idx
         if self.key == ord('v'):
@@ -301,7 +302,7 @@ class Visualizer:
             if self.show_disp_overlay == 1:
                 disp_overlay = self._create_disp_overlay(experiment, ref_im, target_im, mask)
                 visu = visu.hstack(disp_overlay)
-            elif self.show_disp_overlay >= 2:
+            elif self.show_disp_overlay == 2:
                 depth_overlay = self._create_depth_overlay(experiment, ref_im, target_im, mask)
                 visu = visu.hstack(depth_overlay)
 

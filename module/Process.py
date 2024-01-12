@@ -130,6 +130,20 @@ class Process(OrderedDict):
                         self.camera_used.append(val['cam1'])
                     if val['cam2'] not in self.camera_used:
                         self.camera_used.append(val['cam2'])
+                elif key == 'MONOCULAR':
+                    for cam in val['cams']:
+                        assert cam in setup.cameras.keys(), \
+                            f'The chosen cameras for depth dont exist, available cameras are :{setup.cameras.keys()}'
+                        if cam not in self.camera_used:
+                            self.camera_used.append(cam)
+                    if 'pred_depth' in pred.keys():
+                        pred['pred_depth'].append(*val['cams'])
+                    else:
+                        pred.update({'pred_depth': val['cams']})
+                    if 'inference_size' not in val.keys():
+                        val['inference_size'] = None
+                    val['setup'] = setup
+                    process.append(self.monocular_depth(pipe, **val))
                 elif key == 'WRAP':
                     if val['depth']:
                         assert setup.depth_ready(val['cam_src']) and setup.depth_ready(val['cam_dst']), \
@@ -269,6 +283,17 @@ class Process(OrderedDict):
                     else:
                         pass
                 proc.append([key, option])
+            elif key == 'MONOCULAR_DEPTH' or key == 'MONOCULAR' or key == 'MONO':
+                assert len(p['cameras']) >= 1, \
+                    f'The {key} instructions need at least one camera'
+                option = {'cams': p['cameras']}
+                for p_ in p['option']:
+                    if isinstance(p_, dict):
+                        assert 'inference_size' in p_.keys(), f'The option given in {key} doesnt exist'
+                        option['inference_size'] = p_['inference_size']
+                    else:
+                        pass
+                proc.append(['MONOCULAR', option])
             elif key == 'WRAP':
                 assert len(p['cameras']) == 2, \
                     'The WRAP instruction needs 2 cameras : cam_src, cam_dst'
@@ -305,13 +330,13 @@ class Process(OrderedDict):
             pipe.network.update_pred_bidir(activate=pred_bidir)
             pipe.network.update_pred_right(activate=pred_right)
             if inference_size is not None:
-                pipe.network.update_size(inference_size, network='disparity')
+                pipe.network.update_size(inference_size, task='disparity')
             else:
                 pipe.network.update_size(pipe.config['disparity_network']["network_args"].inference_size)
             setup_ = kwargs['setup'] if 'setup' in kwargs.keys() else setup
             setup_ = setup_.stereo_pair(cam1, cam2)
             new_sample = setup_(sample, cut_roi_min=cut_roi_min, cut_roi_max=cut_roi_max)
-            output = pipe.network(new_sample)
+            output = pipe.network(new_sample, task='disparity')
             output = setup_(output, reverse=True)
             res['pred_disp'].update(setup_.disparity_to_depth(output))
 
@@ -323,16 +348,31 @@ class Process(OrderedDict):
             pipe.network.update_pred_bidir(activate=pred_bidir)
             pipe.network.update_pred_right(activate=pred_right)
             if inference_size is not None:
-                pipe.network.update_size(inference_size, network='depth')
+                pipe.network.update_size(inference_size, task='depth')
             else:
-                pipe.network.update_size(pipe.config['depth_network']["network_args"].inference_size, network='depth')
+                pipe.network.update_size(pipe.config['depth_network']["network_args"].inference_size, task='depth')
             setup_ = kwargs['setup'] if 'setup' in kwargs.keys() else setup
             setup_ = setup_.depth_pair(cam1, cam2)
             new_sample = setup_(sample)
-            output = pipe.network(**new_sample)
+            output = pipe.network(**new_sample, task='depth')
             res['pred_depth'].update(setup_(output, reverse=True))
 
         return _depth, [cam1, cam2]
+
+    @staticmethod
+    def monocular_depth(pipe, cams, inference_size, setup, **kwargs0):
+        def _monocular_estimation(sample, res, **kwargs):
+            if inference_size is not None:
+                pipe.network.update_size(inference_size, task='monocular')
+            else:
+                pipe.network.update_size(pipe.config['monocular_depth_network']["network_args"].inference_size,
+                                         task='monocular')
+            setup_ = kwargs['setup'] if 'setup' in kwargs.keys() else setup
+            new_sample = {'sample': {cam: sample[cam] for cam in cams}, 'focal': [setup_.cameras[cam].f for cam in cams]}
+            output = pipe.network(**new_sample, task='monocular')
+            res['pred_depth'].update(output)
+
+        return _monocular_estimation, cams
 
     @staticmethod
     def wrap(pipe, cam_src, cam_dst, depth_tensors, depth, return_depth_reg, return_occlusion, cams, **kwargs0):

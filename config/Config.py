@@ -31,6 +31,7 @@ class ConfigPipe(dict):
         self.config_setup(config["setup"])
         self.config_disparity_network(config["disparity_network"])
         self.config_depth_network(config["depth_network"])
+        self.config_monocular_depth_network(config["monocular_depth_network"])
         # self.config_refinement(config["refinement"])
         self.config_reconstruction(config["reconstruction"])
         self.config_validation(config["validation"])
@@ -99,7 +100,7 @@ class ConfigPipe(dict):
             self["disparity_network"]["path_checkpoint"] = args.path_checkpoint
         else:
             self["disparity_network"]["path_checkpoint"] = config["path_checkpoint"]
-        self["disparity_network"]["preprocessing"] = self.config_preprocessing(config)
+        self["disparity_network"]["preprocessing"] = self.config_preprocessing(config, target="disparity_network")
 
     def config_depth_network(self, config):
         self["depth_network"] = {}
@@ -126,6 +127,23 @@ class ConfigPipe(dict):
         else:
             self["depth_network"]["path_checkpoint"] = config["path_checkpoint"]
         self["depth_network"]["preprocessing"] = self.config_preprocessing(config, target="depth_network")
+
+    def config_monocular_depth_network(self, config):
+        self["monocular_network"] = {}
+        self["monocular_network"]["name"] = config["name"].upper()
+        if self["monocular_network"]["name"] == "KENBURN":
+            args = configure_parser(None,
+                                    config["preprocessing"],
+                                    path_config='Networks/KenburnDepth/config_Kenburn.yml',
+                                    dict_vars=self["dataset"])
+            self["monocular_network"]["network_args"] = args
+        else:
+            pass
+        if args.path_checkpoint:
+            self["monocular_network"]["path_checkpoint"] = args.path_checkpoint
+        else:
+            self["monocular_network"]["path_checkpoint"] = config["path_checkpoint"]
+        self["monocular_network"]["preprocessing"] = self.config_preprocessing(config, target="monocular_network")
 
     def config_preprocessing(self, config, target='disparity_network'):
         transform = []

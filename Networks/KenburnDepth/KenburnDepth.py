@@ -1,10 +1,12 @@
 import os
 import time
+from typing import Union
+
 import numba
 import numpy as np
 import torch
 from kornia.utils import get_cuda_device_if_available
-from torch import nn, tensor
+from torch import nn, tensor, Tensor
 from torchvision.models.detection import MaskRCNN_ResNet50_FPN_Weights, maskrcnn_resnet50_fpn
 
 from .estimation import Semantics, Disparity
@@ -33,7 +35,8 @@ class KenburnDepth(nn.Module):
                 self.netMaskrcnn = YOLO(os.getcwd() + '/' + path + '/yolov8s-seg.pt').to(device=self.device)
                 self.netMaskrcnn.training = False
             else:
-               self.netMaskrcnn = maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT).to(device=self.device).eval()
+                self.netMaskrcnn = maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT).to(
+                    device=self.device).eval()
         self.netRefine = Refine().cuda().eval()
         self.netRefine.load_state_dict({strKey.replace('module', 'net'): tenWeight for strKey, tenWeight in
                                         torch.load(path + "/network-refinement.pytorch").items()})
@@ -74,7 +77,8 @@ class KenburnDepth(nn.Module):
                 elif objPredictions.boxes.conf[intMask] < 0.7:
                     continue
 
-                elif objPredictions.boxes.cls[intMask] not in [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 25]:
+                elif objPredictions.boxes.cls[intMask] not in [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                                                               17, 18, 19, 25]:
                     continue
 
                 boolUsed[intMask] = True
@@ -115,7 +119,8 @@ class KenburnDepth(nn.Module):
                 elif objPredictions['scores'][intMask].item() < 0.7:
                     continue
 
-                elif objPredictions['labels'][intMask].item() not in [1, 3, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+                elif objPredictions['labels'][intMask].item() not in [1, 3, 6, 7, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23,
+                                                                      24,
                                                                       25]:
                     continue
 
@@ -177,25 +182,43 @@ class KenburnDepth(nn.Module):
         return self.netRefine(im, disparity)
 
     @torch.no_grad()
-    def forward(self, im, *args, focal=6, baseline=340, pred_bidir=False, **kwargs):
-        images = [im]
+    def forward(self, images: Union[np.array, torch.tensor, ImageTensor, list, dict], *args, focal: Union[list, float, int] = 1, **kwargs):
+        """
+        Takes as many images as input as you want. It will predict their depth successively
+        The focal argument need to be only one float or int (in mm) or a list (1 per images)
+        """
+        names = []
+        if isinstance(images, dict):
+            im = []
+            for k, v in images.items():
+                names.append(k)
+                im.append(v)
+            images = im
+        if not isinstance(images, list):
+            images = [images]
+        if args:
+            images.append(*kwargs)
+        if not isinstance(focal, list):
+            focal = [focal]
+        if len(focal) > 1:
+            assert len(focal) == len(images)
+        else:
+            focal = [focal[0] for i in range(len(images))]
         depth = []
-        baseline *= 1000
-        focal *= 1000
-        if pred_bidir:
-            assert len(args) >= 1
-            images.append(args[0])
-        for image in images:
+        for image, f in zip(images, focal):
+            f *= 1000
+            image = Tensor(image)
             disparity = self._disparity_estimation(image)
             if self.semantic_adjustment:
                 disparity = self._disparity_adjustment(image, disparity)
             disparity = self._disparity_refinement(image, disparity)
-            disparity = disparity / disparity.max() * baseline
-            tenDepth = (focal * baseline) / (disparity + 0.0000001)
+            disparity = disparity / disparity.max()
+            tenDepth = f / (disparity + 0.0000001)
             depth.append(tenDepth)
-
-        return depth
-
+        if names:
+            return {name: d for name, d in zip(names, depth)}
+        else:
+            return depth
 
 # if __name__ == '__main__':
 #     cpt = 'perso' if os.getcwd().split('/')[2] == 'aurelien' else 'pro'
@@ -215,6 +238,3 @@ class KenburnDepth(nn.Module):
 #         depth_im = DepthTensor(depth_im).pyrUp()
 #         print(depth_im.max_value)
 #         depth_im.show()
-
-
-

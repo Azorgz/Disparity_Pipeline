@@ -14,6 +14,8 @@ from matplotlib import pyplot as plt, patches
 from torch import Tensor
 from torchvision.transforms.functional import to_pil_image
 
+from utils.misc import time_fct
+
 
 def find_class(args, class_name):
     arg = {}
@@ -502,7 +504,6 @@ class DepthTensor(ImageTensor):
 
     @staticmethod
     def __new__(cls, im: Union[ImageTensor, Tensor], device: torch.device = None):
-
         inp = im.squeeze()
         assert len(inp.shape) == 2
         max_value = inp.max()

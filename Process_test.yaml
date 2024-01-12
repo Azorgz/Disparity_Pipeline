@@ -5,9 +5,24 @@ Option:
   dataset:
     number_of_sample: 10
     shuffle: True
-  depth_network:
+  monocular_network:
     name: kenburn
+  depth_network:
+    name: unimatch
+  disparity_network:
+    name: ACVNet
 
+monocular_depth:
+  monocular:
+    cameras: [RGB]
+    option: [inference_size: [240, 320]]
+  wrap:
+    cameras: [IR, RGB]
+    method: depth
+    source: pred_depth
+    option: [return_depth_reg, return_occlusion, []]
+  valid: [IR, RGB]
+  save: [pred_depth, image_reg, depth_reg, occlusion]
 
 Depth-Depth:
   depth:
@@ -17,18 +32,18 @@ Depth-Depth:
     cameras: [IR, RGB]
     method: depth
     source: pred_depth
-    option: []
-  valid: [IR, RGB]
-  save: [pred_depth, image_reg, depth_reg, occlusion]
-
-Depth-Disparity:
-  depth:
-    cameras: [RGB, RGB2]
-    option: [inference_size: [480, 640]]
-  wrap:
-    cameras: [IR, RGB]
-    method: disparity
-    source: pred_depth
     option: [return_depth_reg, return_occlusion, []]
   valid: [IR, RGB]
   save: [pred_depth, image_reg, depth_reg, occlusion]
+#
+#Depth-Disparity:
+#  depth:
+#    cameras: [RGB, RGB2]
+#    option: [inference_size: [480, 640]]
+#  wrap:
+#    cameras: [IR, RGB]
+#    method: disparity
+#    source: pred_depth
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [IR, RGB]
+#  save: [pred_depth, image_reg, depth_reg, occlusion]

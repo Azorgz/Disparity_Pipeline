@@ -98,8 +98,11 @@ def update(d, u):
 
 
 def count_parameter(model):
-    num_params = sum(p.numel() for p in model.parameters())
-    return f'Number of trainable parameters: {num_params}'
+    if model is not None:
+        num_params = sum(p.numel() for p in model.parameters())
+        return f'Number of trainable parameters: {num_params}'
+    else:
+        return 'Not loaded'
 
 
 def clear_folder(folder):
