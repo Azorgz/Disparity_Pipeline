@@ -1,7 +1,6 @@
 # from torch.fft import fft2, ifft2
 import os
 
-import torch
 import yaml
 
 from module.BaseModule import BaseModule
@@ -10,7 +9,6 @@ import numpy as np
 
 from utils.manipulation_tools import merge_dict
 from utils.misc import timeit, deactivated
-from utils.transforms import ToTensor
 
 
 class Validation(BaseModule):

@@ -283,6 +283,7 @@ class Visualizer:
                 self.define_delta(experiment["new_list"][self.idx])
             target_im = ImageTensor(f'{experiment["target_list"][self.idx]}').RGB()
             ref_im = ImageTensor(f'{experiment["ref_list"][self.idx]}').RGB().match_shape(target_im)
+            new_im = new_im.match_shape(target_im)
         else:
             target_im = new_im.clone()
             ref_im = new_im.clone()

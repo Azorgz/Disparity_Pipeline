@@ -138,10 +138,6 @@ class SuperNetwork(BaseModule):
                 pre_dict = {k: v for k, v in checkpoint['model'].items() if k in model_dict}
                 model_dict.update(pre_dict)
                 self.model_depth.load_state_dict(model_dict)
-        # elif self.name_depth == 'KENBURNDEPTH' or self.name_depth == 'KENBURN' or self.name_depth == 'KEN':
-        #     self.name_depth = "KenBurnDepth"
-        #     model = KenburnDepth(self.config['depth_network'], device=self.device)
-        #     self.model_depth = model.to(device=self.device)
         elif config['depth_network']["name"] == "custom":
             self.name_depth = "custom"
             # self.feature_extraction = self._initialize_features_extraction_(self.config['network'])
@@ -159,7 +155,10 @@ class SuperNetwork(BaseModule):
         self.name_monocular = config['monocular_network']["name"].upper()
         if self.name_monocular == 'KENBURNDEPTH' or self.name_monocular == 'KENBURN' or self.name_monocular == 'KEN':
             self.name_monocular = "KenBurnDepth"
-            model = KenburnDepth(self.config['monocular_network'], device=self.device)
+            model = KenburnDepth(path_ckpt=self.config['monocular_network']["path_checkpoint"],
+                                 semantic_adjustment=self.config['monocular_network']['network_args'].semantic_adjustment,
+                                 semantic_network=self.config['monocular_network']['network_args'].semantic_network,
+                                 device=self.device)
         elif config['depth_network']["name"] == "to_be_implemented":
             self.name_monocular = "custom"
             model = None
@@ -262,7 +261,7 @@ class SuperNetwork(BaseModule):
                 target.im_name = sample['target'].im_name
                 res = {'target': target}
             else:
-                ref = time_fct(DepthTensor)(res[0], device=self.device).scale()
+                ref = DepthTensor(res[0], device=self.device).scale()
                 ref.im_name = sample['ref'].im_name
                 res = {'ref': ref}
             self.preprocessing_depth(res, reverse=True)
@@ -275,7 +274,7 @@ class SuperNetwork(BaseModule):
                 warnings.warn('This Network is not implemented')
                 return 0
             for cam, im in res.items():
-                res[cam] = time_fct(DepthTensor)(im, device=self.device).scale()
+                res[cam] = DepthTensor(im, device=self.device).scale()
                 res[cam].im_name = sample[cam].im_name
             self.preprocessing_monocular(res, reverse=True)
             return res

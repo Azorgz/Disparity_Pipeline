@@ -3,10 +3,9 @@ import ntpath
 import os
 from collections import OrderedDict
 from types import FrameType
-from typing import Union, cast
-
+from typing import cast
 import oyaml as yaml
-
+import torch
 from module.SetupCameras import CameraSetup
 from utils.misc import path_leaf
 
@@ -368,7 +367,7 @@ class Process(OrderedDict):
                 pipe.network.update_size(pipe.config['monocular_depth_network']["network_args"].inference_size,
                                          task='monocular')
             setup_ = kwargs['setup'] if 'setup' in kwargs.keys() else setup
-            new_sample = {'sample': {cam: sample[cam] for cam in cams}, 'focal': [setup_.cameras[cam].f for cam in cams]}
+            new_sample = {'sample': {cam: sample[cam] for cam in cams}, 'focal': [setup_.cameras[cam].intrinsics[0, 0, 0] for cam in cams]}
             output = pipe.network(**new_sample, task='monocular')
             res['pred_depth'].update(output)
 
@@ -399,11 +398,11 @@ class Process(OrderedDict):
     def valid(pipe, cam_reg, cam_ref, exp_name, **kwargs0):
         def _valid(sample, res, **kwargs):
             name = f'{cam_reg}_to_{cam_ref}'
-            im_reg = res['image_reg'][name]
             im_ref = sample[cam_ref]
+            im_reg = res['image_reg'][name].match_shape(im_ref)
             im_old = sample[cam_reg].match_shape(im_ref)
             if name in res['occlusion'].keys():
-                occlusion = res['occlusion'][name]
+                occlusion = res['occlusion'][name].to(torch.float32).match_shape(im_ref).to(torch.bool)
             else:
                 occlusion = None
             pipe.validation.activated = True

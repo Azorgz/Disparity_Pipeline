@@ -1,8 +1,5 @@
-from module.BaseModule import BaseModule
 from module.PostProcessing import PostProcessing
-from utils import transforms
-from utils.misc import timeit
-from utils.transforms import Resize, Pad, DispSide, Compose
+from utils.classes.transforms import Resize, Pad, DispSide, Compose
 
 
 class Preprocessing:
@@ -32,7 +29,7 @@ class Preprocessing:
         if self.resize is not None:
             return self.resize.inference_size
         elif self.pad is not None:
-            return self.pad.shape
+            return self.pad.inference_size
         else:
             return None
 
@@ -40,8 +37,10 @@ class Preprocessing:
     def inference_size(self, size):
         if self.resize is not None and self.resize.inference_size != size:
             self.resize.inference_size = size
-        elif self.pad is not None and self.pad.shape != size:
-            self.pad.shape = size
+        elif self.pad is not None:
+            self.pad.inference_size = size
+        if self.postprocessing is not None:
+            self.postprocessing = None
 
     @property
     def ori_size(self):
@@ -61,7 +60,7 @@ class Preprocessing:
                 if im.im_type == 'IR':
                     sample[key] = im.RGB('gray')
             if self.transforms is not None:
-                sample = self.transforms(sample)
+                sample = self.transforms(sample, **kwargs)
             if self.postprocessing is None:
                 self.postprocessing = PostProcessing(self.config,
                                                      self.device,
@@ -73,5 +72,5 @@ class Preprocessing:
             for key, im in sample.items():
                 if im.im_type == 'IR':
                     sample[key] = im.GRAYSCALE()
-            sample = self.postprocessing(sample)
+            sample = self.postprocessing(sample, **kwargs)
         return sample

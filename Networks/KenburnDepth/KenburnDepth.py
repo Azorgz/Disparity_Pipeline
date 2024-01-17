@@ -20,26 +20,29 @@ from ultralytics import YOLO
 
 class KenburnDepth(nn.Module):
 
-    def __init__(self, config, device=None):
+    def __init__(self, path_ckpt: str = '',
+                 semantic_adjustment: bool = False,
+                 semantic_network: str = 'YOLO',
+                 device=None):
         super(KenburnDepth, self).__init__()
-        path = config["path_checkpoint"]
-        self.semantic_adjustment = config['network_args'].semantic_adjustment
-        self.semantic_network = config['network_args'].semantic_network
+        self.path_ckpt = path_ckpt
+        self.semantic_adjustment = semantic_adjustment
+        self.semantic_network = semantic_network
         self.device = device if device is not None else get_cuda_device_if_available()
         self.netSemantics = Semantics().to(device=self.device).eval()
         self.netDisparity = Disparity().to(device=self.device).eval()
         self.netDisparity.load_state_dict({strKey.replace('module', 'net'): tenWeight for strKey, tenWeight in
-                                           torch.load(path + "/network-disparity.pytorch").items()})
+                                           torch.load(self.path_ckpt + "/network-disparity.pytorch").items()})
         if self.semantic_adjustment:
             if self.semantic_network == 'YOLO':
-                self.netMaskrcnn = YOLO(os.getcwd() + '/' + path + '/yolov8s-seg.pt').to(device=self.device)
+                self.netMaskrcnn = YOLO(os.getcwd() + '/' + self.path_ckpt + '/yolov8s-seg.pt').to(device=self.device)
                 self.netMaskrcnn.training = False
             else:
                 self.netMaskrcnn = maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT).to(
                     device=self.device).eval()
         self.netRefine = Refine().cuda().eval()
         self.netRefine.load_state_dict({strKey.replace('module', 'net'): tenWeight for strKey, tenWeight in
-                                        torch.load(path + "/network-refinement.pytorch").items()})
+                                        torch.load(self.path_ckpt + "/network-refinement.pytorch").items()})
 
     @torch.no_grad()
     def _disparity_estimation(self, im):
@@ -53,7 +56,7 @@ class KenburnDepth(nn.Module):
         intWidth = min(int(size * fltRatio), size)
         intHeight = min(int(size / fltRatio), size)
 
-        tenImage = torch.nn.functional.interpolate(input=tensor(im), size=(intHeight, intWidth), mode='bilinear',
+        tenImage = torch.nn.functional.interpolate(input=im, size=(intHeight, intWidth), mode='bilinear',
                                                    align_corners=False)
 
         return self.netDisparity(tenImage, self.netSemantics(tenImage))
@@ -182,7 +185,8 @@ class KenburnDepth(nn.Module):
         return self.netRefine(im, disparity)
 
     @torch.no_grad()
-    def forward(self, images: Union[np.array, torch.tensor, ImageTensor, list, dict], *args, focal: Union[list, float, int] = 1, **kwargs):
+    def forward(self, images: Union[np.array, torch.tensor, ImageTensor, list, dict], *args,
+                focal: Union[list, float, int] = 1, **kwargs):
         """
         Takes as many images as input as you want. It will predict their depth successively
         The focal argument need to be only one float or int (in mm) or a list (1 per images)
@@ -206,14 +210,14 @@ class KenburnDepth(nn.Module):
             focal = [focal[0] for i in range(len(images))]
         depth = []
         for image, f in zip(images, focal):
-            f *= 1000
             image = Tensor(image)
             disparity = self._disparity_estimation(image)
             if self.semantic_adjustment:
                 disparity = self._disparity_adjustment(image, disparity)
             disparity = self._disparity_refinement(image, disparity)
-            disparity = disparity / disparity.max()
-            tenDepth = f / (disparity + 0.0000001)
+            disparity = disparity# / 1024 * disparity.shape[-1]
+            tenDepth = f * 40*1e-3 / (disparity + 0.0000001)
+            print(f'Max : {disparity.max()}, Min : {disparity.min()}')
             depth.append(tenDepth)
         if names:
             return {name: d for name, d in zip(names, depth)}

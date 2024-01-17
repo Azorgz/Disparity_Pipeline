@@ -1,14 +1,13 @@
 import argparse
 import os
 from glob import glob
-from pathlib import Path
 
 from kornia.utils import get_cuda_device_if_available
 
 from Networks.UniMatch.parser import get_args_parser_depth
 import yaml
 import torch
-from utils import transforms as transforms
+from utils.classes import transforms as transforms
 from utils.misc import update
 
 
@@ -154,8 +153,7 @@ class ConfigPipe(dict):
                          transforms.Resize(self[target]["network_args"].inference_size,
                                            self[target]["network_args"].padding_factor)]
         elif config['name'].upper() == 'ACVNET':
-            transform = [transforms.ToFloatTensor(),
-                         transforms.Pad(self[target]["network_args"].inference_size, keep_ratio=True)]
+            transform = [transforms.Pad(self[target]["network_args"].inference_size, keep_ratio=True)]
         elif config['name'].upper() == 'KENBURN':
             transform = [transforms.Resize(self[target]["network_args"].inference_size, 0)]
         # else:

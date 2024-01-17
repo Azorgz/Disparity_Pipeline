@@ -1,27 +1,68 @@
 import os
 import time
-
+import open3d as o3d
 import numpy as np
+import torch
+from kornia.geometry import depth_to_3d
+from kornia.morphology import dilation
 from matplotlib import pyplot as plt
 from matplotlib.pyplot import plot
+from open3d.examples.pipelines.icp_registration import draw_registration_result
 from pandas import DataFrame
+from torch import Tensor
 
+from Networks.KenburnDepth.KenburnDepth import KenburnDepth
 # import torch
 from Result_analysis.ResultFrame import ResultFrame
 # from utils.classes import ImageTensor
 # from utils.classes.Visualizer import Visualizer
-
 # from utils.classes.Image import ImageTensor
 import numpy as np
 
+from module.SetupCameras import CameraSetup
+from utils.classes import ImageTensor, Metric_nec_tensor
+from utils.classes.Image import DepthTensor
+from utils.gradient_tools import grad_tensor
+from utils.misc import time_fct
+
 # import cv2 as cv
-#
 # from utils.registration_tools import SIFT
 # from utils.visualization import result_visualizer, visual_control
 
+device = torch.device('cuda')
+R = CameraSetup(from_file="/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera.yaml")
+NN = KenburnDepth(path_ckpt=os.getcwd() + "/Networks/KenburnDepth/pretrained",
+                  semantic_adjustment=False,
+                  device=device)
+# Depth
+im_dst, idx = R.cameras['RGB'].random_image()
+# im_dst = R.cameras['RGB'].__getitem__(2500)
+im_src = R.cameras['IR'].__getitem__(idx).RGB('gray')
 
-base_path = os.getcwd() + "/results/"
-res = ResultFrame(base_path + "Test/Depth-Disparity")
+matrix_dst = R.cameras['RGB'].intrinsics[:, :3, :3]
+matrix_src = R.cameras['RGB2'].intrinsics[:, :3, :3]
+
+DepthTensor(time_fct(NN)(Tensor(im_dst.pyrDown().pyrDown()), focal=matrix_dst[0, 0, 0])[0].clip(0, 200)).show()
+DepthTensor(time_fct(NN)(Tensor(im_src.pyrDown()), focal=matrix_src[0, 0, 0])[0].clip(0, 200)).show()
+
+DepthTensor(time_fct(NN)(Tensor(im_dst.pyrDown()), focal=matrix_dst[0, 0, 0])[0].clip(0, 200)).show()
+DepthTensor(time_fct(NN)(Tensor(im_src), focal=matrix_src[0, 0, 0])[0].clip(0, 200)).show()
+
+DepthTensor(time_fct(NN)(Tensor(im_dst), focal=matrix_dst[0, 0, 0])[0].clip(0, 200)).show()
+DepthTensor(time_fct(NN)(Tensor(im_src.pyrUp()), focal=matrix_src[0, 0, 0])[0].clip(0, 200)).show()
+
+
+
+
+
+
+metric = Metric_nec_tensor(device)
+
+
+
+
+# base_path = os.getcwd() + "/results/"
+# res = ResultFrame(base_path + "Test/Depth-Disparity")
 # # res1 = ResultFrame(base_path + "camera_position_ir_finer/Depth-Depth")
 # cam = 'IR'
 # setup = 'raw test'
@@ -151,8 +192,6 @@ time.sleep(1)
 
 # Best Depth 1186 / dz=5, dx=4, dy=2, da=1
 # Best Depth 1984 / dz=1, dx=7, dy=2, da=1
-
-
 
 
 # name = '/home/godeta/PycharmProjects/Disparity_Pipeline/results/Vis/Validation.yaml'

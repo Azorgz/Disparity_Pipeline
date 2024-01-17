@@ -1,18 +1,11 @@
-import cv2 as cv
-import numpy as np
-from skimage.metrics import structural_similarity, mean_squared_error, normalized_root_mse, \
-    normalized_mutual_information, peak_signal_noise_ratio
-
 import torch
-# from .Image import ImageCustom
-from torchvision.transforms import Grayscale
-from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MS_SSIM
 from torchmetrics import MeanSquaredError as MSE
+from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MS_SSIM
 from torchmetrics import PeakSignalNoiseRatio as PSNR
-
+from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
+import torch.nn.functional as F1
 ######################### METRIC ##############################################
-from utils.gradient_tools import grad, grad_tensor
+from utils.gradient_tools import grad_tensor
 
 
 class BaseMetric_Tensor:
@@ -26,12 +19,19 @@ class BaseMetric_Tensor:
         self.range_min = 0
         self.range_max = 1
         self.commentary = "Just a base"
+        self.ratio_list = torch.tensor([1, 4 / 3, 3 / 2, 16 / 9, 21 / 9])
+        self.ratio_dict = {1: [512, 512],
+                           round(4 / 3, 3): [480, 640],
+                           round(3 / 2, 3): [440, 660],
+                           round(16 / 9, 3): [405, 720],
+                           round(21 / 9, 3): [340, 800]}
 
     def __call__(self, im1, im2, *args, mask=None, **kwargs):
         # Input array is a path to an image OR an already formed ndarray instance
-        assert im1.shape[-2:] == im2.shape[-2:], " The inputs are not the same size"
-        _, c, h, w = im1.shape
-        _, c1, h1, w1 = im2.shape
+        # assert im1.shape[-2:] == im2.shape[-2:], " The inputs are not the same size"
+        c, h, w = im1.shape[-3:]
+        c1 = im2.shape[1]
+
         if c == c1:
             self.image_true = im1.clone()
             self.image_test = im2.clone()
@@ -41,8 +41,24 @@ class BaseMetric_Tensor:
         else:
             self.image_true = im1.clone()
             self.image_test = im2.GRAYSCALE()
-
+        size = self._determine_size_from_ratio()
+        self.image_true = F1.interpolate(self.image_true, size=size,
+                                         mode='bilinear',
+                                         align_corners=True)
+        self.image_test = F1.interpolate(self.image_test, size=size,
+                                         mode='bilinear',
+                                         align_corners=True)
+        if mask is not None:
+            self.mask = F1.interpolate(mask.to(torch.float32), size=size,
+                                       mode='bilinear',
+                                       align_corners=True).to(torch.bool)
         self.value = 0
+
+    def _determine_size_from_ratio(self):
+        ratio = self.image_true.shape[-1] / self.image_true.shape[-2]
+        idx_ratio = round(float(self.ratio_list[torch.argmin((self.ratio_list - ratio) ** 2)]), 3)
+        size = self.ratio_dict[float(idx_ratio)]
+        return size
 
     def __add__(self, other):
         assert isinstance(other, BaseMetric_Tensor)
@@ -84,7 +100,7 @@ class Metric_ssim_tensor(BaseMetric_Tensor):
             del temp
         else:
             temp, image = self.ssim(self.image_test, self.image_true)
-            self.value = image[mask].mean()
+            self.value = image[:, :, self.mask[0, 0, :, :]].mean()
             self.ssim.reset()
             del temp
             # self.value = self.ssim(self.image_test * mask, self.image_true * mask)
@@ -113,10 +129,10 @@ class MultiScaleSSIM_tensor(BaseMetric_Tensor):
         if mask is None:
             self.value = self.ms_ssim(self.image_test, self.image_true)
         else:
-            self.value = self.ms_ssim(self.image_test*mask, self.image_true*mask)
+            self.value = self.ms_ssim(self.image_test * self.mask, self.image_true * self.mask)
             nb_pixel_im = self.image_test.shape[-2] * self.image_test.shape[-1]
-            nb_pixel_mask = (~mask).to(torch.float32).sum()
-            self.value = (self.value*nb_pixel_im - nb_pixel_mask) / (nb_pixel_im - nb_pixel_mask)
+            nb_pixel_mask = (~self.mask).to(torch.float32).sum()
+            self.value = (self.value * nb_pixel_im - nb_pixel_mask) / (nb_pixel_im - nb_pixel_mask)
         return self.value
 
     def scale(self):
@@ -136,8 +152,8 @@ class Metric_mse_tensor(BaseMetric_Tensor):
         if mask is None:
             self.value = self.mse(self.image_true, self.image_test)
         else:
-            self.value = self.mse(self.image_true[:, :, mask[0, 0, :, :]].flatten(),
-                                  self.image_test[:, :, mask[0, 0, :, :]].flatten())
+            self.value = self.mse(self.image_true[:, :, self.mask[0, 0, :, :]].flatten(),
+                                  self.image_test[:, :, self.mask[0, 0, :, :]].flatten())
         return self.value
 
     def scale(self):
@@ -157,8 +173,8 @@ class Metric_rmse_tensor(BaseMetric_Tensor):
         if mask is None:
             self.value = self.rmse(self.image_true, self.image_test)
         else:
-            self.value = self.rmse(self.image_true[:, :, mask[0, 0, :, :]].flatten(),
-                                   self.image_test[:, :, mask[0, 0, :, :]].flatten())
+            self.value = self.rmse(self.image_true[:, :, self.mask[0, 0, :, :]].flatten(),
+                                   self.image_test[:, :, self.mask[0, 0, :, :]].flatten())
         return self.value
 
     def scale(self):
@@ -181,8 +197,8 @@ class Metric_psnr_tensor(BaseMetric_Tensor):
             if mask is None:
                 self.value = self.psnr(self.image_true, self.image_test)
             else:
-                self.value = self.psnr(self.image_true[:, :, mask[0, 0, :, :]].flatten(),
-                                       self.image_test[:, :, mask[0, 0, :, :]].flatten())
+                self.value = self.psnr(self.image_true[:, :, self.mask[0, 0, :, :]].flatten(),
+                                       self.image_test[:, :, self.mask[0, 0, :, :]].flatten())
         except RuntimeError:
             self.value = -1
         return self.value
@@ -212,9 +228,9 @@ class Metric_nec_tensor(BaseMetric_Tensor):
         ref_true = ref_true / ref_true.max()
         ref_test = ref_test / ref_test.max()
         if mask is not None:
-            ref_true = ref_true.flatten(start_dim=2)[:, :, mask[0, 0, :, :].flatten()]
-            ref_test = ref_test.flatten(start_dim=2)[:, :, mask[0, 0, :, :].flatten()]
-        self.value = torch.sum(ref_true * ref_test) / torch.sum(ref_true * ref_true)
+            ref_true = ref_true.flatten(start_dim=2)[:, :, self.mask[0, 0, :, :].flatten()]
+            ref_test = ref_test.flatten(start_dim=2)[:, :, self.mask[0, 0, :, :].flatten()]
+        self.value = torch.sum(ref_true * ref_test) / torch.sqrt(torch.sum(ref_true * ref_true) * torch.sum(ref_test * ref_test))
         return self.value
 
 ########

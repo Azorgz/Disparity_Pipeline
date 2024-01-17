@@ -1,15 +1,9 @@
 import torch
-from kornia import create_meshgrid
-from kornia.filters import MedianBlur
-from kornia.geometry import depth_to_3d, transform_points, project_points, normalize_pixel_coordinates, \
-    denormalize_pixel_coordinates
-from kornia.morphology import dilation, erosion, opening, closing
-from torch import Tensor
 import torch.nn.functional as F
+from kornia.geometry import depth_to_3d, transform_points, project_points, normalize_pixel_coordinates
+from kornia.morphology import dilation
+from torch import Tensor
 from utils.classes import ImageTensor
-import numpy as np
-import open3d as o3d
-
 from utils.classes.Image import DepthTensor
 
 

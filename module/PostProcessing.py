@@ -1,10 +1,4 @@
-import torch
-import matplotlib.pyplot as plt
-
-from module.BaseModule import BaseModule
-# from utils.classes import ImageCustom
-from utils.misc import timeit
-from utils.transforms import Unpad, ResizeDisp, Compose, ResizeDepth
+from utils.classes.transforms import Unpad, ResizeDisp, Compose, ResizeDepth
 from torchvision.transforms.functional import hflip
 
 
@@ -34,7 +28,7 @@ class PostProcessing:
         self.transform = Compose(self.transform, self.device)
         # self.histo = None
 
-    def __call__(self, sample, *args):
+    def __call__(self, sample, *args, **kwargs):
         for size, (key, disp) in zip(self.ori_size, sample.items()):
             disp = self.transform(disp, size=size)
             if self.config['pred_bidir'] and self.task != 'depth' and self.task != 'monocular':

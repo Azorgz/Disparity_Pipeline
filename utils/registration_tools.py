@@ -2,12 +2,9 @@ import os
 import cv2 as cv
 import timeit
 import numpy as np
-import torch
-from torch import Tensor
 
 from utils.classes import ImageTensor
-from utils.gradient_tools import grad
-from utils.transforms import ToTensor, ToFloatTensor, Resize, ResizeDisp
+from utils.classes.transforms import ToTensor, ToFloatTensor, Resize
 from utils.visualization import vis_disparity
 
 

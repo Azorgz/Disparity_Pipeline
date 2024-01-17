@@ -371,7 +371,8 @@ class ImageTensor(Tensor):
 
     @im_type.setter
     def im_type(self, t) -> None:
-        warnings.warn("The attribute can't be modified")
+        self._im_type = t
+        # warnings.warn("The attribute can't be modified")
 
     @property
     def mode_list(self) -> list:
@@ -519,7 +520,6 @@ class DepthTensor(ImageTensor):
         inp_.im_type = 'Depth'
         return inp_
 
-
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
         # print(f"Calling '{func.__name__}' for Subclass")
@@ -543,7 +543,7 @@ class DepthTensor(ImageTensor):
         fig, ax = plt.subplots(ncols=len(im_display), num=num, squeeze=False)
         for i, img in enumerate(im_display):
             im_display = img.squeeze()
-            im_display = (im_display - im_display.min()) / (im_display.max() - im_display.min())
+            # im_display = (im_display - im_display.min()) / (im_display.max() - im_display.min())
             if len(im_display.shape) > 2:
                 im_display, cmap = im_display.permute(1, 2, 0), None
             else:

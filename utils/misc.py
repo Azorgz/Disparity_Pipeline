@@ -141,9 +141,11 @@ def time_fct(func):
         start = time.time()
         res = func(*args, **kwargs)
         try:
-            print(f"\nFunction {func.__name__} executed in : {time.time() - start} seconds")
+            print(f"\nFunction {func.__name__} executed in : {time.time() - start} seconds"
+                  f"\n--------------------------------------------------------------------------------")
         except AttributeError:
-            print(f"\nFunction {func.__class__.__name__} executed in : {time.time() - start} seconds")
+            print(f"\nFunction {func.__class__.__name__} executed in : {time.time() - start} seconds"
+                  f"\n--------------------------------------------------------------------------------")
         return res
 
     return wrapper

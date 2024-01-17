@@ -206,6 +206,13 @@ class BaseCamera(PinholeCamera):
         im = ImageTensor(im_path, device=self.device)
         return im
 
+    def random_image(self):
+        list_im = sorted(os.listdir(self.path))
+        index = torch.randint(0, len(list_im), [1])
+        im_path = f'{self.path}/{list_im[index]}'
+        im = ImageTensor(im_path, device=self.device)
+        return im, index
+
     @property
     def center(self):
         return Tensor([self.tx, self.ty, self.tz]).to(self.device)

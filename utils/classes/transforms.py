@@ -37,217 +37,47 @@ class Compose(object):
         return sample
 
 
-class PerspectiveTransform:
-    """Register an image to another one following the perspective Transform matrix"""
-    _matrix = None
-    _inverse_matrix = None
-    _shape = None
-    _center = None
-    _map = None
-    _inverse_map = None
-
-    def __init__(self, matrix, shape, device, center=()):
-        self.device = device
-        self.update(matrix, shape, center)
-
-    def __call__(self, image, image_ref, reverse=False):
-        pass
-
-    def __mul__(self, other):
-        matrix = other.inverse_matrix @ self.matrix
-        return PerspectiveTransform(matrix, self.shape, self.device, self.center)
-
-    def __truediv__(self, other):
-        matrix = other.matrix @ self.inverse_matrix
-        return PerspectiveTransform(matrix, self.shape, self.device, self.center)
-
-    def __add__(self, other):
-        return self * other
-
-    def __sub__(self, other):
-        return self / other
-
-    def update_matrix(self, matrix):
-        self._matrix = Tensor(matrix).to(self.device)  # [3, 3]
-        i_matrix = torch.linalg.inv(self.matrix)  # [3, 3]
-        self._inverse_matrix = Tensor(i_matrix).to(self.device)  # [3, 3]
-
-    def update_shape(self, shape):
-        self._shape = Tensor(shape).to(self.device)
-
-    def update_center(self, center):
-        c = center if center else (int(self.shape[0] / 2), int(self.shape[1] / 2))
-        self._center = Tensor(c).to(self.device)
-
-    def update(self, matrix, shape, center=None):
-        self.update_shape(shape)
-        self.update_matrix(matrix)
-        self.update_center(center)
-        self._init_map_()
-
-    def _init_map_(self):
-        height, width = self.shape[0], self.shape[1]
-        grid_reg = kornia.utils.create_meshgrid(height, width, normalized_coordinates=False,
-                                                device=self.device)  # [1 H W 2]
-        grid_reg[:, :, :, 0] = grid_reg[:, :, :, 0] - self.center[1]
-        grid_reg[:, :, :, 1] = grid_reg[:, :, :, 1] - self.center[0]
-        z = torch.ones_like(grid_reg[:, :, :, 0])
-        grid = torch.stack([grid_reg, z], dim=-1)  # [1 H W 3]
-
-        grid_transformed = (self.matrix @ grid.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)  # [1 H W 3]
-        alpha = grid_transformed[:, :, :, 2]
-        grid_transformed[:, :, :, 0] = 2 * (grid_transformed[:, :, :, 0] / alpha) / width - 1  # [1 H W 3]
-        grid_transformed[:, :, :, 1] = 2 * (grid_transformed[:, :, :, 1] / alpha) / height - 1  # [1 H W 3]
-        self._map = grid_transformed  # [1 H W 3]
-
-        grid_transformed_inv = (self.inverse_matrix @ grid.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)  # [1 H W 3]
-        grid_transformed_inv[:, :, :, 0] = 2 * (
-                grid_transformed_inv[:, :, :, 0] / grid_transformed_inv[:, :, :, 2]) / width - 1  # [1 H W 3]
-        grid_transformed_inv[:, :, :, 1] = 2 * (
-                grid_transformed_inv[:, :, :, 1] / grid_transformed_inv[:, :, :, 2]) / height - 1  # [1 H W 3]
-        self._inverse_map = grid_transformed_inv  # [1 H W 3]
-
-    @property
-    def map(self):
-        return self._map
-
-    # @map.setter
-    # def map(self, value):
-    #     """Return the calling function's name."""
-    #     # Ref: https://stackoverflow.com/a/57712700/
-    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
-    #     if name == '_init_map_' or name == '__new__':
-    #         self.map = value
-    #
-    # @map.deleter
-    # def map(self):
-    #     warnings.warn("The attribute can't be deleted")
-
-    @property
-    def inverse_map(self):
-        return self._inverse_map
-
-    #
-    # @inverse_map.setter
-    # def inverse_map(self, value):
-    #     """Return the calling function's name."""
-    #     # Ref: https://stackoverflow.com/a/57712700/
-    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
-    #     if name == '_init_map_' or name == '__new__':
-    #         self.inverse_map = value
-
-    @inverse_map.deleter
-    def inverse_map(self):
-        warnings.warn("The attribute can't be deleted")
-
-    @property
-    def matrix(self):
-        return self._matrix
-
-    # @matrix.setter
-    # def matrix(self, value):
-    #     """Return the calling function's name."""
-    #     # Ref: https://stackoverflow.com/a/57712700/
-    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
-    #     if name == 'update_matrix' or name == '__new__':
-    #         self.matrix = value
-    #
-    # @matrix.deleter
-    # def matrix(self):
-    #     warnings.warn("The attribute can't be deleted")
-
-    @property
-    def inverse_matrix(self):
-        return self._matrix
-
-    # @inverse_matrix.setter
-    # def inverse_matrix(self, value):
-    #     """Return the calling function's name."""
-    #     # Ref: https://stackoverflow.com/a/57712700/
-    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
-    #     if name == 'update_matrix' or name == '__new__':
-    #         self.inverse_matrix = value
-    #
-    # @inverse_matrix.deleter
-    # def inverse_matrix(self):
-    #     warnings.warn("The attribute can't be deleted")
-
-    @property
-    def shape(self):
-        return self._shape
-
-    #
-    # @shape.setter
-    # def shape(self, value):
-    #     """Return the calling function's name."""
-    #     # Ref: https://stackoverflow.com/a/57712700/
-    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
-    #     if name == 'update_shape' or name == '__new__':
-    #         self.shape = value
-    #
-    # @shape.deleter
-    # def shape(self):
-    #     warnings.warn("The attribute can't be deleted")
-
-    @property
-    def center(self):
-        return self._center
-
-    # @center.setter
-    # def center(self, value):
-    #     """Return the calling function's name."""
-    #     # Ref: https://stackoverflow.com/a/57712700/
-    #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
-    #     if name == 'update_center' or name == '__new__':
-    #         self.center = value
-    #
-    # @center.deleter
-    # def center(self):
-    #     warnings.warn("The attribute can't be deleted")
-
-
 class Pad:
-    def __init__(self, shape, keep_ratio=False):
+    def __init__(self, inference_size, keep_ratio=False):
         self.keep_ratio = keep_ratio
-        self.shape = shape
-        self.pad = [0, 0, 0, 0]
-        self.inference_size = [0, 0]
-        self.ori_size = [0, 0]
+        self.pad = []
+        self.inference_size = inference_size
+        self.ori_size = []
 
-    def __call__(self, sample, device, *args):
-        _, _, h, w = sample['left'].shape
-        self.ori_size = [h, w]
-        if self.keep_ratio:
-            while h > self.shape[0] or w > self.shape[1]:
-                sample['left'] = F1.interpolate(sample['left'], size=[round(h * 0.5), round(w * 0.5)],
-                                                mode='bilinear',
-                                                align_corners=True)
-                sample['right'] = F1.interpolate(sample['right'], size=[round(h * 0.5), round(w * 0.5)],
-                                                 mode='bilinear',
-                                                 align_corners=True)
-                _, _, h, w = sample['left'].shape
-        else:
-            if h > self.shape[0] or w > self.shape[1]:
-                if h / self.shape[0] >= w / self.shape[1]:
-                    w = w * self.shape[0] / h
-                    h = self.shape[0]
-                else:
-                    h = h * self.shape[1] / w
-                    w = self.shape[1]
-                sample['left'] = F1.interpolate(sample['left'], size=[int(h), int(w)],
-                                                mode='bilinear',
-                                                align_corners=True)
-                sample['right'] = F1.interpolate(sample['right'], size=[int(h), int(w)],
-                                                 mode='bilinear',
-                                                 align_corners=True)
-        self.__pad__(int(h), int(w))
-        sample['left'] = F.pad(sample['left'], self.pad, fill=0, padding_mode='edge')
-        sample['right'] = F.pad(sample['right'], self.pad, fill=0, padding_mode='edge')
-        _, _, h, w = sample['left'].shape
-        self.inference_size = [h, w]
+    def __call__(self, sample, device, *args, **kwargs):
+        for key in sample.keys():
+            h, w = sample[key].shape[-2:]
+            self.ori_size.append([h, w])
+            if self.keep_ratio:
+                while h > self.inference_size[0] or w > self.inference_size[1]:
+                    sample[key] = sample[key].pyrDown()
+                    h, w = sample[key].shape[-2:]
+            else:
+                if h > self.inference_size[0] or w > self.inference_size[1]:
+                    if h / self.inference_size[0] >= w / self.inference_size[1]:
+                        w = w * self.inference_size[0] / h
+                        h = self.inference_size[0]
+                    else:
+                        h = h * self.inference_size[1] / w
+                        w = self.inference_size[1]
+                        sample[key] = F1.interpolate(sample[key], size=[int(h), int(w)],
+                                                     mode='bilinear',
+                                                     align_corners=True)
+            self._pad(int(h), int(w))
+            sample[key] = sample[key].pad(self.pad[-1])
         return sample
 
-    def __pad__(self, h: int, w: int):
+    @property
+    def inference_size(self):
+        return self._inference_size
+
+    @inference_size.setter
+    def inference_size(self, value):
+        self._inference_size = value
+        self.ori_size = []
+        self.pad = []
+
+    def _pad(self, h: int, w: int):
         """
         The pad method modify the parameter pad of the Pad object to put a list :
         [pad_left, pad_top, pad_right, pad_bottom]
@@ -255,13 +85,13 @@ class Pad:
         :param w: Current width of the image
         :return: Nothing, modify the attribute "pad" of the object
         """
-        pad_h = (self.shape[0] - h) / 2
+        pad_h = (self.inference_size[0] - h) / 2
         t_pad = pad_h if pad_h % 1 == 0 else pad_h + 0.5
         b_pad = pad_h if pad_h % 1 == 0 else pad_h - 0.5
-        pad_w = (self.shape[1] - w) / 2
+        pad_w = (self.inference_size[1] - w) / 2
         l_pad = pad_w if pad_w % 1 == 0 else pad_w + 0.5
         r_pad = pad_w if pad_w % 1 == 0 else pad_w - 0.5
-        self.pad = [int(l_pad), int(t_pad), int(r_pad), int(b_pad)]
+        self.pad.append([int(l_pad), int(r_pad), int(t_pad), int(b_pad)])
 
 
 class Unpad:
@@ -269,17 +99,23 @@ class Unpad:
         self.pad = pad
         self.ori_size = ori_size
 
-    def __call__(self, image, device, *args):
-        _, h, w = image.shape
-        image = F.crop(image,
-                       self.pad[1], self.pad[0],
-                       h - self.pad[1] - self.pad[3],
-                       w - self.pad[0] - self.pad[2])
-
-        im = F1.interpolate(image.unsqueeze(1), size=[self.ori_size[0], self.ori_size[1]],
-                            mode='bilinear',
-                            align_corners=True).squeeze(1)
-        return im * self.ori_size[1] / float(w)
+    def __call__(self, disp, device, *args, size=0, **kwargs):
+        h, w = disp.shape[-2:]
+        size = size if size is not None else self.ori_size
+        l_pad, r_pad, t_pad, b_pad = self.pad[0]
+        disp = disp[:, :, :, l_pad:] if l_pad > 0 else disp
+        disp = disp[:, :, :, :-r_pad] if r_pad > 0 else disp
+        disp = disp[:, :, t_pad:, :] if t_pad > 0 else disp
+        disp = disp[:, :, :-b_pad, :] if b_pad > 0 else disp
+        self.pad.pop(0)
+        if size == 0:
+            pass
+        elif h != size[0] or w != size[1]:
+            disp = F1.interpolate(disp, size=[size[0], size[1]],
+                                  mode='bilinear',
+                                  align_corners=True)
+            disp *= size[1] / w
+        return disp
 
 
 class Normalize(object):
@@ -295,7 +131,7 @@ class Normalize(object):
         else:
             self.std = [0, 0, 0]
 
-    def __call__(self, sample, *args):
+    def __call__(self, sample, *args, **kwargs):
 
         for key in sample.keys():
             # Images have converted to tensor, with shape [C, H, W]
@@ -312,7 +148,7 @@ class Resize(object):
         self.inference_size = inference_size
         self.ori_size = []
 
-    def __call__(self, sample, *args):
+    def __call__(self, sample, *args, **kwargs):
         self.ori_size = []
         key_ref = list(sample.keys())[0]
         if self.inference_size is None:
@@ -322,8 +158,9 @@ class Resize(object):
                     int(np.ceil(sample[key_ref].size(-1) / self.padding_factor)) * self.padding_factor]
             else:
                 pass
+            self.inference_size = self.ori_size
 
-        if self.inference_size is not None:
+        else:
             for key in sample.keys():
                 ori_size = sample[key].shape[-2:]
                 self.ori_size.append(ori_size)
@@ -331,8 +168,6 @@ class Resize(object):
                     sample[key] = F1.interpolate(sample[key], size=self.inference_size,
                                                  mode='bilinear',
                                                  align_corners=True)
-        else:
-            self.inference_size = self.ori_size
         return sample
 
 
@@ -345,7 +180,7 @@ class ResizeDepth(object):
         else:
             self.size = 0
 
-    def __call__(self, depth, device, *args, size=None):
+    def __call__(self, depth, device, *args, size=None, **kwargs):
         h, w = depth.shape[-2:]
         size = size if size is not None else self.size
         if size == 0:
@@ -368,7 +203,7 @@ class ResizeDisp(object):
         else:
             self.size = 0
 
-    def __call__(self, disp, device, *args, size=None):
+    def __call__(self, disp, device, *args, size=None, **kwargs):
         h, w = disp.shape[-2:]
         size = size if size is not None else self.size
         if size == 0:
@@ -390,7 +225,7 @@ class DispSide(object):
         self.disp_right = disp_right
         self.disp_bidir = disp_bidir
 
-    def __call__(self, sample, *args):
+    def __call__(self, sample, *args, **kwargs):
         if self.disp_right:
             sample["left"], sample["right"] = hflip(sample["right"]), hflip(sample["left"])
         elif self.disp_bidir:
@@ -406,7 +241,7 @@ class ToTensor(object):
     def __init__(self, no_normalize=False):
         self.no_normalize = no_normalize
 
-    def __call__(self, sample, device, *args):
+    def __call__(self, sample, device, *args, **kwargs):
         if isinstance(sample, dict):
             for key in sample.keys():
                 sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
@@ -428,20 +263,187 @@ class ToFloatTensor(object):
     def __init__(self, no_normalize=False):
         self.no_normalize = no_normalize
 
-    def __call__(self, sample, device, *args):
+    def __call__(self, sample, device, *args, **kwargs):
         if isinstance(sample, dict):
             for key in sample.keys():
-                sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
-                if self.no_normalize:
-                    sample[key] = torch.cuda.FloatTensor(sample[key])
-                else:
-                    sample[key] = torch.cuda.FloatTensor(sample[key] / 255.)
-                sample[key] = sample[key].to(device).unsqueeze(0)
+                sample[key] = sample[key].to(torch.cuda.FloatTensor)
+                # sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
+                # if self.no_normalize:
+                #     sample[key] = torch.cuda.FloatTensor(sample[key])
+                # else:
+                #     sample[key] = torch.cuda.FloatTensor(sample[key] / 255.)
+                # sample[key] = sample[key].to(device).unsqueeze(0)
         else:
-            sample = np.transpose(sample, (2, 0, 1))
-            sample = torch.cuda.FloatTensor(sample / 255.)
-            sample = sample.to(device).unsqueeze(0)
+            sample = sample.to(torch.cuda.FloatTensor)
         return sample
+
+# class PerspectiveTransform:
+#     """Register an image to another one following the perspective Transform matrix"""
+#     _matrix = None
+#     _inverse_matrix = None
+#     _shape = None
+#     _center = None
+#     _map = None
+#     _inverse_map = None
+#
+#     def __init__(self, matrix, shape, device, center=()):
+#         self.device = device
+#         self.update(matrix, shape, center)
+#
+#     def __call__(self, image, image_ref, reverse=False):
+#         pass
+#
+#     def __mul__(self, other):
+#         matrix = other.inverse_matrix @ self.matrix
+#         return PerspectiveTransform(matrix, self.shape, self.device, self.center)
+#
+#     def __truediv__(self, other):
+#         matrix = other.matrix @ self.inverse_matrix
+#         return PerspectiveTransform(matrix, self.shape, self.device, self.center)
+#
+#     def __add__(self, other):
+#         return self * other
+#
+#     def __sub__(self, other):
+#         return self / other
+#
+#     def update_matrix(self, matrix):
+#         self._matrix = Tensor(matrix).to(self.device)  # [3, 3]
+#         i_matrix = torch.linalg.inv(self.matrix)  # [3, 3]
+#         self._inverse_matrix = Tensor(i_matrix).to(self.device)  # [3, 3]
+#
+#     def update_shape(self, shape):
+#         self._shape = Tensor(shape).to(self.device)
+#
+#     def update_center(self, center):
+#         c = center if center else (int(self.shape[0] / 2), int(self.shape[1] / 2))
+#         self._center = Tensor(c).to(self.device)
+#
+#     def update(self, matrix, shape, center=None):
+#         self.update_shape(shape)
+#         self.update_matrix(matrix)
+#         self.update_center(center)
+#         self._init_map_()
+#
+#     def _init_map_(self):
+#         height, width = self.shape[0], self.shape[1]
+#         grid_reg = kornia.utils.create_meshgrid(height, width, normalized_coordinates=False,
+#                                                 device=self.device)  # [1 H W 2]
+#         grid_reg[:, :, :, 0] = grid_reg[:, :, :, 0] - self.center[1]
+#         grid_reg[:, :, :, 1] = grid_reg[:, :, :, 1] - self.center[0]
+#         z = torch.ones_like(grid_reg[:, :, :, 0])
+#         grid = torch.stack([grid_reg, z], dim=-1)  # [1 H W 3]
+#
+#         grid_transformed = (self.matrix @ grid.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)  # [1 H W 3]
+#         alpha = grid_transformed[:, :, :, 2]
+#         grid_transformed[:, :, :, 0] = 2 * (grid_transformed[:, :, :, 0] / alpha) / width - 1  # [1 H W 3]
+#         grid_transformed[:, :, :, 1] = 2 * (grid_transformed[:, :, :, 1] / alpha) / height - 1  # [1 H W 3]
+#         self._map = grid_transformed  # [1 H W 3]
+#
+#         grid_transformed_inv = (self.inverse_matrix @ grid.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)  # [1 H W 3]
+#         grid_transformed_inv[:, :, :, 0] = 2 * (
+#                 grid_transformed_inv[:, :, :, 0] / grid_transformed_inv[:, :, :, 2]) / width - 1  # [1 H W 3]
+#         grid_transformed_inv[:, :, :, 1] = 2 * (
+#                 grid_transformed_inv[:, :, :, 1] / grid_transformed_inv[:, :, :, 2]) / height - 1  # [1 H W 3]
+#         self._inverse_map = grid_transformed_inv  # [1 H W 3]
+#
+#     @property
+#     def map(self):
+#         return self._map
+#
+#     # @map.setter
+#     # def map(self, value):
+#     #     """Return the calling function's name."""
+#     #     # Ref: https://stackoverflow.com/a/57712700/
+#     #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+#     #     if name == '_init_map_' or name == '__new__':
+#     #         self.map = value
+#     #
+#     # @map.deleter
+#     # def map(self):
+#     #     warnings.warn("The attribute can't be deleted")
+#
+#     @property
+#     def inverse_map(self):
+#         return self._inverse_map
+#
+#     #
+#     # @inverse_map.setter
+#     # def inverse_map(self, value):
+#     #     """Return the calling function's name."""
+#     #     # Ref: https://stackoverflow.com/a/57712700/
+#     #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+#     #     if name == '_init_map_' or name == '__new__':
+#     #         self.inverse_map = value
+#
+#     @inverse_map.deleter
+#     def inverse_map(self):
+#         warnings.warn("The attribute can't be deleted")
+#
+#     @property
+#     def matrix(self):
+#         return self._matrix
+#
+#     # @matrix.setter
+#     # def matrix(self, value):
+#     #     """Return the calling function's name."""
+#     #     # Ref: https://stackoverflow.com/a/57712700/
+#     #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+#     #     if name == 'update_matrix' or name == '__new__':
+#     #         self.matrix = value
+#     #
+#     # @matrix.deleter
+#     # def matrix(self):
+#     #     warnings.warn("The attribute can't be deleted")
+#
+#     @property
+#     def inverse_matrix(self):
+#         return self._matrix
+#
+#     # @inverse_matrix.setter
+#     # def inverse_matrix(self, value):
+#     #     """Return the calling function's name."""
+#     #     # Ref: https://stackoverflow.com/a/57712700/
+#     #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+#     #     if name == 'update_matrix' or name == '__new__':
+#     #         self.inverse_matrix = value
+#     #
+#     # @inverse_matrix.deleter
+#     # def inverse_matrix(self):
+#     #     warnings.warn("The attribute can't be deleted")
+#
+#     @property
+#     def shape(self):
+#         return self._shape
+#
+#     #
+#     # @shape.setter
+#     # def shape(self, value):
+#     #     """Return the calling function's name."""
+#     #     # Ref: https://stackoverflow.com/a/57712700/
+#     #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+#     #     if name == 'update_shape' or name == '__new__':
+#     #         self.shape = value
+#     #
+#     # @shape.deleter
+#     # def shape(self):
+#     #     warnings.warn("The attribute can't be deleted")
+#
+#     @property
+#     def center(self):
+#         return self._center
+#
+#     # @center.setter
+#     # def center(self, value):
+#     #     """Return the calling function's name."""
+#     #     # Ref: https://stackoverflow.com/a/57712700/
+#     #     name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+#     #     if name == 'update_center' or name == '__new__':
+#     #         self.center = value
+#     #
+#     # @center.deleter
+#     # def center(self):
+#     #     warnings.warn("The attribute can't be deleted")
 
 #
 #
