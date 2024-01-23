@@ -19,6 +19,7 @@ def perspective2grid(matrix, shape, device):
     grid_transformed[:, :, :, 1] = 2 * (grid_transformed[:, :, :, 1] / alpha) / height - 1  # [1 H W 3]
     return grid_transformed[..., :2]  # [1 H W 2]
 
+
 def histogram_equalization(image, method=0):
     if method == 0:
         return image

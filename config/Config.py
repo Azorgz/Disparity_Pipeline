@@ -59,9 +59,8 @@ class ConfigPipe(dict):
             self["dataset"]["number_of_sample"] = len(config["indexes"])
             self["dataset"]["indexes"] = config["indexes"]
         else:
-            self["dataset"]["number_of_sample"] = config["number_of_sample"]
+            self["dataset"]["number_of_sample"] = eval(config["number_of_sample"])
             self["dataset"]["indexes"] = None
-        # self["dataset"]["save_file_list_in_conf"] = config["save_file_list_in_conf"]
 
     def config_setup(self, config):
         self["setup"] = {}

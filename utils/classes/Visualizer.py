@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from utils.classes import ImageTensor
 from utils.classes.VideoGenerator import VideoGenerator
-from utils.gradient_tools import grad_tensor, grad
+from utils.gradient_tools import grad_tensor_image, grad_image
 
 
 class Visualizer:
@@ -386,13 +386,13 @@ class Visualizer:
 
     def _create_grad_im(self, new_im, ref_im, target_im, mask):
         if self.tensor:
-            grad_new = grad_tensor(new_im, self.device)
-            grad_ref = grad_tensor(ref_im, self.device)
-            grad_target = grad_tensor(target_im, self.device)
+            grad_new = grad_tensor_image(new_im, self.device)
+            grad_ref = grad_tensor_image(ref_im, self.device)
+            grad_target = grad_tensor_image(target_im, self.device)
         else:
-            grad_new = grad(new_im)
-            grad_ref = grad(ref_im)
-            grad_target = grad(target_im)
+            grad_new = grad_image(new_im)
+            grad_ref = grad_image(ref_im)
+            grad_target = grad_image(target_im)
         im = (grad_new * mask / 2 + grad_target * mask / 2).vstack(grad_ref / 2 + grad_target / 2)
 
         return im

@@ -186,7 +186,7 @@ class KenburnDepth(nn.Module):
 
     @torch.no_grad()
     def forward(self, images: Union[np.array, torch.tensor, ImageTensor, list, dict], *args,
-                focal: Union[list, float, int] = 1, **kwargs):
+                focal: Union[list, float, int] = 1, intrinsics: Union[list, tensor] = torch.eye(4).unsqueeze(0), **kwargs):
         """
         Takes as many images as input as you want. It will predict their depth successively
         The focal argument need to be only one float or int (in mm) or a list (1 per images)
@@ -202,6 +202,12 @@ class KenburnDepth(nn.Module):
             images = [images]
         if args:
             images.append(*kwargs)
+        if not isinstance(intrinsics, list):
+            intrinsics = [intrinsics]
+        if len(intrinsics) > 1:
+            assert len(intrinsics) == len(images)
+        else:
+            intrinsics = [intrinsics[0] for i in range(len(images))]
         if not isinstance(focal, list):
             focal = [focal]
         if len(focal) > 1:
@@ -209,15 +215,16 @@ class KenburnDepth(nn.Module):
         else:
             focal = [focal[0] for i in range(len(images))]
         depth = []
-        for image, f in zip(images, focal):
+        for image, intrinsic, f in zip(images, intrinsics, focal):
             image = Tensor(image)
+            fx = intrinsic[0, 0, 0]
+            dx = intrinsic[0, 0, 2]*2
             disparity = self._disparity_estimation(image)
             if self.semantic_adjustment:
                 disparity = self._disparity_adjustment(image, disparity)
             disparity = self._disparity_refinement(image, disparity)
-            disparity = disparity# / 1024 * disparity.shape[-1]
-            tenDepth = f * 40*1e-3 / (disparity + 0.0000001)
-            print(f'Max : {disparity.max()}, Min : {disparity.min()}')
+            disparity = disparity / dx * 1024
+            tenDepth = fx * 40 * 1e-3 / (disparity + 0.0000001)
             depth.append(tenDepth)
         if names:
             return {name: d for name, d in zip(names, depth)}

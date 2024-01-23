@@ -110,7 +110,6 @@ class Semantics(torch.nn.Module):
         tenPreprocessed = tenPreprocessed * torch.tensor(data=[1.0 / 0.229, 1.0 / 0.224, 1.0 / 0.225],
                                                          dtype=tenPreprocessed.dtype,
                                                          device=tenPreprocessed.device).view(1, 3, 1, 1)
-
         return self.netVgg(tenPreprocessed)
 
 

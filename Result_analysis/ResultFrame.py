@@ -39,10 +39,11 @@ class ResultFrame:
                     data[key]['delta_occ'] = np.array(data[key]['new_occ']) / np.array(data[key]['ref']) - 1
                     # data[key]['delta_occ'][data[key]['ref'] == 0] = 0.
                     if self.mask_outlier is None:
-                        self.mask_outlier = np.array(data[key]['ref']) <= np.quantile(np.array(data[key]['ref']), 0.01)
+                        lim = np.array(data[key]['ref']).std() / 2
+                        self.mask_outlier = lim > np.array(data[key]['ref'])
                     else:
-                        self.mask_outlier = (np.array(data[key]['ref']) <= np.quantile(np.array(data[key]['ref']),
-                                                                                       0.01)) + self.mask_outlier
+                        lim = np.array(data[key]['ref']).std()/2
+                        self.mask_outlier = (lim > np.array(data[key]['ref'])) + self.mask_outlier
                     data[key]['delta'], data[key]['delta_occ'] = data[key]['delta'].tolist(), data[key][
                         'delta_occ'].tolist()
 
@@ -133,7 +134,10 @@ class ValFrame(DataFrame):
         return ValFrame({k: vec[key] for k, vec in self.items()})
 
     def show(self, index=None, ref=0):
-        idx = {f'{k} delta': vec * 100 for k, vec in self.items() if k == index}
+        if index is not None:
+            idx = {f'{k} delta': vec * 100 for k, vec in self.items() if k == index}
+        else:
+            idx = {f'{k} delta': vec * 100 for k, vec in self.items()}
         if f'{index} delta' in idx.keys():
             idx['0%'] = ref * idx[f'{index} delta']
             m = round(idx[f'{index} delta'].mean(), 3)

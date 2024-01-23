@@ -1,12 +1,10 @@
-import numpy as np
 import cv2 as cv
+import numpy as np
+import torch
 from kornia import pi
 from kornia.color import hsv_to_rgb
-from kornia.morphology import dilation
-
-# from utils.classes.Image import ImageCustom
+from kornia.filters import median_blur
 from torchmetrics.functional import image_gradients
-import torch
 from torchvision.transforms.functional import gaussian_blur
 
 from utils.classes import ImageTensor
@@ -20,7 +18,7 @@ def normalisation_tensor(image):
         return image
 
 
-def grad(image: ImageTensor) -> ImageTensor:
+def grad_image(image: ImageTensor) -> ImageTensor:
     image = image.GRAYSCALE().squeeze().cpu().numpy()
     Ix = cv.Sobel(image, cv.CV_64F, 1, 0, borderType=cv.BORDER_REFLECT_101)
     Iy = cv.Sobel(image, cv.CV_64F, 0, 1, borderType=cv.BORDER_REFLECT_101)
@@ -40,11 +38,11 @@ def grad(image: ImageTensor) -> ImageTensor:
     return ImageTensor(output)
 
 
-def grad_tensor(image_tensor, device):
+def grad_tensor_image(image_tensor: ImageTensor, device=None) -> ImageTensor:
     im_t = image_tensor.put_channel_at(1)
     c = image_tensor.shape[1]
     ratio = torch.sum(image_tensor > 0)/(image_tensor.shape[3]*image_tensor.shape[2])
-    im_t = gaussian_blur(im_t, [3, 3])
+    im_t = gaussian_blur(im_t, [5, 5])
     dy, dx = image_gradients(im_t)
     if c > 1:
         dx, dy = torch.sum(dx, dim=1) / 3, torch.sum(dy, dim=1) / 3
@@ -64,3 +62,24 @@ def grad_tensor(image_tensor, device):
     h[mask] = 0
     output = hsv_to_rgb(torch.stack([h, s, v], dim=1).squeeze(2))
     return output
+
+
+def grad_tensor(image_tensor) -> ImageTensor:
+    im_t = image_tensor.put_channel_at(1)
+    c = image_tensor.shape[1]
+    ratio = torch.sum(image_tensor > 0)/(image_tensor.shape[3]*image_tensor.shape[2])
+    im_t = median_blur(im_t, (5, 5))
+    dy, dx = image_gradients(im_t)
+    if c > 1:
+        dx, dy = torch.sum(dx, dim=1) / 3, torch.sum(dy, dim=1) / 3
+    grad_im = torch.sqrt(dx ** 2 + dy ** 2)
+    m = torch.mean(grad_im)
+    grad_im[grad_im < m * 2 / ratio] = 0
+    grad_im[grad_im > m * 5] = 5 * m
+    # kernel = torch.ones(3, 3).to(device)
+    # grad_im = dilation(grad_im.unsqueeze(0), kernel).squeeze(0)
+    mask = grad_im == 0
+    orient = torch.atan2(dy, dx)  # / np.pi * 180
+    orient[mask] = 0
+    grad_im = normalisation_tensor(grad_im)
+    return torch.stack([grad_im, orient], dim=1)

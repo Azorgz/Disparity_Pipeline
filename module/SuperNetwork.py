@@ -269,7 +269,7 @@ class SuperNetwork(BaseModule):
         else:
             sample = self.preprocessing_monocular(sample)
             if self.name_monocular == "KenBurnDepth":
-                res = self.model_monocular(sample, focal=focal)
+                res = self.model_monocular(sample, focal=focal, intrinsics=intrinsics)
             else:
                 warnings.warn('This Network is not implemented')
                 return 0

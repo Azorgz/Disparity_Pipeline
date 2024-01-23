@@ -367,7 +367,9 @@ class Process(OrderedDict):
                 pipe.network.update_size(pipe.config['monocular_depth_network']["network_args"].inference_size,
                                          task='monocular')
             setup_ = kwargs['setup'] if 'setup' in kwargs.keys() else setup
-            new_sample = {'sample': {cam: sample[cam] for cam in cams}, 'focal': [setup_.cameras[cam].intrinsics[0, 0, 0] for cam in cams]}
+            new_sample = {'sample': {cam: sample[cam] for cam in cams},
+                          'focal': [setup_.cameras[cam].f for cam in cams],
+                          'intrinsics': [setup_.cameras[cam].intrinsics for cam in cams]}
             output = pipe.network(**new_sample, task='monocular')
             res['pred_depth'].update(output)
 

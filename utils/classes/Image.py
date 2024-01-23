@@ -1,7 +1,9 @@
+import inspect
 import os
 import warnings
 from os.path import *
-from typing import Union
+from types import FrameType
+from typing import Union, cast
 
 import PIL.Image
 import cv2 as cv
@@ -498,6 +500,7 @@ class DepthTensor(ImageTensor):
     """
     _max_value = 0
     _min_value = 0
+    _scaled = False
     _ori_shape = None
     _mode_list = ['L', 'RGB']
     _im_type = 'Depth'
@@ -509,10 +512,7 @@ class DepthTensor(ImageTensor):
         assert len(inp.shape) == 2
         max_value = inp.max()
         min_value = inp.min()
-        if isinstance(inp, ImageTensor):
-            inp_ = (inp - min_value) / (max_value - min_value)
-        else:
-            inp_ = ImageTensor((inp - min_value) / (max_value - min_value))
+        inp_ = (inp - min_value) / (max_value - min_value)
         inp_ = super().__new__(cls, inp_, device=device)
         inp_._max_value = max_value
         inp_._min_value = min_value
@@ -585,17 +585,33 @@ class DepthTensor(ImageTensor):
         a = super().normalize(minmax=minmax, keep_abs_max=keep_abs_max)
         return a
 
+    @property
+    def scaled(self):
+        return self._scaled
+
+    @scaled.setter
+    def scaled(self, value):
+        """Only settable by the scale and unscale and new methods"""
+        # Ref: https://stackoverflow.com/a/57712700/
+        name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
+        if name == 'scale' or name == 'unscale' or name == '__new__':
+            self._scaled = value
+
     def scale(self):
-        if self.max() <= 1:
-            return self.clone() * (self.max_value - self.min_value) + self.min_value
+        new = self.clone()
+        if not new.scaled:
+            new.scaled = True
+            return new * (new.max_value - new.min_value) + new.min_value
         else:
-            return self.clone()
+            return new
 
     def unscale(self):
-        if self.max() != 1:
-            return (self.clone() - self.min_value) / (self.max_value - self.min_value)
+        new = self.clone()
+        if new.scaled:
+            new.scaled = False
+            return (new - new.min_value) / (new.max_value - new.min_value)
         else:
-            return self.clone()
+            return new
 
     def inverse_depth(self, remove_zeros=False):
         if remove_zeros:

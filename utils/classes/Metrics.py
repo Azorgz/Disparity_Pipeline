@@ -223,15 +223,47 @@ class Metric_nec_tensor(BaseMetric_Tensor):
 
     def __call__(self, im1, im2, *args, mask=None, **kwargs):
         super().__call__(im1, im2, *args, mask=mask, **kwargs)
-        ref_true = grad_tensor(self.image_true, self.device)
-        ref_test = grad_tensor(self.image_test, self.device)
-        ref_true = ref_true / ref_true.max()
-        ref_test = ref_test / ref_test.max()
+        ref_true = grad_tensor(self.image_true)
+        ref_test = grad_tensor(self.image_test)
         if mask is not None:
             ref_true = ref_true.flatten(start_dim=2)[:, :, self.mask[0, 0, :, :].flatten()]
             ref_test = ref_test.flatten(start_dim=2)[:, :, self.mask[0, 0, :, :].flatten()]
-        self.value = torch.sum(ref_true * ref_test) / torch.sqrt(torch.sum(ref_true * ref_true) * torch.sum(ref_test * ref_test))
+            dot_prod = torch.abs(torch.cos(ref_true[0, 1, :] - ref_test[0, 1, :]))
+            self.value = ((ref_true[:, 0, :]*ref_test[:, 0, :] * dot_prod).sum() /
+                          torch.sqrt(torch.sum(ref_true[:, 0, :] * ref_true[:, 0, :]) * torch.sum(ref_test[:, 0, :] * ref_test[:, 0, :])))
+        else:
+            dot_prod = torch.abs(torch.cos(ref_true[:, 1, :, :] - ref_test[:, 1, :, :]))
+            self.value = ((ref_true[:, 0, :, :]*ref_test[:, 0, :, :]*dot_prod).sum() /
+                          torch.sqrt(torch.sum(ref_true[:, 0, :, :] * ref_true[:, 0, :, :]) * torch.sum(ref_test[:, 0, :, :] * ref_test[:, 0, :, :])))
+        # self.value = torch.sum(ref_true * ref_test) / torch.sqrt(torch.sum(ref_true * ref_true) * torch.sum(ref_test * ref_test))
         return self.value
+
+# class Metric_nec_tensor(BaseMetric_Tensor):
+#     def __init__(self, device):
+#         super().__init__(device)
+#         self.metric = "Edges Correlation"
+#         self.commentary = "The higher, the better"
+#         self.range_min = 0
+#         self.range_max = 1
+#
+#     def __call__(self, im1, im2, *args, mask=None, **kwargs):
+#         super().__call__(im1, im2, *args, mask=mask, **kwargs)
+#         ref_true = grad_tensor(self.image_true, self.device)
+#         ref_test = grad_tensor(self.image_test, self.device)
+#         ref_true = ref_true / ref_true.max()
+#         ref_test = ref_test / ref_test.max()
+#         if mask is not None:
+#             ref_true = ref_true.flatten(start_dim=2)[:, :, self.mask[0, 0, :, :].flatten()]
+#             ref_test = ref_test.flatten(start_dim=2)[:, :, self.mask[0, 0, :, :].flatten()]
+#             # dot_prod = torch.abs(torch.cos(ref_true[:, 1:, :] - ref_test[:, 1:, :]))
+#             # self.value = ((ref_true[:, :1, :]*ref_test[:, :1, :] * dot_prod).sum() /
+#             #               torch.sqrt(torch.sum(ref_true[:, :1, :] * ref_true[:, :1, :]) * torch.sum(ref_test[:, :1, :] * ref_test[:, :1, :])))
+#         # else:
+#         #     dot_prod = torch.abs(torch.cos(ref_true[:, 1:, :, :] - ref_test[:, 1:, :, :]))
+#         #     self.value = ((ref_true[:, :1, :, :]*ref_test[:, :1, :, :]*dot_prod).sum() /
+#         #                   torch.sqrt(torch.sum(ref_true[:, :1, :, :] * ref_true[:, :1, :, :]) * torch.sum(ref_test[:, :1, :, :] * ref_test[:, :1, :, :])))
+#         self.value = torch.sum(ref_true * ref_test) / torch.sqrt(torch.sum(ref_true * ref_true) * torch.sum(ref_test * ref_test))
+#         return self.value
 
 ########
 # class BaseMetric:

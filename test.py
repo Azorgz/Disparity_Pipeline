@@ -28,36 +28,45 @@ from utils.misc import time_fct
 # import cv2 as cv
 # from utils.registration_tools import SIFT
 # from utils.visualization import result_visualizer, visual_control
+from utils.gradient_tools import grad_tensor
+
 
 device = torch.device('cuda')
-R = CameraSetup(from_file="/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera.yaml")
+R = CameraSetup(from_file="/home/aurelien/PycharmProjects/Disparity_Pipeline/Setup_Camera.yaml")
 NN = KenburnDepth(path_ckpt=os.getcwd() + "/Networks/KenburnDepth/pretrained",
                   semantic_adjustment=False,
                   device=device)
 # Depth
-im_dst, idx = R.cameras['RGB'].random_image()
-# im_dst = R.cameras['RGB'].__getitem__(2500)
-im_src = R.cameras['IR'].__getitem__(idx).RGB('gray')
+src = 'IR'
+dst = 'RGB'
 
-matrix_dst = R.cameras['RGB'].intrinsics[:, :3, :3]
-matrix_src = R.cameras['RGB2'].intrinsics[:, :3, :3]
-
-DepthTensor(time_fct(NN)(Tensor(im_dst.pyrDown().pyrDown()), focal=matrix_dst[0, 0, 0])[0].clip(0, 200)).show()
-DepthTensor(time_fct(NN)(Tensor(im_src.pyrDown()), focal=matrix_src[0, 0, 0])[0].clip(0, 200)).show()
-
-DepthTensor(time_fct(NN)(Tensor(im_dst.pyrDown()), focal=matrix_dst[0, 0, 0])[0].clip(0, 200)).show()
-DepthTensor(time_fct(NN)(Tensor(im_src), focal=matrix_src[0, 0, 0])[0].clip(0, 200)).show()
-
-DepthTensor(time_fct(NN)(Tensor(im_dst), focal=matrix_dst[0, 0, 0])[0].clip(0, 200)).show()
-DepthTensor(time_fct(NN)(Tensor(im_src.pyrUp()), focal=matrix_src[0, 0, 0])[0].clip(0, 200)).show()
+# im_dst, idx = R.cameras[dst].random_image()
+im_dst = R.cameras['RGB'].__getitem__(0)
+im_src = R.cameras[src].__getitem__(0).RGB('gray')
+im_src_new = ImageTensor("/home/aurelien/PycharmProjects/Disparity_Pipeline/results/methods_comparison/Depth-Depth/image_reg/IR_to_RGB/IR_000-Setup_Camera.png")
+matrix_dst = R.cameras[dst].intrinsics[:, :3, :3]
+f_dst = R.cameras[dst].f
+var_dst = {'focal': f_dst, 'intrinsics': matrix_dst}
+matrix_src = R.cameras[src].intrinsics[:, :3, :3]
+f_src = R.cameras[src].f
+var_src = {'focal': f_src, 'intrinsics': matrix_src}
 
 
-
-
-
+# DepthTensor(NN(Tensor(im_dst.pyrDown().pyrDown()), **var_dst)[0].clip(0, 200)).show()
+# DepthTensor(NN(Tensor(im_src.pyrDown()), **var_src)[0].clip(0, 200)).show()
+#
+# DepthTensor(NN(Tensor(im_dst.pyrDown()), **var_dst)[0].clip(0, 200)).show()
+# DepthTensor(NN(Tensor(im_src), **var_src)[0].clip(0, 200)).show()
+#
+# DepthTensor(NN(Tensor(im_dst), **var_dst)[0].clip(0, 200)).show()
+# DepthTensor(NN(Tensor(im_src.pyrUp()), **var_src)[0].clip(0, 200)).show()
 
 metric = Metric_nec_tensor(device)
 
+old = metric(im_dst, im_src)
+new = metric(im_dst, im_src_new)
+
+time.time()
 
 
 
