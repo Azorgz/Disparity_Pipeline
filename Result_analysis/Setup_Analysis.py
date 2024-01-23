@@ -1,20 +1,64 @@
 import os
 import time
-
-import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
-from Result_analysis.ResultFrame import ResultFrame, ValFrame
+from Result_analysis.ResultFrame import ResultFrame
 
-base_path = os.getcwd() + "/../results/"
-res = ResultFrame(base_path + "methods_comparison/Depth-Depth")
-print('Mean')
-print(res.delta.mean())
-print('Positif')
-val = (res.delta > 0).sum(0)/len(res.delta)
-val[0] = 1 - val[0]
-print(val)
+#     # Without Occlusion
+#     frame_mean = pd.DataFrame(
+#         {f"{f}": res.delta.mean().values},
+#         index=res.delta.mean().index)
+#     frames_mean = frame_mean.join(frames_mean)
+#     frame_std = pd.DataFrame(
+#         {f"{f}": res.delta.std().values},
+#         index=res.delta.mean().index)
+#     frames_std = frame_std.join(frames_std)
+#     data = ((res.delta > 0).sum(0) / len(res.delta)).values
+#     data[0] = 1 - data[0]
+#     frame_pos = pd.DataFrame(
+#         {f"{f}": data},
+#         index=res.delta.mean().index)
+#     frames_pos = frame_pos.join(frames_pos)
+#
+#     # With Occlusion
+#     frame_mean_occ = pd.DataFrame(
+#         {f"{f}": res.delta_occ.mean().values},
+#         index=res.delta_occ.mean().index)
+#     frames_mean_occ = frame_mean_occ.join(frames_mean_occ)
+#     frame_std_occ = pd.DataFrame(
+#         {f"{f}": res.delta_occ.std().values},
+#         index=res.delta_occ.mean().index)
+#     frames_std_occ = frame_std_occ.join(frames_std_occ)
+#     data = ((res.delta_occ > 0).sum(0) / len(res.delta_occ)).values
+#     data[0] = 1 - data[0]
+#     frame_pos_occ = pd.DataFrame(
+#         {f"{f}": data},
+#         index=res.delta_occ.mean().index)
+#     frames_pos_occ = frame_pos_occ.join(frames_pos_occ)
+#
+# with pd.ExcelWriter(f'{folder}.xlsx') as writer:
+#     frames_mean.to_excel(writer, sheet_name='Delta moyen')
+#     frames_mean_occ.to_excel(writer, sheet_name='Delta occ moyen')
+#     frames_std.to_excel(writer, sheet_name='Delta std')
+#     frames_std_occ.to_excel(writer, sheet_name='Delta occ std')
+#     frames_pos.to_excel(writer, sheet_name='Delta positif')
+#     frames_pos_occ.to_excel(writer, sheet_name='Delta occ positif')
+#
+# time.sleep(1)
 ### MULTI SETUP CONFIG ############
 
+folder = "camera_intrinsic_ir"
+base_path = os.getcwd() + "/../results/"
+
+frames_mean = pd.DataFrame()
+frames_std = pd.DataFrame()
+frames_pos = pd.DataFrame()
+frames_mean_occ = pd.DataFrame()
+frames_std_occ = pd.DataFrame()
+frames_pos_occ = pd.DataFrame()
+
+for f in reversed(os.listdir(base_path + folder)):
+    res = ResultFrame(base_path + folder + '/' + f)
 # res1 = ResultFrame(base_path + "camera_position_ir_finer/Depth-Depth")
 # cam = 'IR'
 # setup = 'raw test'
@@ -138,6 +182,5 @@ print(val)
 # plt.legend(['df mm', 'dpx um'])
 
 plt.show()
-
 
 time.sleep(1)
