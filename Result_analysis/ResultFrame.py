@@ -35,9 +35,9 @@ class ResultFrame:
                 self.mask_outlier = None
                 for key in data.keys():
                     data[key]['delta'] = np.array(data[key]['new']) / np.array(data[key]['ref']) - 1
-                    # data[key]['delta'][np.array(data[key]['ref']) == 0] = 0.
+                    data[key]['delta'][np.array(data[key]['ref']) == 0] = 0.
                     data[key]['delta_occ'] = np.array(data[key]['new_occ']) / np.array(data[key]['ref']) - 1
-                    # data[key]['delta_occ'][data[key]['ref'] == 0] = 0.
+                    data[key]['delta_occ'][data[key]['ref'] == 0] = 0.
                     if self.mask_outlier is None:
                         lim = np.array(data[key]['ref']).std() / 2
                         self.mask_outlier = lim > np.array(data[key]['ref'])

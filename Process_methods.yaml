@@ -4,7 +4,7 @@ Option:
   setup: # Paths to the config file of the pre-calibrated camera's setup
     path: Setup_Camera.yaml
   dataset:
-    number_of_sample: 1/10
+    number_of_sample: 1/3
     shuffle: False
   depth_network:
     name: unimatch

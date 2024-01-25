@@ -60,6 +60,8 @@ for f in reversed(os.listdir(base_path + folder)):
         {f"{k}": res.timer.iloc[1][k] for k in res.timer.iloc[1].keys()}, index=[f])
     frames_timer = pd.concat([frames_timer, frame_timer])
 
+
+
 with pd.ExcelWriter(f'{folder}.xlsx') as writer:
     frames_mean.to_excel(writer, sheet_name='Delta moyen')
     frames_mean_occ.to_excel(writer, sheet_name='Delta occ moyen')
