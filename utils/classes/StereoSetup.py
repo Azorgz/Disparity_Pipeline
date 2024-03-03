@@ -46,7 +46,7 @@ class StereoSetup(StereoCamera):
 
         relative = relative_transformation(right.extrinsics.inverse(), left.extrinsics.inverse())
         R = relative[0, :3, :3].cpu().numpy()
-        T = relative[0, :3, -1].cpu().numpy()
+        T = relative[0, :3, -1].cpu().numpy() + [-1e-8, 0, 0]
 
         R1, R2, P1, P2, _, _, _ = cv.stereoRectify(cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2,
                                                    (self.new_shape[1], self.new_shape[0]), R, T,

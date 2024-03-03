@@ -282,15 +282,15 @@ class Visualizer:
             if self.multi_setup:
                 self.define_delta(experiment["new_list"][self.idx])
             target_im = ImageTensor(f'{experiment["target_list"][self.idx]}').RGB()
-            ref_im = ImageTensor(f'{experiment["ref_list"][self.idx]}').RGB().match_shape(target_im)
-            new_im = new_im.match_shape(target_im)
+            ref_im = ImageTensor(f'{experiment["ref_list"][self.idx]}').RGB().match_shape(target_im, keep_ratio=True)
+            new_im = new_im.match_shape(target_im, keep_ratio=True)
         else:
             target_im = new_im.clone()
             ref_im = new_im.clone()
         if self.show_occlusion:
             mask = 1 - ImageTensor(
                 f'{experiment["occlusion_path"]}/{experiment["occlusion_mask"][self.idx]}').match_shape(
-                target_im)
+                target_im, keep_ratio=True)
         else:
             mask = 1
         visu = (target_im / 2 + new_im * mask / 2).vstack(target_im / 2 + ref_im / 2)

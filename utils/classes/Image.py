@@ -11,7 +11,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from matplotlib import cm
+from matplotlib import colormaps as cm
 from matplotlib import pyplot as plt, patches
 from torch import Tensor
 from torchvision.transforms.functional import to_pil_image
@@ -165,8 +165,9 @@ class ImageTensor(Tensor):
             if channel_pos == -1:
                 return self, 'unknown', 'unknown', 'unknown'
             if all(torch.equal(temp[i, :, :], temp[i + 1, :, :]) for i in range(temp.shape[channel_pos] - 1)):
+                # temp = temp[:1, :, :]
                 im_type = 'IR'
-                cmap = 'L'
+                cmap = 'RGB'
             else:
                 im_type = 'RGB'
                 cmap = 'RGB'
@@ -286,7 +287,7 @@ class ImageTensor(Tensor):
     def put_channel_at(self, idx=1):
         return torch.movedim(self, self.channel_pos, idx)
 
-    def match_shape(self, other):
+    def match_shape(self, other, keep_ratio=False):
         temp = self.put_channel_at()
         if isinstance(other, ImageTensor) or isinstance(other, DepthTensor):
             b = other.put_channel_at()
@@ -295,7 +296,15 @@ class ImageTensor(Tensor):
         dims = len(b.shape) - 2
         shape = b.shape[-dims:]
         mode = 'bilinear' if dims <= 2 else 'trilinear'
-        temp = F.interpolate(temp, size=shape, mode=mode, align_corners=True)
+        if keep_ratio:
+            shape_temp = temp.shape[-dims:]
+            ratio = torch.tensor(shape_temp)/torch.tensor(shape)
+            ratio = ratio.max()
+            temp = F.interpolate(temp, mode='nearest-exact', scale_factor=float((1/ratio).cpu().numpy()))
+        else:
+            temp = F.interpolate(temp, size=shape, mode=mode, align_corners=True)
+        if keep_ratio:
+            temp = temp.pad(other)
         return temp.put_channel_at(self.channel_pos)
 
     def normalize(self, minmax=False, keep_abs_max=False):
@@ -414,7 +423,8 @@ class ImageTensor(Tensor):
             pass
         elif self.color_mode == 'L':
             x = np.linspace(0.0, 1.0, 256)
-            cmap_rgb = Tensor(cm.get_cmap(plt.get_cmap(colormap))(x)[:, :3]).to(self.device).squeeze()
+            # cmap_rgb = Tensor(cm.get_cmap(plt.get_cmap(colormap))(x)[:, :3]).to(self.device).squeeze()
+            cmap_rgb = Tensor(cm[colormap](x)[:, :3]).to(self.device).squeeze()
             temp = (self * 255).long().squeeze()
             new = ImageTensor(cmap_rgb[temp].permute(2, 0, 1), color_mode='RGB')
             self.data = new.data

@@ -4,7 +4,7 @@ import warnings
 from pathlib import Path
 import numpy as np
 import torch
-from kornia.geometry import PinholeCamera, angle_axis_to_rotation_matrix
+from kornia.geometry import PinholeCamera, axis_angle_to_rotation_matrix
 from torch import Tensor
 import inspect
 from types import FrameType
@@ -58,7 +58,7 @@ class BaseCamera(PinholeCamera):
             self.is_positioned = is_positioned
         self._f = f if f is not None else 1e-3
         self._pixel_size = pixel_size if pixel_size is not None else (
-            self.f / intrinsics[0, 0, 0].cpu(), self.f / intrinsics[0, 0, 0].cpu())
+            float(self.f / intrinsics[0, 0, 0].cpu().numpy()), float(self.f / intrinsics[0, 0, 0].cpu().numpy()))
         self._FOV_v = round(2 * math.atan(self.pixel_size[1] * h / (2 * self.f)) * 180 / math.pi, 1)
         self._FOV_h = round(2 * math.atan(self.pixel_size[0] * w / (2 * self.f)) * 180 / math.pi, 1)
         h = torch.tensor(h).unsqueeze(0).to(self.device)
@@ -91,7 +91,7 @@ class BaseCamera(PinholeCamera):
                 'is_positioned': self.is_positioned,
                 'im_type': self.im_type,
                 'f': self.f,
-                'pixel_size': list(self.pixel_size),
+                'pixel_size': [self.pixel_size[0], self.pixel_size[1]],
                 'aperture': self.aperture}
 
     def _init_size_(self) -> tuple:
@@ -108,14 +108,7 @@ class BaseCamera(PinholeCamera):
             im_path = f'{self.path}/{sorted(os.listdir(self.path))[0]}'
             im_calib = ImageTensor(im_path)
         _, c, h, w = im_calib.shape
-        if c == 1:
-            im_type = 'IR'
-        else:
-            if np.array_equal(im_calib[:, :, 0], im_calib[:, :, 1]) and \
-                    np.array_equal(im_calib[:, :, 0], im_calib[:, :, 2]):
-                im_type = 'IR'
-            else:
-                im_type = 'RGB'
+        im_type = im_calib.im_type
         return h, w, im_type, im_calib
 
     def _init_intrinsics_(self, h: int, w: int, f, pixel_size) -> Tensor:
@@ -142,7 +135,7 @@ class BaseCamera(PinholeCamera):
         rx = rx if rx is not None else 0
         ry = ry if ry is not None else 0
         rz = rz if rz is not None else 0
-        mat_rot = angle_axis_to_rotation_matrix(Tensor(np.array([[rx, ry, rz]])))
+        mat_rot = axis_angle_to_rotation_matrix(Tensor(np.array([[rx, ry, rz]])))
         mat = torch.zeros([1, 4, 4])
         mat[:, :3, :3] = mat_rot
         mat[:, :, -1] = mat_tr

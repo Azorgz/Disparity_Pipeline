@@ -7,7 +7,7 @@ from module.SetupCameras import CameraSetup
 
 
 name_path = '/'
-perso = '/home/aurelien/Images/Images/'
+perso = '/home/aurelien/Images/Images_LYNRED/'
 pro = '/home/godeta/PycharmProjects/LYNRED/Images/'
 
 p = pro if 'godeta' in os.getcwd() else perso

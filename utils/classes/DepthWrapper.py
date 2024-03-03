@@ -1,8 +1,10 @@
 import torch
 import torch.nn.functional as F
-from kornia.geometry import depth_to_3d, transform_points, project_points, normalize_pixel_coordinates
+from kornia.geometry import depth_to_3d, transform_points, project_points, normalize_pixel_coordinates, depth_to_3d_v2
 from kornia.morphology import dilation
 from torch import Tensor
+from torch.nn import MaxPool2d, Sequential
+
 from utils.classes import ImageTensor
 from utils.classes.Image import DepthTensor
 
@@ -35,7 +37,7 @@ class DepthWrapper:
         b, c, h, w = depth_dst.shape
         kernel = torch.ones(3, 3).to(self.device)
         depth_dst = dilation(depth_dst, kernel)
-        points_3d_dst: Tensor = depth_to_3d(depth_dst, matrix_dst, False)  # Bx3xHxW
+        points_3d_dst: Tensor = depth_to_3d_v2(depth_dst[0], matrix_dst[0], False)  # Bx3xHxW
         # points_3d_dst[:, :1] *= -1
         # points_3d_dst[:, 2] *= -1
         # pcd = o3d.geometry.PointCloud()
@@ -49,10 +51,10 @@ class DepthWrapper:
         #                                   point_show_normal=True,
         #                                   mesh_show_back_face=True)
         # transform points from source to destination
-        points_3d_dst = points_3d_dst.permute(0, 2, 3, 1)  # BxHxWx3
+        # points_3d_dst = points_3d_dst.permute(0, 2, 3, 1)  # BxHxWx3
 
         # apply transformation to the 3d points
-        points_3d_src = transform_points(src_trans_dst[:, None], points_3d_dst)  # BxHxWx3
+        points_3d_src = transform_points(src_trans_dst[:, None].to(torch.float32), points_3d_dst)  # BxHxWx3
 
         # project back to pixels
         camera_matrix_tmp: Tensor = matrix_src[:, None, None]  # Bx1x1x3x3
@@ -66,21 +68,23 @@ class DepthWrapper:
         cloud = torch.concatenate([points_2d_src, points_3d_src[:, :, :, -1:]], dim=-1)
 
         grid = Tensor(points_2d_src_norm).clone()
-        mask_valid = torch.ones(h * w).to(torch.bool).to(self.device)
+        # mask_valid = torch.ones(h * w).to(torch.bool).to(self.device)
         res = {'image_reg': F.grid_sample(image_src, grid, align_corners=True)}
         if return_occlusion:
             res['occlusion'] = self.find_occlusion(cloud, [height, width])
             res['occlusion'].im_name = image_src.im_name + '_occlusion'
         if return_depth_reg:
-            depth_reg = self.compute_depth_src(cloud, [height, width], mask_valid,
-                                               post_process_depth=post_process_depth)
+            depth_reg = self.compute_depth_src(cloud, [height, width], post_process_depth=post_process_depth)
             depth_reg.im_name = image_src.im_name + '_depth'
+            conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
+            conv_upsampling = Sequential(conv_upsampling)
             res['depth_reg'] = depth_reg
+            res['depth_reg'][depth_reg == 0] = conv_upsampling(depth_reg)[depth_reg == 0]
         return res
 
-    def compute_depth_src(self, cloud, size_image, mask_valid, post_process_depth=0):
+    def compute_depth_src(self, cloud, size_image, post_process_depth=0):
         # Put all the point into a H*W x 3 vector
-        c = torch.tensor(cloud.flatten(start_dim=0, end_dim=2))[mask_valid]  # H*W x 3
+        c = torch.tensor(cloud.flatten(start_dim=0, end_dim=2))  # H*W x 3
         # Remove the point landing outside the image
         mask = ((c[:, 0] < 0) + (c[:, 0] >= size_image[1] - 1) + (c[:, 1] < 0) + (c[:, 1] >= size_image[0] - 1)) == 0
         c = c[mask]

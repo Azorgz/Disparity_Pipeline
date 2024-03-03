@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 # Util function for loading point clouds|
 import numpy as np
-from kornia.geometry import relative_transformation, depth_to_3d, transform_points
+from kornia.geometry import relative_transformation, depth_to_3d, transform_points, depth_to_3d_v2
 from kornia.morphology import dilation
 
 # Data structures and functions for rendering
@@ -41,22 +41,18 @@ class PointCloudRenderer:
                                                      src_cam.extrinsics.inverse()).to(torch.float32)
 
     def _create_new_perspective_renderer(self, source, target):
-        k = source.intrinsics.to(torch.float32)
-        k = k[:, [0, 1, 3, 2], :]
-        k[0, 0, 0] = 0.006
-        k[0, 1, 1] = 0.006
+        self.K_src = source.intrinsics
         cam_src = {'R': source.extrinsics[:, :3, :3].to(torch.float32),
                    'T': source.extrinsics[:, :3, 3].to(torch.float32),
-                   'K': k}
-                   # 'image_size': torch.tensor([source.height, source.width])}
-        k = target.intrinsics.to(torch.float32)
-        k = k[:, [0, 1, 3, 2], :]
-        k[0, 0, 0] = 0.006
-        k[0, 1, 1] = 0.006
+                   'K': self.K_src.to(torch.float32),
+                   'in_ndc': False,
+                   'image_size': [(source.height, source.width)]}
+        self.K_tgt = target.intrinsics
         cam_tgt = {'R': target.extrinsics[:, :3, :3].to(torch.float32),
                    'T': target.extrinsics[:, :3, 3].to(torch.float32),
-                   'K': k}
-                   # 'image_size': torch.tensor([target.height, target.width])}
+                   'K': self.K_tgt.to(torch.float32),
+                   'in_ndc': False,
+                   'image_size': [(target.height, target.width)]}
         self.cam_src = PerspectiveCameras(device=self.device, **cam_src)
         self.cam_tgt = PerspectiveCameras(device=self.device, **cam_tgt)
         raster_settings_src = PointsRasterizationSettings(
@@ -74,10 +70,10 @@ class PointCloudRenderer:
         rasterizer_tgt = PointsRasterizer(cameras=self.cam_tgt, raster_settings=raster_settings_tgt)
         self.renderer_tgt = PointsRenderer(rasterizer=rasterizer_tgt, compositor=AlphaCompositor())
         # Initialisation
-        self.renderer_src(Pointclouds(points=[torch.zeros([1, 3], device=self.device)], features=[torch.zeros([1, 3],
-                                                                                                              device=self.device)]))
-        self.renderer_tgt(Pointclouds(points=[torch.zeros([1, 3], device=self.device)], features=[torch.zeros([1, 3],
-                                                                                                              device=self.device)]))
+        # self.renderer_src(Pointclouds(points=[torch.zeros([1, 3], device=self.device)], features=[torch.zeros([1, 3],
+        #                                                                                                       device=self.device)]))
+        # self.renderer_tgt(Pointclouds(points=[torch.zeros([1, 3], device=self.device)], features=[torch.zeros([1, 3],
+        #                                                                                                       device=self.device)]))
 
     def __call__(self, image_src: ImageTensor, depth: DepthTensor, *args,
                  return_occlusion=True, post_process_image=3, depth_tgt=True,
@@ -86,10 +82,10 @@ class PointCloudRenderer:
             # depth src is needed to create the pointcloud to be projected to tgt
             b, c, h, w = depth.shape
             M = depth.max()
-            points_3d_tgt: Tensor = depth_to_3d(depth, self.cam_tgt.K[:, :3, :3], normalize_points=False)  # Bx3xHxW
-
+            points_3d_tgt: Tensor = depth_to_3d(depth, self.K_tgt[:, :3, :3], normalize_points=True)  # Bx3xHxW
             points_3d_tgt = points_3d_tgt.permute(0, 2, 3, 1)  # BxHxWx3
-            # points_3d_tgt[:, 0] *= -1
+            # points_3d_tgt *= 1/4
+            # points_3d_tgt[:, 1] *= -1
             # points_3d_tgt[:, 2] *= -1
             # apply transformation to the 3d points
             # points_3d_src = transform_points(self.relative_pose[:, None], points_3d_tgt)  # BxHxWx3
@@ -106,7 +102,6 @@ class PointCloudRenderer:
             # pointcloud_tgt = Pointclouds(points=[verts], features=[rgb])
             depth_src = self.renderer_tgt(pointcloud_tgt) * M
             depth_src.put_channel_at(1).show()
-
             time.sleep(1)
 
 
@@ -134,7 +129,7 @@ pc_render = PointCloudRenderer(R.cameras[src], R.cameras[tgt])
 
 pc_render(im_src, depth, depth_tgt=True)
 
-# Setup
+# # Setup
 # if torch.cuda.is_available():
 #     device = torch.device("cuda:0")
 #     torch.cuda.set_device(device)
@@ -148,7 +143,7 @@ pc_render(im_src, depth, depth_tgt=True)
 # # Load point cloud
 # pointcloud = np.load(obj_filename)
 # verts = torch.Tensor(pointcloud['verts']).to(device)
-#
+# verts[:, 1] -= verts[:, 1].min()
 # rgb = torch.Tensor(pointcloud['rgb']).to(device)
 #
 # start = time.time()
@@ -156,18 +151,20 @@ pc_render(im_src, depth, depth_tgt=True)
 # time_pointcloud = time.time() - start
 #
 # # Initialize a camera.
-# Ro, To = look_at_view_transform(5, 0, 0)
+# # Ro, To = look_at_view_transform(-0.00001, 0, 0)
+# Ro, To = R.cameras[tgt].extrinsics[:, :3, :3].to(torch.float32), R.cameras[tgt].extrinsics[:, :3, 3].to(torch.float32)
 # cameras_p = FoVPerspectiveCameras(device=device, R=Ro, T=To, znear=0.001)
-# R, T = look_at_view_transform(2, 5, 0)
-# cameras_o = FoVOrthographicCameras(device=device, R=R, T=T, znear=0.001)
+# R1, T1 = R.cameras[tgt].extrinsics[:, :3, :3].to(torch.float32), R.cameras[src].extrinsics[:, :3, 3].to(torch.float32)
+# # R1, T1 = look_at_view_transform(-0.000001, 0, 0)
+# cameras_o = FoVPerspectiveCameras(device=device, R=R1, T=T1, znear=0.001)
 #
 # # Define the settings for rasterization and shading. Here we set the output image to be of size
 # # 512x512. As we are rendering images for visualization purposes only we will set faces_per_pixel=1
 # # and blur_radius=0.0. Refer to raster_points.py for explanations of these parameters.
 # raster_settings = PointsRasterizationSettings(
-#     image_size=512,
+#     image_size=(480, 640),
 #     radius=0.003,
-#     points_per_pixel=10,
+#     points_per_pixel=3,
 #     bin_size=0
 # )
 #
