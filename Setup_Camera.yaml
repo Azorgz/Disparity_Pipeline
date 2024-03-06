@@ -19,7 +19,9 @@ cameras:
       - 0.0
       - 0.0
       - 1.0
-    f: 0.014
+    f:
+    - 14.0
+    - 14.0
     im_type: IR
     intrinsics:
     - - 853.0
@@ -41,10 +43,7 @@ cameras:
     is_positioned: true
     is_ref: false
     name: IR
-    path: /home/aurelien/Images/Images/Day/master/infrared_corrected
-    pixel_size:
-    - 1.64e-05
-    - 1.64e-05
+    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/master/infrared_corrected
   IR2:
     aperture: 1.2
     extrinsics:
@@ -64,7 +63,9 @@ cameras:
       - 0.0
       - 0.0
       - 1.0
-    f: 0.014
+    f:
+    - 14.0
+    - 14.0
     im_type: IR
     intrinsics:
     - - 853.0
@@ -86,10 +87,7 @@ cameras:
     is_positioned: true
     is_ref: false
     name: IR2
-    path: /home/aurelien/Images/Images/Day/slave/infrared_corrected
-    pixel_size:
-    - 1.64e-05
-    - 1.64e-05
+    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/slave/infrared_corrected
   RGB:
     aperture: 1.4
     extrinsics:
@@ -109,7 +107,9 @@ cameras:
       - 0.0
       - 0.0
       - 1.0
-    f: 0.006
+    f:
+    - 6.0
+    - 6.0
     im_type: RGB
     intrinsics:
     - - 1739.0
@@ -131,10 +131,7 @@ cameras:
     is_positioned: true
     is_ref: true
     name: RGB
-    path: /home/aurelien/Images/Images/Day/master/visible
-    pixel_size:
-    - 3.45e-06
-    - 3.45e-06
+    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/master/visible
   RGB2:
     aperture: 1.4
     extrinsics:
@@ -154,7 +151,9 @@ cameras:
       - 0.0
       - 0.0
       - 1.0
-    f: 0.006
+    f:
+    - 6.0
+    - 6.0
     im_type: RGB
     intrinsics:
     - - 1739.0
@@ -176,10 +175,7 @@ cameras:
     is_positioned: true
     is_ref: false
     name: RGB2
-    path: /home/aurelien/Images/Images/Day/slave/visible
-    pixel_size:
-    - 3.45e-06
-    - 3.45e-06
+    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/slave/visible
 depth_pair:
   name:
   - IR&IR2

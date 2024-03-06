@@ -287,20 +287,25 @@ class ImageTensor(Tensor):
     def put_channel_at(self, idx=1):
         return torch.movedim(self, self.channel_pos, idx)
 
-    def match_shape(self, other, keep_ratio=False):
+    def match_shape(self, other: Union[Tensor, tuple, list], keep_ratio=False):
         temp = self.put_channel_at()
-        if isinstance(other, ImageTensor) or isinstance(other, DepthTensor):
+        if isinstance(other, tuple) or isinstance(other, list):
+           shape = other
+           dims = len(other)
+        elif isinstance(other, ImageTensor) or isinstance(other, DepthTensor):
             b = other.put_channel_at()
+            dims = len(b.shape) - 2
+            shape = b.shape[-dims:]
         else:
             b = other.clone()
-        dims = len(b.shape) - 2
-        shape = b.shape[-dims:]
+            dims = len(b.shape) - 2
+            shape = b.shape[-dims:]
         mode = 'bilinear' if dims <= 2 else 'trilinear'
         if keep_ratio:
             shape_temp = temp.shape[-dims:]
             ratio = torch.tensor(shape_temp)/torch.tensor(shape)
             ratio = ratio.max()
-            temp = F.interpolate(temp, mode='nearest-exact', scale_factor=float((1/ratio).cpu().numpy()))
+            temp = F.interpolate(temp, mode=mode, scale_factor=float((1/ratio).cpu().numpy()))
         else:
             temp = F.interpolate(temp, size=shape, mode=mode, align_corners=True)
         if keep_ratio:
@@ -361,8 +366,8 @@ class ImageTensor(Tensor):
         plt.show()
         return ax
 
-    def save(self, path, name=None):
-        name = self.im_name + '.png' if name is None else name
+    def save(self, path, name=None, ext='png'):
+        name = self.im_name + f'.{ext}' if name is None else name
         if not os.path.exists(path):
             os.makedirs(path, exist_ok=True)
         if not cv.imwrite(path + f'/{name}', self.opencv()):

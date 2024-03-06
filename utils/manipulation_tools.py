@@ -7,9 +7,17 @@ import numpy as np
 import torch
 from kornia import create_meshgrid
 from kornia.utils import get_cuda_device_if_available
-from torch import Tensor, FloatTensor
+from torch import Tensor, FloatTensor, cat
 from kornia.feature.responses import harris_response
 from utils.classes.Image import ImageTensor
+
+
+def prepare_points_depth(depth):
+    b, c, h, w = depth.shape
+    grid = create_meshgrid(h, w, device=depth.device)
+    grid3d = cat((grid, 1.0 / depth.permute(0, 2, 3, 1)), dim=-1)
+    vec3d = grid3d.permute(3, 0, 1, 2).flatten(start_dim=1)
+    return vec3d.permute(1, 0)
 
 
 def extract_roi_from_map(mask_left: Tensor, mask_right: Tensor):

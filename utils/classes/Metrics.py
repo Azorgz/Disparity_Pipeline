@@ -19,12 +19,12 @@ class BaseMetric_Tensor:
         self.range_min = 0
         self.range_max = 1
         self.commentary = "Just a base"
-        self.ratio_list = torch.tensor([1, 4 / 3, 3 / 2, 16 / 9, 21 / 9])
+        self.ratio_list = torch.tensor([1, 3 / 4, 2 / 3, 9 / 16, 9 / 21])
         self.ratio_dict = {1: [512, 512],
-                           round(4 / 3, 3): [480, 640],
-                           round(3 / 2, 3): [440, 660],
-                           round(16 / 9, 3): [405, 720],
-                           round(21 / 9, 3): [340, 800]}
+                           round(3 / 4, 3): [480, 640],
+                           round(2 / 3, 3): [440, 660],
+                           round(9 / 16, 3): [405, 720],
+                           round(9 / 21, 3): [340, 800]}
 
     def __call__(self, im1, im2, *args, mask=None, **kwargs):
         # Input array is a path to an image OR an already formed ndarray instance
@@ -55,7 +55,7 @@ class BaseMetric_Tensor:
         self.value = 0
 
     def _determine_size_from_ratio(self):
-        ratio = self.image_true.shape[-1] / self.image_true.shape[-2]
+        ratio = self.image_true.shape[-2] / self.image_true.shape[-1]
         idx_ratio = round(float(self.ratio_list[torch.argmin((self.ratio_list - ratio) ** 2)]), 3)
         size = self.ratio_dict[float(idx_ratio)]
         return size

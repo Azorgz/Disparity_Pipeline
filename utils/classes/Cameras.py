@@ -9,60 +9,110 @@ from torch import Tensor
 import inspect
 from types import FrameType
 from typing import cast, Union
-
+from utils.misc import print_tuple
 from utils.classes.Image import ImageTensor
 
 
 class BaseCamera(PinholeCamera):
-    """
-    setup: is not used for know, gives the other camera names in the rig
-    is_positioned : Boolean specifying if the extrinsic matrix is known or by default.
-    A positioned Camera can be used for depth-based projection and disparity projection in case of coplanarity
-     with the source
-    f : distance focal of the Camera Optic in meter
-    aperture : Aperture used (not used for now)
-    pixel_size : A Tuple giving the physical size of the pixels in (w h) order
-    FOV: Value computed with the given value of Focal and pixel size
-    """
-    _setup = None
+    '''
+    A camera object subclassing the camera from Kornia.
+    :param path: Always required (valid path or in the future stream url)
+    :param device: not mandatory (defined as gpu if a gpu is available)
+    :param name: not mandatory, defined as 'BaseCam' by default
+    :param is_positioned: not mandatory, defined as False by default. This parameter is True if the relative pose of the camera in the camera rig is known
+    :param aperture: only cosmetic parameter for now
+    :param intrinsics: if define it will create a camera with this matrix. If no other parameters is specified, the FOV/f/pixel size/sensor size will be defined by default
+    :param f: focal in milimeters, if set with intrinsic, it will fix the other intrinsics values, if the intrinsics matrix is not given another set of parameters will be necessary as sensor_size or pixel_size...
+    :param pixel_size: pixel size in micrometer, if set with intrinsic, it will fix the other intrinsics values, if the intrinsics matrix is not given another set of parameters will be necessary as sensor_size or focal...
+    :param sensor_size: sensor size in milimeters, if set with intrinsic, it will fix the other intrinsics values, if the intrinsics matrix is not given another set of parameters will be necessary as focal or pixel_size...
+    :param HFOV: horizontal angular field of view in degrees
+    :param VFOV: vertical angular field of view in degrees
+    :param sensor_resolution: defined by the images find in path resolution. If set it's only a control value emetting a warning if the source images are not at matching resolution
+    :param extrinsics: if define the camera will be positionned using that matrix, ignoring the following parameters. If no pose parameter is given, the pose will be canonical by default
+    :param x: relative position in x defined in meter, in the Camera Setup frame. Overwritten by extrinsics
+    :param y: relative position in y defined in meter, in the Camera Setup frame. Overwritten by extrinsics
+    :param z: relative position in y defined in meter, in the Camera Setup frame. Overwritten by extrinsics
+    :param rx: relative rotation around x defined in radian (or degree if in_degree is set to True), in the Camera Setup frame. Overwritten by extrinsics
+    :param ry: relative rotation around y defined in radian (or degree if in_degree is set to True), in the Camera Setup frame. Overwritten by extrinsics
+    :param rz: relative rotation around z defined in radian (or degree if in_degree is set to True), in the Camera Setup frame. Overwritten by extrinsics
+    :param in_degree: set to True if you express the position angles in degrees
+    '''
     _is_positioned = False
     _is_ref = False
-    _f = None
     _aperture = None
-    _pixel_size = None
-    _FOV_v = None
-    _FOV_h = None
+    _setup=None
     _name = 'BaseCam'
+    _im_type = None
+    _f = None
+    _pixel_size = None
+    _VFOV = None
+    _HFOV = None
+    _aspect_ratio = None
+    _sensor_size = None
+    _sensor_resolution = None
 
-    def __init__(self, intrinsics: Union[Tensor, np.ndarray], extrinsics: Union[Tensor, np.ndarray],
-                 path: (str or Path), name: str, device, is_positioned: bool, f: float, pixel_size: tuple,
-                 aperture: float,
-                 x, y, z, rx, ry, rz) -> None:
+    def __init__(self,
+                 path: (str or Path)=None,
+                 device=None,
+                 name='BaseCam',
+                 is_positioned=False,
+                 aperture=None,
+                 # Extrinsic args
+                 intrinsics: Union[Tensor, np.ndarray]=None,
+                 f: (float or tuple)=None,
+                 pixel_size: (float or tuple)=None,
+                 sensor_size: tuple=None,
+                 HFOV: float=None,
+                 VFOV: float=None,
+                 aspect_ratio: float=None,
+                 sensor_resolution: tuple=None,
+                 # Extrinsic args
+                 extrinsics: Union[Tensor, np.ndarray] = None,
+                 x: float=None,
+                 y: float=None,
+                 z: float=None,
+                 rx: float=None,
+                 ry: float=None,
+                 rz: float=None,
+                 in_degree: bool=False,
+                 **kwargs) -> None:
+        # General parameters
         self._name = name
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self._aperture = aperture
-        assert os.path.exists(path)
-        self.path = path
+        self._init_path(path)
         h, w, im_type, im_calib = self._init_size_()
+        self._sensor_resolution = sensor_resolution if sensor_resolution is not None else (w, h)
+        if self._sensor_resolution[0] != w or self._sensor_resolution[1] != h:
+            warnings.warn(f'The specified sensor resolution {sensor_resolution} and the source image resolution {(w, h)} are different')
         self._im_type = im_type
         self._im_calib = im_calib
-        if intrinsics is None:
-            intrinsics = self._init_intrinsics_(h, w, f, pixel_size)
-        else:
-            intrinsics = torch.tensor(intrinsics, dtype=torch.double).unsqueeze(0).to(self.device)
+
+        # Intrinsics parameters definition
+        intrinsics, parameters = self._init_intrinsics_(
+                intrinsics=intrinsics,
+                f=f,
+                pixel_size=pixel_size,
+                sensor_size=sensor_size,
+                HFOV=HFOV,
+                VFOV=VFOV,
+                aspect_ratio=aspect_ratio)
+        self._f = parameters['f']
+        self._pixel_size = parameters['pixel_size']
+        self._sensor_size = parameters['sensor_size']
+        self._VFOV = parameters['VFOV']
+        self._HFOV = parameters['HFOV']
+        self._aspect_ratio = parameters['aspect_ratio']
+
         if extrinsics is None:
             self.is_positioned = False
             extrinsics = self._init_extrinsics_(x, y, z, rx, ry, rz)
         else:
             extrinsics = torch.tensor(extrinsics, dtype=torch.double).unsqueeze(0).to(self.device)
             self.is_positioned = is_positioned
-        self._f = f if f is not None else 1e-3
-        self._pixel_size = pixel_size if pixel_size is not None else (
-            float(self.f / intrinsics[0, 0, 0].cpu().numpy()), float(self.f / intrinsics[0, 0, 0].cpu().numpy()))
-        self._FOV_v = round(2 * math.atan(self.pixel_size[1] * h / (2 * self.f)) * 180 / math.pi, 1)
-        self._FOV_h = round(2 * math.atan(self.pixel_size[0] * w / (2 * self.f)) * 180 / math.pi, 1)
-        h = torch.tensor(h).unsqueeze(0).to(self.device)
-        w = torch.tensor(w).unsqueeze(0).to(self.device)
+
+        h = torch.tensor(self.sensor_resolution[1]).unsqueeze(0).to(self.device)
+        w = torch.tensor(self.sensor_resolution[0]).unsqueeze(0).to(self.device)
         super(BaseCamera, self).__init__(intrinsics, extrinsics, h, w)
 
     def __str__(self):
@@ -70,17 +120,18 @@ class BaseCamera(PinholeCamera):
         global_parameter = {i: j for i, j in self.save_dict().items() if i not in optical_parameter}
         string1 = '\n'.join([': '.join([str(key), str(v)]) for key, v in global_parameter.items()])
         gap = "\n\noptical parameters : \n".upper()
-        string2 = '\n'.join([': '.join([str(key), str(v)]) for key, v in optical_parameter.items()])
+        string2 = '\n'.join([': '.join([str(key), print_tuple(v)]) for key, v in optical_parameter.items()])
         return string1 + gap + string2
 
     def optical_parameter(self):
-        return {'f': (self.f * 10 ** 3, "mm"),
+        return {'f': (self.f[0] * 10 ** 3, "mm"),
                 'pixel_size': ((self.pixel_size[0] * 10 ** 6, self.pixel_size[1] * 10 ** 6), 'um'),
+                'sensor_size': ((self.sensor_size[0] * 10 ** 3, self.sensor_size[1] * 10 ** 3), 'mm'),
                 'width': (float(self.width.cpu()), 'pixels'),
                 'height': (float(self.height.cpu()), 'pixels'),
                 'aperture': (self.aperture, ''),
-                'FOVh': (self.FOV_h, '°'),
-                'FOVv': (self.FOV_v, '°')}
+                'HFOV': (self.HFOV, '°'),
+                'VFOV': (self.VFOV, '°')}
 
     def save_dict(self):
         return {'name': self.name,
@@ -90,9 +141,18 @@ class BaseCamera(PinholeCamera):
                 'is_ref': self.is_ref,
                 'is_positioned': self.is_positioned,
                 'im_type': self.im_type,
-                'f': self.f,
-                'pixel_size': [self.pixel_size[0], self.pixel_size[1]],
+                'f': [self.f[0]*1e3, self.f[1]*1e3],
+                'sensor_resolution': [self.sensor_resolution[0], self.sensor_resolution[1]],
                 'aperture': self.aperture}
+
+    def _init_path(self, path):
+        try:
+            assert os.path.exists(path)
+            self.path = path
+            return 0
+        except AssertionError:
+            print(f'There is no image file at {path}, a source is necessary to configure a new camera')
+            raise AssertionError
 
     def _init_size_(self) -> tuple:
         try:
@@ -111,14 +171,24 @@ class BaseCamera(PinholeCamera):
         im_type = im_calib.im_type
         return h, w, im_type, im_calib
 
-    def _init_intrinsics_(self, h: int, w: int, f, pixel_size) -> Tensor:
+    def _init_intrinsics_(self, **kwargs):
+        if kwargs['intrinsics'] is not None:
+            intrinsics, parameters = intrinsics_parameters_from_matrix(self.sensor_resolution, **kwargs)
+            intrinsics = torch.tensor(intrinsics, dtype=torch.double).unsqueeze(0).to(self.device)
+        else:
+            parameters = intrinsics_parameters_wo_matrix(self.sensor_resolution, **kwargs)
+            intrinsics = self._init_intrinsics_matrix(self.sensor_resolution[1], self.sensor_resolution[0],
+                                                      parameters['f'], parameters['pixel_size'])
+        return intrinsics, parameters
+
+    def _init_intrinsics_matrix(self, h: int, w: int, f, pixel_size) -> Tensor:
         """
         :param h: Height of the images
         :param w: Width of the images
         :return: Init the intrinsic matrix of the camera with default parameter
         """
         if f is not None and pixel_size is not None:
-            d = int(f / pixel_size[0]), int(f / pixel_size[1])
+            d = int(f[0] / pixel_size[0]), int(f[1] / pixel_size[1])
         else:
             d = (int(np.sqrt(h ** 2 + w ** 2) / 2), int(np.sqrt(h ** 2 + w ** 2) / 2))
         return torch.tensor([[d[0], 0, int(w / 2), 0],
@@ -163,9 +233,9 @@ class BaseCamera(PinholeCamera):
 
     def update_pos(self, extrinsics=None, x=None, y=None, z=None, x_pix=None, y_pix=None, rx=None, ry=None, rz=None):
         x = x if x is not None else (
-            x_pix * self.pixel_size / self.f if x_pix is not None else self.intrinsics[0, 0, 3].cpu())
+            x_pix * self.pixel_size[0] / self.f[0] if x_pix is not None else self.extrinsics[0, 0, 3].cpu())
         y = y if y is not None else (
-            y_pix * self.pixel_size / self.f if y_pix is not None else self.intrinsics[0, 1, 3].cpu())
+            y_pix * self.pixel_size[1] / self.f[1] if y_pix is not None else self.extrinsics[0, 1, 3].cpu())
         if extrinsics is None:
             self.extrinsics = self._init_extrinsics_(x, y, z, rx, ry, rz)
         else:
@@ -190,20 +260,24 @@ class BaseCamera(PinholeCamera):
                 distance = torch.sqrt(torch.sum((distance - self.center) ** 2))
         if not distance:
             distance = torch.sqrt(torch.sum(self.center ** 2))
-        fov_v = 2 * math.tan(self.FOV_v / 360 * math.pi) * distance
-        fov_h = 2 * math.tan(self.FOV_h / 360 * math.pi) * distance
+        fov_v = 2 * math.tan(self.VFOV / 360 * math.pi) * distance
+        fov_h = 2 * math.tan(self.HFOV / 360 * math.pi) * distance
         return fov_h / self.width, fov_v / self.height
 
-    def __getitem__(self, index):
+    def __getitem__(self, index, autopad=False, **kwargs):
         im_path = f'{self.path}/{sorted(os.listdir(self.path))[index]}'
         im = ImageTensor(im_path, device=self.device)
+        if autopad:
+            temp = torch.zeros(*im.shape[:-2], self.sensor_resolution[1], self.sensor_resolution[0])
+            im = im.pad(temp)
         return im
 
-    def random_image(self):
-        list_im = sorted(os.listdir(self.path))
-        index = torch.randint(0, len(list_im), [1])
-        im_path = f'{self.path}/{list_im[index]}'
-        im = ImageTensor(im_path, device=self.device)
+    def random_image(self, autopad=False, **kwargs):
+        # list_im = os.listdir(self.path))
+        index = torch.randint(0, len(os.listdir(self.path)), [1])
+        # im_path = f'{self.path}/{list_im[index]}'
+        # im = ImageTensor(im_path, device=self.device)
+        im = self.__getitem__(index, autopad=autopad)
         return im, index
 
     @property
@@ -223,12 +297,24 @@ class BaseCamera(PinholeCamera):
         return self._pixel_size
 
     @property
-    def FOV_v(self):
-        return self._FOV_v
+    def sensor_size(self):
+        return self._sensor_size
 
     @property
-    def FOV_h(self):
-        return self._FOV_h
+    def sensor_resolution(self):
+        return self._sensor_resolution
+
+    @property
+    def aspect_ratio(self):
+        return self._aspect_ratio
+
+    @property
+    def VFOV(self):
+        return self._VFOV
+
+    @property
+    def HFOV(self):
+        return self._HFOV
 
     @property
     def name(self):
@@ -336,25 +422,268 @@ class BaseCamera(PinholeCamera):
 
 
 class RGBCamera(BaseCamera):
-    def __init__(self, intrinsics: Union[Tensor, np.ndarray], extrinsics: Union[Tensor, np.ndarray],
-                 path: (str or Path),
-                 device=None, name='RGB', im_type='RGB', is_ref=False, is_positioned=False,
-                 f=None, pixel_size=None, aperture=2.0, x=None, y=None, z=None, rx=None, ry=None, rz=None) -> None:
-        super(RGBCamera, self).__init__(intrinsics, extrinsics, path, name, device,
-                                        f=f, pixel_size=pixel_size, aperture=aperture, is_positioned=is_positioned,
-                                        x=x, y=y, z=z, rx=rx, ry=ry, rz=rz)
+    '''
+    A RGB camera object subclassing the camera from Kornia.
+    :param path: Always required (valid path or in the future stream url)
+    :param device: not mandatory (defined as gpu if a gpu is available)
+    :param name: not mandatory, defined as 'RGB cam' by default
+    :param is_positioned: not mandatory, defined as False by default. This parameter is True if the relative pose of the camera in the camera rig is known
+    :param aperture: only cosmetic parameter for now
+    :param intrinsics: if define it will create a camera with this matrix. If no other parameters is specified, the FOV/f/pixel size/sensor size will be defined by default
+    :param f: focal in milimeters, if set with intrinsic, it will fix the other intrinsics values, if the intrinsics matrix is not given another set of parameters will be necessary as sensor_size or pixel_size...
+    :param pixel_size: pixel size in micrometer, if set with intrinsic, it will fix the other intrinsics values, if the intrinsics matrix is not given another set of parameters will be necessary as sensor_size or focal...
+    :param sensor_size: sensor size in milimeters, if set with intrinsic, it will fix the other intrinsics values, if the intrinsics matrix is not given another set of parameters will be necessary as focal or pixel_size...
+    :param HFOV: horizontal angular field of view in degrees
+    :param VFOV: vertical angular field of view in degrees
+    :param sensor_resolution: defined by the images find in path resolution. If set it's only a control value emetting a warning if the source images are not at matching resolution
+    :param extrinsics: if define the camera will be positionned using that matrix, ignoring the following parameters. If no pose parameter is given, the pose will be canonical by default
+    :param x: relative position in x defined in meter, in the Camera Setup frame. Overwritten by extrinsics
+    :param y: relative position in y defined in meter, in the Camera Setup frame. Overwritten by extrinsics
+    :param z: relative position in y defined in meter, in the Camera Setup frame. Overwritten by extrinsics
+    :param rx: relative rotation around x defined in radian (or degree if in_degree is set to True), in the Camera Setup frame. Overwritten by extrinsics
+    :param ry: relative rotation around y defined in radian (or degree if in_degree is set to True), in the Camera Setup frame. Overwritten by extrinsics
+    :param rz: relative rotation around z defined in radian (or degree if in_degree is set to True), in the Camera Setup frame. Overwritten by extrinsics
+    :param in_degree: set to True if you express the position angles in degrees
+    '''
+    def __init__(self,
+                 path: (str or Path)=None,
+                 device=None,
+                 name='RGB cam',
+                 is_positioned=False,
+                 aperture=None,
+                 # Extrinsic args
+                 intrinsics: Union[Tensor, np.ndarray]=None,
+                 f: (float or tuple)=None,
+                 pixel_size: (float or tuple)=None,
+                 sensor_size: tuple=None,
+                 HFOV: float=None,
+                 VFOV: float=None,
+                 aspect_ratio: float=None,
+                 sensor_resolution: tuple=None,
+                 # Extrinsic args
+                 extrinsics: Union[Tensor, np.ndarray] = None,
+                 x: float=None,
+                 y: float=None,
+                 z: float=None,
+                 rx: float=None,
+                 ry: float=None,
+                 rz: float=None,
+                 in_degree: bool=False,
+                 **kwargs) -> None:
+
+        super(RGBCamera, self).__init__(
+                 path=path,
+                 device=device,
+                 name=name,
+                 is_positioned=is_positioned,
+                 aperture=aperture,
+                 # Extrinsic args
+                 intrinsics=intrinsics,
+                 f=f,
+                 pixel_size=pixel_size,
+                 sensor_size=sensor_size,
+                 HFOV=HFOV,
+                 VFOV=VFOV,
+                 aspect_ratio=aspect_ratio,
+                 sensor_resolution=sensor_resolution,
+                 # Extrinsic args
+                 extrinsics=extrinsics,
+                 x=x,
+                 y=y,
+                 z=z,
+                 rx=rx,
+                 ry=ry,
+                 rz=rz,
+                 in_degree=in_degree,
+                 **kwargs)
         assert self.im_type == 'RGB', 'The Folder does not contain RGB images'
 
     # def init3d(self):
 
 
 class IRCamera(BaseCamera):
-    def __init__(self, intrinsics: Union[Tensor, np.ndarray], extrinsics: Union[Tensor, np.ndarray],
-                 path: (str or Path),
-                 device=None, name='IR', im_type='RGB', is_ref=False, is_positioned=False,
-                 f=None, pixel_size=None, aperture=2.0, x=None, y=None, z=None, rx=None, ry=None, rz=None) -> None:
-        super(IRCamera, self).__init__(intrinsics, extrinsics, path, name, device,
-                                       f=f, pixel_size=pixel_size, aperture=aperture, is_positioned=is_positioned,
-                                       x=x, y=y, z=z, rx=rx, ry=ry, rz=rz)
+    '''
+    An IR camera object subclassing the camera from Kornia.
+    :param path: Always required (valid path or in the future stream url)
+    :param device: not mandatory (defined as gpu if a gpu is available)
+    :param name: not mandatory, defined as 'IR cam' by default
+    :param is_positioned: not mandatory, defined as False by default. This parameter is True if the relative pose of the camera in the camera rig is known
+    :param aperture: only cosmetic parameter for now
+    :param intrinsics: if define it will create a camera with this matrix. If no other parameters is specified, the FOV/f/pixel size/sensor size will be defined by default
+    :param f: focal in milimeters, if set with intrinsic, it will fix the other intrinsics values, if the intrinsics matrix is not given another set of parameters will be necessary as sensor_size or pixel_size...
+    :param pixel_size: pixel size in micrometer, if set with intrinsic, it will fix the other intrinsics values, if the intrinsics matrix is not given another set of parameters will be necessary as sensor_size or focal...
+    :param sensor_size: sensor size in milimeters, if set with intrinsic, it will fix the other intrinsics values, if the intrinsics matrix is not given another set of parameters will be necessary as focal or pixel_size...
+    :param HFOV: horizontal angular field of view in degrees
+    :param VFOV: vertical angular field of view in degrees
+    :param sensor_resolution: defined by the images find in path resolution. If set it's only a control value emetting a warning if the source images are not at matching resolution
+    :param extrinsics: if define the camera will be positionned using that matrix, ignoring the following parameters. If no pose parameter is given, the pose will be canonical by default
+    :param x: relative position in x defined in meter, in the Camera Setup frame. Overwritten by extrinsics
+    :param y: relative position in y defined in meter, in the Camera Setup frame. Overwritten by extrinsics
+    :param z: relative position in y defined in meter, in the Camera Setup frame. Overwritten by extrinsics
+    :param rx: relative rotation around x defined in radian (or degree if in_degree is set to True), in the Camera Setup frame. Overwritten by extrinsics
+    :param ry: relative rotation around y defined in radian (or degree if in_degree is set to True), in the Camera Setup frame. Overwritten by extrinsics
+    :param rz: relative rotation around z defined in radian (or degree if in_degree is set to True), in the Camera Setup frame. Overwritten by extrinsics
+    :param in_degree: set to True if you express the position angles in degrees
+    '''
+
+    def __init__(self,
+                 path: (str or Path) = None,
+                 device=None,
+                 name='IR cam',
+                 is_positioned=False,
+                 aperture=None,
+                 # Extrinsic args
+                 intrinsics: Union[Tensor, np.ndarray] = None,
+                 f: (float or tuple) = None,
+                 pixel_size: (float or tuple) = None,
+                 sensor_size: tuple = None,
+                 HFOV: float = None,
+                 VFOV: float = None,
+                 aspect_ratio: float = None,
+                 sensor_resolution: tuple = None,
+                 # Extrinsic args
+                 extrinsics: Union[Tensor, np.ndarray] = None,
+                 x: float = None,
+                 y: float = None,
+                 z: float = None,
+                 rx: float = None,
+                 ry: float = None,
+                 rz: float = None,
+                 in_degree: bool = False,
+                 **kwargs) -> None:
+        super(IRCamera, self).__init__(
+            path=path,
+            device=device,
+            name=name,
+            is_positioned=is_positioned,
+            aperture=aperture,
+            # Extrinsic args
+            intrinsics=intrinsics,
+            f=f,
+            pixel_size=pixel_size,
+            sensor_size=sensor_size,
+            HFOV=HFOV,
+            VFOV=VFOV,
+            aspect_ratio=aspect_ratio,
+            sensor_resolution=sensor_resolution,
+            # Extrinsic args
+            extrinsics=extrinsics,
+            x=x,
+            y=y,
+            z=z,
+            rx=rx,
+            ry=ry,
+            rz=rz,
+            in_degree=in_degree,
+            **kwargs)
         assert self.im_type == 'IR', 'The Folder does not contain IR images'
 
+def intrinsics_parameters_from_matrix(sensor_resolution, **kwargs)->(np.ndarray, dict):
+    assert kwargs['intrinsics'] is not None
+    intrinsics = kwargs['intrinsics']
+    if kwargs['f'] is not None:
+        f = (kwargs['f'] / 1e3, kwargs['f'] / 1e3) if not len_2(kwargs['f']) else (
+        kwargs['f'][0] / 1e3, kwargs['f'][1] / 1e3)
+        pixel_size = (f[0] / intrinsics[0, 0], f[1] / intrinsics[1, 1])
+        sensor_size = (sensor_resolution[0] * pixel_size[0], sensor_resolution[1] * pixel_size[1])
+        HFOV = 2 * np.arctan(sensor_size[0] / (2 * f[0])) * 180 / np.pi
+        VFOV = 2 * np.arctan(sensor_size[1] / (2 * f[1])) * 180 / np.pi
+        aspect_ratio = pixel_size[0] / pixel_size[1]
+    elif kwargs['pixel_size'] is not None:
+        pixel_size = (kwargs['pixel_size'] / 1e6, kwargs['pixel_size'] / 1e6) if not len_2(kwargs['pixel_size']) else (
+        kwargs['pixel_size'][0] / 1e6, kwargs['pixel_size'][1] / 1e6)
+        f = (intrinsics[0, 0] * pixel_size[0], intrinsics[1, 1] * pixel_size[1])
+        sensor_size = (sensor_resolution[0] * pixel_size[0], sensor_resolution[1] * pixel_size[1])
+        HFOV = 2 * np.arctan(sensor_size[0] / (2 * f[0])) * 180 / np.pi
+        VFOV = 2 * np.arctan(sensor_size[1] / (2 * f[1])) * 180 / np.pi
+        aspect_ratio = pixel_size[0] / pixel_size[1]
+    elif kwargs['sensor_size'] is not None:
+        sensor_size = (kwargs['sensor_size'][0] / 1e3, kwargs['sensor_size'][1] / 1e3)
+        pixel_size = (sensor_size[0] / sensor_resolution[0], sensor_size[1] / sensor_resolution[1])
+        f = (intrinsics[0, 0] * pixel_size[0], intrinsics[1, 1] * pixel_size[1])
+        HFOV = 2 * np.arctan(sensor_size[0] / (2 * f[0])) * 180 / np.pi
+        VFOV = 2 * np.arctan(sensor_size[1] / (2 * f[1])) * 180 / np.pi
+        aspect_ratio = pixel_size[0] / pixel_size[1]
+    else:
+        f = None
+        pixel_size = None
+        sensor_size = None
+        HFOV = kwargs['HFOV']
+        VFOV = kwargs['VFOV']
+        aspect_ratio = kwargs['aspect_ratio']
+    return intrinsics, {'f': (round(f[0]*1e3, 3)/1e3, round(f[1]*1e3, 3)/1e3),
+            'pixel_size': (round(pixel_size[0]*1e6, 3)/1e6, round(pixel_size[1]*1e6, 3)/1e6),
+            'sensor_size': (round(sensor_size[0]*1e3, 3)/1e3, round(sensor_size[1]*1e3, 3)/1e3),
+            'aspect_ratio': aspect_ratio,
+            'HFOV': round(HFOV, 2),
+            'VFOV': round(VFOV, 2)}
+
+def intrinsics_parameters_wo_matrix(sensor_resolution, **kwargs)->dict:
+    # With f known :
+    if kwargs['f'] is not None:
+        f = (kwargs['f'] / 1e3, kwargs['f'] / 1e3) if not len_2(kwargs['f']) else (
+            kwargs['f'][0] / 1e3, kwargs['f'][1] / 1e3)
+        if kwargs['pixel_size'] is not None:
+            pixel_size = (kwargs['pixel_size'] / 1e6, kwargs['pixel_size'] / 1e6) if not len_2(
+                kwargs['pixel_size']) else (kwargs['pixel_size'][0] / 1e6, kwargs['pixel_size'][1] / 1e6)
+            sensor_size = (sensor_resolution[0] * pixel_size[0], sensor_resolution[1] * pixel_size[1])
+            HFOV = 2 * np.arctan(sensor_size[0] / (2 * f[0])) * 180 / np.pi
+            VFOV = 2 * np.arctan(sensor_size[1] / (2 * f[1])) * 180 / np.pi
+        elif kwargs['sensor_size'] is not None:
+            sensor_size = (kwargs['sensor_size'][0] / 1e3, kwargs['sensor_size'][1] / 1e3)
+            pixel_size = (sensor_size[0] / sensor_resolution[0], sensor_size[1] / sensor_resolution[1])
+            HFOV = 2 * np.arctan(sensor_size[0] / (2 * f[0])) * 180 / np.pi
+            VFOV = 2 * np.arctan(sensor_size[1] / (2 * f[1])) * 180 / np.pi
+        elif kwargs['HFOV'] is not None and kwargs['VFOV'] is not None:
+            HFOV = kwargs['HFOV']
+            VFOV = kwargs['VFOV']
+            sensor_size = (np.arctan(HFOV / 360 * np.pi) * 2 * f[0], np.arctan(VFOV / 360 * np.pi) * 2 * f[1])
+            pixel_size = (sensor_size[0] / sensor_resolution[0], sensor_size[1] / sensor_resolution[1])
+        aspect_ratio = pixel_size[0] / pixel_size[1]
+
+    # With the sensor size known :
+    elif kwargs['pixel_size'] is not None or kwargs['sensor_size'] is not None:
+        if kwargs['pixel_size'] is not None:
+            pixel_size = (kwargs['pixel_size'] / 1e6, kwargs['pixel_size'] / 1e6) if not len_2(kwargs['pixel_size'])\
+                else (kwargs['pixel_size'][0] / 1e6, kwargs['pixel_size'][1] / 1e6)
+            sensor_size = sensor_resolution[0] * pixel_size[0], sensor_resolution[1] * pixel_size[1]
+        elif kwargs['sensor_size'] is not None:
+            sensor_size = (kwargs['sensor_size'][0] / 1e3, kwargs['sensor_size'][1] / 1e3)
+            pixel_size = (sensor_size[0]/sensor_resolution[0] , sensor_size[1]/sensor_resolution[1])
+        else:
+            sensor_size = (kwargs['sensor_size'][0] / 1e3, kwargs['sensor_size'][1] / 1e3)
+            pixel_size = (kwargs['pixel_size'] / 1e6, kwargs['pixel_size'] / 1e6) if not len_2(kwargs['pixel_size'])\
+                else (kwargs['pixel_size'][0] / 1e6, kwargs['pixel_size'][1] / 1e6)
+        if kwargs['HFOV'] is not None + kwargs['VFOV'] is not None:
+            if kwargs['HFOV'] is not None and kwargs['VFOV'] is not None:
+                HFOV = kwargs['HFOV']
+                VFOV = kwargs['VFOV']
+                f = (sensor_size[0] / (2 * np.tan(HFOV / 360 * np.pi)), sensor_size[1] / (2 * np.tan(VFOV / 360 * np.pi)))
+            elif kwargs['HFOV'] is not None:
+                HFOV = kwargs['HFOV']
+                f = (sensor_size[0] / (2 * np.tan(HFOV / 360 * np.pi)), sensor_size[0] / (2 * np.tan(HFOV / 360 * np.pi)))
+                VFOV = 2 * np.arctan(sensor_size[1] / (2 * f[1])) * 180 / np.pi
+            else:
+                VFOV = kwargs['VFOV']
+                f = (sensor_size[1] / (2 * np.tan(VFOV / 360 * np.pi)), sensor_size[1] / (2 * np.tan(VFOV / 360 * np.pi)))
+                HFOV = 2 * np.arctan(sensor_size[0] / (2 * f[0])) * 180 / np.pi
+        aspect_ratio = pixel_size[0] / pixel_size[1]
+    else:
+        f = kwargs['f']
+        pixel_size = kwargs['pixel_size']
+        sensor_size = kwargs['sensor_size']
+        HFOV = kwargs['HFOV']
+        VFOV = kwargs['VFOV']
+        aspect_ratio = kwargs['aspect_ratio']
+    return {'f': (round(f[0]*1e3, 3)/1e3, round(f[1]*1e3, 3)/1e3),
+            'pixel_size': (round(pixel_size[0]*1e6, 3)/1e6, round(pixel_size[1]*1e6, 3)/1e6),
+            'sensor_size': (round(sensor_size[0]*1e3, 3)/1e3, round(sensor_size[1]*1e3, 3)/1e3),
+            'aspect_ratio': aspect_ratio,
+            'HFOV': round(HFOV, 2),
+            'VFOV': round(VFOV, 2)}
+
+def len_2(vec):
+    if isinstance(vec, tuple) or isinstance(vec, list) or isinstance(vec, torch.Tensor) or isinstance(vec, np.ndarray):
+        return True if len(vec) == 2 else False
+    else:
+        return False

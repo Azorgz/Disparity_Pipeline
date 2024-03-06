@@ -16,6 +16,13 @@ import torch
 #         lines = f.readlines()
 #     lines = [l.rstrip() for l in lines]
 #     return lines
+def print_tuple(t, link=' '):
+    t = [*t]
+    string = ''
+    for el in t:
+        string += str(el)
+        string += link
+    return string
 
 
 def name_generator(idx, max_number=10e4):

@@ -17,13 +17,13 @@ path_RGB2 = p + 'Day/slave/visible'
 path_IR = p + 'Day/master/infrared_corrected'
 path_IR2 = p + 'Day/slave/infrared_corrected'
 
-IR = IRCamera(None, None, path_IR, device=torch.device('cuda'), name='IR', f=14e-3, pixel_size=(16.4e-6, 16.4e-6),
+IR = IRCamera(path=path_IR, device=torch.device('cuda'), name='IR', f=14, pixel_size=16.4,
               aperture=1.2)
-IR2 = IRCamera(None, None, path_IR2, device=torch.device('cuda'), name='IR2', f=14e-3, pixel_size=(16.4e-6, 16.4e-6),
+IR2 = IRCamera(path=path_IR2, device=torch.device('cuda'), name='IR2', f=14, pixel_size=(16.4, 16.4),
                aperture=1.2)
-RGB = RGBCamera(None, None, path_RGB, device=torch.device('cuda'), name='RGB', f=6e-3, pixel_size=(3.45e-6, 3.45e-6),
+RGB = RGBCamera(path=path_RGB, device=torch.device('cuda'), name='RGB', f=6, pixel_size=3.45,
                 aperture=1.4)
-RGB2 = RGBCamera(None, None, path_RGB2, device=torch.device('cuda'), name='RGB2', f=6e-3, pixel_size=(3.45e-6, 3.45e-6),
+RGB2 = RGBCamera(path=path_RGB2, device=torch.device('cuda'), name='RGB2', f=6, pixel_size=(3.45, 3.45),
                  aperture=1.4)
 R = CameraSetup(RGB, IR, IR2, RGB2, print_info=True)
 

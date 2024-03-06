@@ -18,7 +18,7 @@ frames_timer = pd.DataFrame()
 for f in reversed(os.listdir(base_path + folder)):
     res = ResultFrame(base_path + folder + '/' + f)
 
-    # Without Occlusion
+#     # Without Occlusion
     data = res.delta.mean().values
     data[0] = -data[0]
     frame_mean = pd.DataFrame(

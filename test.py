@@ -4,6 +4,7 @@ import time
 import open3d as o3d
 import numpy as np
 import torch
+import tqdm
 from kornia.geometry import depth_to_3d
 from kornia.morphology import dilation
 from matplotlib import pyplot as plt
@@ -18,13 +19,12 @@ from Result_analysis.ResultFrame import ResultFrame
 # from utils.classes import ImageTensor
 # from utils.classes.Visualizer import Visualizer
 # from utils.classes.Image import ImageTensor
-import numpy as np
 
 from module.SetupCameras import CameraSetup
 from utils.classes import ImageTensor, Metric_nec_tensor
 from utils.classes.Image import DepthTensor
 from utils.gradient_tools import grad_tensor
-from utils.misc import time_fct
+from utils.misc import time_fct, name_generator
 
 # import cv2 as cv
 # from utils.registration_tools import SIFT
@@ -33,25 +33,38 @@ from utils.gradient_tools import grad_tensor
 
 
 # device = torch.device('cuda')
-# R = CameraSetup(from_file="/home/aurelien/PycharmProjects/Disparity_Pipeline/Setup_Camera.yaml")
+# R = CameraSetup(from_file="/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera_FLIR.yaml")
 # NN = KenburnDepth(path_ckpt=os.getcwd() + "/Networks/KenburnDepth/pretrained",
 #                   semantic_adjustment=False,
 #                   device=device)
 # # Depth
 # src = 'IR'
 # dst = 'RGB'
+# im, idx = R.cameras['RGB'].random_image(autopad=True)
+# im.show()
 #
 # # im_dst, idx = R.cameras[dst].random_image()
 # im_dst = R.cameras['RGB'].__getitem__(0)
 # im_src = R.cameras[src].__getitem__(0).RGB('gray')
 import torch.nn.functional as F
-p = '/home/aurelien/Images/Images_LLVIP/LLVIP_raw_images/train/infrared/'
-n_p = '/home/aurelien/Images/Images_LLVIP/LLVIP_raw_images/train/infrared_corrected/'
+p1 = '/home/godeta/PycharmProjects/FLIR_ADAS_v2/images_thermal_train/data'
+p2 = '/home/godeta/PycharmProjects/FLIR_ADAS_v2/images_thermal_val/data'
+n_p = '/home/godeta/PycharmProjects/FLIR_ADAS_v2/images_thermal_processed'
+files = glob.glob(p1 + '/*.jpg') + glob.glob(p2 + '/*.jpg')
 # im_src_new = ImageTensor("/home/aurelien/PycharmProjects/Disparity_Pipeline/results/methods_comparison/Depth-Depth/image_reg/IR_to_RGB/IR_000-Setup_Camera.png")
-for im in sorted(glob.glob(p + '/*.png') + glob.glob(p + '/*.jpg') + glob.glob(p + '/*.jpeg')):
-    im_ir = ImageTensor(f"{im}")
-    ir = F.interpolate(im_ir, size=[512, 640], mode='bicubic', align_corners=True)
-    ir.save(f"{n_p}")
+for idx, im in enumerate(tqdm.tqdm(files)):
+    split_name = (im.split('/')[-1]).split('-')
+    video_name = split_name[1]
+    frame = split_name[3]
+    path = f'{n_p}/{video_name}'
+    im = ImageTensor(f"{im}")
+    # if not os.path.isdir(f'{n_p}/{video_name}'):
+    #     os.makedirs(path)
+    im.im_name = f'{frame}'
+    im.save(path)
+
+
+
 # matrix_dst = R.cameras[dst].intrinsics[:, :3, :3]
 # f_dst = R.cameras[dst].f
 # var_dst = {'focal': f_dst, 'intrinsics': matrix_dst}

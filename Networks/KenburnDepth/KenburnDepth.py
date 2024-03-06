@@ -1,21 +1,16 @@
 import os
-import time
 from typing import Union
 
-import numba
 import numpy as np
 import torch
 from kornia.utils import get_cuda_device_if_available
 from torch import nn, tensor, Tensor
 from torchvision.models.detection import MaskRCNN_ResNet50_FPN_Weights, maskrcnn_resnet50_fpn
-
-from .estimation import Semantics, Disparity
-from .refinement import Refine
+from ultralytics import YOLO
 
 from utils.classes import ImageTensor
-from utils.classes.Image import DepthTensor
-from utils.misc import time_fct
-from ultralytics import YOLO
+from .estimation import Semantics, Disparity
+from .refinement import Refine
 
 
 class KenburnDepth(nn.Module):
