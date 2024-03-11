@@ -59,7 +59,7 @@ class StereoSetup(StereoCamera):
         self.depth_min = Tensor([z_min]).to(self.device)
         self.depth_max = Tensor([abs(P2[0, -1] * accuracy)]).to(self.device)
         self._init_maps_(R1, R2, P1, P2)
-        self._name = name if name is not None else f'{left.name}&{right.name}'
+        self._name = name if name is not None else f'{left.id}&{right.id}'
 
         self._init_roi_()
         self._ROI = [self.roi_max, self.roi_min]
@@ -133,8 +133,8 @@ class StereoSetup(StereoCamera):
             cut_roi_max = False
         if not reverse:
             self.last_call = {'cut_roi_min': cut_roi_min, 'cut_roi_max': cut_roi_max}
-            left = self.left.name
-            right = self.right.name
+            left = self.left.id
+            right = self.right.id
             new_sample = {}
             for key, im in sample.items():
                 if key == left:
@@ -156,8 +156,8 @@ class StereoSetup(StereoCamera):
         return new_sample
 
     def _reversed_call_(self, sample, *args):
-        left = self.left.name
-        right = self.right.name
+        left = self.left.id
+        right = self.right.id
         new_sample = {}
         cut_roi_min = self.last_call['cut_roi_min']
         cut_roi_max = self.last_call['cut_roi_max']
@@ -244,19 +244,13 @@ class StereoSetup(StereoCamera):
     def show_image_calibration(self):
         im_left = self.left.im_calib
         im_right = self.right.im_calib
-        sample = {self.left.name: im_left, self.right.name: im_right}
+        sample = {self.left.id: im_left, self.right.id: im_right}
         sample_1 = self(sample)
         # sample_2 = self(sample_1, reverse=True)
         sample_1['right'].show(num='right image', point=self.pts_right)
         sample_1['left'].show(num='left image', point=self.pts_left)
         (sample_1['right'] * 0.5 + sample_1['left'] * 0.5).show(roi=[self.current_roi_max, self.current_roi_min])
 
-        # sample_0['right'].show(num='Right 2 Left', roi=[self.roi_right2left_min, self.roi_right2left_max])
-        # sample_1['right'].show(num='Left 2 Right', roi=[self.roi_left2right_min, self.roi_left2right_max])
-        # (sample_2[self.left.name]-sample[self.left.name]).show()
-        # (sample_2[self.right.name]-sample[self.right.name]).show()
-        # (sample_0['right'] * 0.5 + sample_0['left'] * 0.5).show(
-        #     num='Right 2 Left', roi=[self.roi_min, self.roi_max])
 
     @property
     def shape_left(self):
@@ -310,19 +304,19 @@ class DepthSetup:
         self._target = target
         self._f = ref.f
         self._shape = ref.im_calib.shape[-2:]
-        self._name = name if name is not None else f'{ref.name}&{target.name}'
+        self._name = name if name is not None else f'{ref.id}&{target.id}'
 
     def __call__(self, sample, *args, reverse=False, **kwargs):
         if not reverse:
-            return {'sample': {'ref': sample[self.ref.name].clone(), 'target': sample[self.target.name].clone()},
+            return {'sample': {'ref': sample[self.ref.id].clone(), 'target': sample[self.target.id].clone()},
                     'intrinsics': self.intrinsics,
                     'pose': self._pose,
                     'focal': self.ref.f,
                     'depth': True}
         else:
             res = {}
-            res.update({self.ref.name: sample['ref']}) if 'ref' in sample.keys() else res.update({self.target.name: sample['target']})
-            res.update({self.target.name: sample['target']}) if 'target' in sample.keys() else res.update({self.ref.name: sample['ref']})
+            res.update({self.ref.id: sample['ref']}) if 'ref' in sample.keys() else res.update({self.target.id: sample['target']})
+            res.update({self.target.id: sample['target']}) if 'target' in sample.keys() else res.update({self.ref.id: sample['ref']})
             return res
 
     @property

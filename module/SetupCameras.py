@@ -41,13 +41,13 @@ class StereoPairs:
             if isinstance(stereo_setup, StereoSetup):
                 self.setup.append(stereo_setup)
                 self.names.append(stereo_setup.name)
-                self.left.append(stereo_setup.left.name)
-                self.right.append(stereo_setup.right.name)
+                self.left.append(stereo_setup.left.id)
+                self.right.append(stereo_setup.right.id)
             else:
                 self.setup.append(stereo_setup)
                 self.names.append(stereo_setup.name)
-                self.left.append(stereo_setup.ref.name)
-                self.right.append(stereo_setup.target.name)
+                self.left.append(stereo_setup.ref.id)
+                self.right.append(stereo_setup.target.id)
         return self
 
     def __sub__(self, stereo_setup: StereoSetup or str):
@@ -204,9 +204,9 @@ class CameraSetup(object):
         list_rgb = {key: f' ({"Ref" if cam.is_ref else ("In position" if cam.is_positioned else "Position unknown")})'
                     for key, cam
                     in self.cameras_RGB.items()}
-        string = f'Cameras : {", ".join([key for key in self.cameras.keys()])}\n'
-        string += f'Cameras IR : {", ".join([key + list_ir[key] for key in self.cameras_IR.keys()])}\n'
-        string += f'Cameras RGB : {", ".join([key + list_rgb[key] for key in self.cameras_RGB.keys()])}\n'
+        # string = f'Cameras : {", ".join([self.cameras[key].id for key in self.cameras.keys()])}\n'
+        string = f'Cameras IR : {", ".join([self.cameras[key].name + f" ({key})" + list_ir[key] for key in self.cameras_IR.keys()])}\n'
+        string += f'Cameras RGB : {", ".join([self.cameras[key].name + f" ({key})"  + list_rgb[key] for key in self.cameras_RGB.keys()])}\n'
         string += f'The Reference Camera is : {self.camera_ref}'
         return string
 
@@ -248,21 +248,21 @@ class CameraSetup(object):
 
     def _add_camera_(self, camera: Union[IRCamera, RGBCamera], print_info) -> IRCamera or RGBCamera:
         k = 0
-        while camera.name in self.cameras.keys():
-            camera.update_name(k)
+        while camera.id in self.cameras.keys():
+            camera.update_id(k)
             k += 1
-        self.cameras[camera.name] = camera
+        self.cameras[camera.id] = camera
         if self.nb_cameras == 1:
-            self.update_camera_ref(camera.name)
+            self.update_camera_ref(camera.id)
         if isinstance(camera, IRCamera):
-            self.cameras_IR[camera.name] = camera
+            self.cameras_IR[camera.id] = camera
         else:
-            self.cameras_RGB[camera.name] = camera
+            self.cameras_RGB[camera.id] = camera
         for cam in self.cameras.values():
-            cam.update_setup(self.camera_ref, [k for k in self.cameras.keys() if k != cam.name])
-        # self.cameras_calibration[camera.name] = {'matrix': torch.eye(3), 'crop': Tensor([0, 0, 0, 0])}
+            cam.update_setup(self.camera_ref, [k for k in self.cameras.keys() if k != cam.id])
+        # self.cameras_calibration[camera.id] = {'matrix': torch.eye(3), 'crop': Tensor([0, 0, 0, 0])}
         if print_info:
-            print(f'The {camera.im_type} Camera {camera.name} has been added to the Rig')
+            print(f'The {camera.im_type} Camera {camera.name} has been added to the Rig as {camera.id}')
         return camera
 
     def _del_camera_(self, camera: Union[IRCamera, RGBCamera, str], print_info) -> IRCamera or RGBCamera:
@@ -278,18 +278,18 @@ class CameraSetup(object):
                 camera = self.cameras.pop(camera)
                 break
             elif camera is v:
-                if isinstance(self.cameras[camera.name], IRCamera):
-                    self.cameras_IR.pop(camera.name)
+                if isinstance(self.cameras[camera.id], IRCamera):
+                    self.cameras_IR.pop(camera.id)
                 else:
-                    self.cameras_RGB.pop(camera.name)
-                if self.camera_ref == camera.name:
+                    self.cameras_RGB.pop(camera.id)
+                if self.camera_ref == camera.id:
                     self.camera_ref = None
-                    self._set_default_new_ref_(camera.name)
-                camera = self.cameras.pop(camera.name)
+                    self._set_default_new_ref_(camera.id)
+                camera = self.cameras.pop(camera.id)
                 break
         camera.reset()
         for cam in self.cameras.values():
-            cam.update_setup(self.camera_ref, [k for k in self.cameras.keys() if k != cam.name])
+            cam.update_setup(self.camera_ref, [k for k in self.cameras.keys() if k != cam.id])
         if print_info:
             print(f'The {camera.im_type} Camera {camera.name} has been removed from the Rig')
         return camera
@@ -324,7 +324,7 @@ class CameraSetup(object):
                 ref = self.recover_pose_from_keypoints(c, ref=ref, t=t_cam)
         else:
             if not isinstance(cam, str):
-                cam = cam.name
+                cam = cam.id
             if self._check_if_cam_is_in_setup_(cam):
                 Kpts_gen = KeypointsGenerator(self.device, detector='SIFT_SCALE', matcher='SNN')
                 cam_ref = ref if ref is not None and isinstance(ref, str) else self._camera_ref
@@ -385,7 +385,7 @@ class CameraSetup(object):
 
     def update_camera_ref(self, cam: Union[IRCamera, RGBCamera, str]):
         if not isinstance(cam, str):
-            cam = cam.name
+            cam = cam.id
         if self._check_if_cam_is_in_setup_(cam) and cam != self.camera_ref:
             if self.camera_ref:  # If we already have a camera Ref
                 self.cameras[self.camera_ref].is_ref = False  # It's not the Ref anymore
@@ -408,7 +408,7 @@ class CameraSetup(object):
                                         rx=None, ry=None, rz=None):
         """
         Update the camera position in regard to the Ref Camera position.
-        :param name: Name of the Camera to be moved
+        :param name: id of the Camera to be moved
         :param extrinsics: new extrinsics matrix (optional)
         :param x: new x position in regard to the Cam_ref position
         :param y: new y position in regard to the Cam_ref position
@@ -435,7 +435,7 @@ class CameraSetup(object):
         """
         Move a Camera in the Setup from its position to its position + the given delta in each direction/angle
         The units are meters/rad
-        :param name: Name of the Camera to be moved
+        :param name: id of the Camera to be moved
         :param dx: displacement in x direction in meter
         :param dy: displacement in y direction in meter
         :param dz: displacement in z direction in meter
@@ -514,13 +514,13 @@ class CameraSetup(object):
             d = DepthSetup(ref, target, self.device, name=name)
             self.depth_pair += d
 
-    def update_model(self, model):
-        self.registration.model = model
-        self.manual_calibration_available = True
+    # def update_model(self, model):
+    #     self.registration.model = model
+    #     self.manual_calibration_available = True
 
     def _check_if_cam_is_in_setup_(self, cam: Union[IRCamera, RGBCamera, str]):
         if not isinstance(cam, str):
-            name = cam.name
+            name = cam.id
         else:
             name = cam
         try:

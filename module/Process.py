@@ -88,9 +88,9 @@ class Process(OrderedDict):
                     if val['pred_bidir']:
                         cam = [val['cam1'], val['cam2']]
                     elif val['pred_right']:
-                        cam = [setup.stereo_pair(val['cam1'], val['cam2']).right.name]
+                        cam = [setup.stereo_pair(val['cam1'], val['cam2']).right.id]
                     else:
-                        cam = [setup.stereo_pair(val['cam1'], val['cam2']).left.name]
+                        cam = [setup.stereo_pair(val['cam1'], val['cam2']).left.id]
                     if name_var in pred.keys():
                         pred[name_var].append(*cam)
                     else:
@@ -114,9 +114,9 @@ class Process(OrderedDict):
                     if val['pred_bidir']:
                         cam = [val['cam1'], val['cam2']]
                     elif val['pred_right']:
-                        cam = [setup.depth_pair(val['cam1'], val['cam2']).target.name]
+                        cam = [setup.depth_pair(val['cam1'], val['cam2']).target.id]
                     else:
-                        cam = [setup.depth_pair(val['cam1'], val['cam2']).ref.name]
+                        cam = [setup.depth_pair(val['cam1'], val['cam2']).ref.id]
                     if name_var in pred.keys():
                         pred[name_var].append(*cam)
                     else:

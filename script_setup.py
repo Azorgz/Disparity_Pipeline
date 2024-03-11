@@ -17,13 +17,13 @@ path_RGB2 = p + 'Day/slave/visible'
 path_IR = p + 'Day/master/infrared_corrected'
 path_IR2 = p + 'Day/slave/infrared_corrected'
 
-IR = IRCamera(path=path_IR, device=torch.device('cuda'), name='IR', f=14, pixel_size=16.4,
+IR = IRCamera(path=path_IR, device=torch.device('cuda'), id='IR', name='mainIR', f=14, pixel_size=16.4,
               aperture=1.2)
-IR2 = IRCamera(path=path_IR2, device=torch.device('cuda'), name='IR2', f=14, pixel_size=(16.4, 16.4),
+IR2 = IRCamera(path=path_IR2, device=torch.device('cuda'), id='IR2', name='subIR', f=14, pixel_size=(16.4, 16.4),
                aperture=1.2)
-RGB = RGBCamera(path=path_RGB, device=torch.device('cuda'), name='RGB', f=6, pixel_size=3.45,
+RGB = RGBCamera(path=path_RGB, device=torch.device('cuda'), id='RGB', name='mainRGB', f=6, pixel_size=3.45,
                 aperture=1.4)
-RGB2 = RGBCamera(path=path_RGB2, device=torch.device('cuda'), name='RGB2', f=6, pixel_size=(3.45, 3.45),
+RGB2 = RGBCamera(path=path_RGB2, device=torch.device('cuda'), id='RGB2', name='subRGB', f=6, pixel_size=(3.45, 3.45),
                  aperture=1.4)
 R = CameraSetup(RGB, IR, IR2, RGB2, print_info=True)
 
@@ -60,6 +60,8 @@ R.calibration_for_stereo('IR', 'IR2')
 
 R.calibration_for_depth('IR', 'IR2')
 R.calibration_for_depth('RGB', 'RGB2')
+
+print(R)
 
 perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/'
 pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/'

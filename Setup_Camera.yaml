@@ -22,6 +22,7 @@ cameras:
     f:
     - 14.0
     - 14.0
+    id: IR
     im_type: IR
     intrinsics:
     - - 853.0
@@ -42,8 +43,11 @@ cameras:
       - 1.0
     is_positioned: true
     is_ref: false
-    name: IR
-    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/master/infrared_corrected
+    name: mainIR
+    path: /home/aurelien/Images/Images_LYNRED/Day/master/infrared_corrected
+    sensor_resolution:
+    - 640
+    - 480
   IR2:
     aperture: 1.2
     extrinsics:
@@ -66,6 +70,7 @@ cameras:
     f:
     - 14.0
     - 14.0
+    id: IR2
     im_type: IR
     intrinsics:
     - - 853.0
@@ -86,8 +91,11 @@ cameras:
       - 1.0
     is_positioned: true
     is_ref: false
-    name: IR2
-    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/slave/infrared_corrected
+    name: subIR
+    path: /home/aurelien/Images/Images_LYNRED/Day/slave/infrared_corrected
+    sensor_resolution:
+    - 640
+    - 480
   RGB:
     aperture: 1.4
     extrinsics:
@@ -110,6 +118,7 @@ cameras:
     f:
     - 6.0
     - 6.0
+    id: RGB
     im_type: RGB
     intrinsics:
     - - 1739.0
@@ -130,8 +139,11 @@ cameras:
       - 1.0
     is_positioned: true
     is_ref: true
-    name: RGB
-    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/master/visible
+    name: mainRGB
+    path: /home/aurelien/Images/Images_LYNRED/Day/master/visible
+    sensor_resolution:
+    - 1280
+    - 960
   RGB2:
     aperture: 1.4
     extrinsics:
@@ -154,6 +166,7 @@ cameras:
     f:
     - 6.0
     - 6.0
+    id: RGB2
     im_type: RGB
     intrinsics:
     - - 1739.0
@@ -174,31 +187,34 @@ cameras:
       - 1.0
     is_positioned: true
     is_ref: false
-    name: RGB2
-    path: /home/godeta/PycharmProjects/LYNRED/Images/Day/slave/visible
+    name: subRGB
+    path: /home/aurelien/Images/Images_LYNRED/Day/slave/visible
+    sensor_resolution:
+    - 1280
+    - 960
 depth_pair:
   name:
-  - IR&IR2
-  - RGB&RGB2
+  - mainIR&subIR
+  - mainRGB&subRGB
   ref:
-  - IR
-  - RGB
+  - mainIR
+  - mainRGB
   target:
-  - IR2
-  - RGB2
+  - subIR
+  - subRGB
 stereo_pair:
   left:
-  - RGB
-  - RGB
-  - IR
-  - IR
+  - mainRGB
+  - mainRGB
+  - mainIR
+  - mainIR
   name:
-  - RGB&RGB2
-  - RGB&IR
-  - IR&RGB2
-  - IR&IR2
+  - mainRGB&subRGB
+  - mainRGB&mainIR
+  - mainIR&subRGB
+  - mainIR&subIR
   right:
-  - RGB2
-  - IR
-  - RGB2
-  - IR2
+  - subRGB
+  - mainIR
+  - subRGB
+  - subIR
