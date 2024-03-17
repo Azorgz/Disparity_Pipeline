@@ -25,7 +25,8 @@ class StereoSetup(StereoCamera):
     _ROI = [0, 0, 0, 0]
 
     def __init__(self, left: Union[IRCamera, RGBCamera], right: Union[IRCamera, RGBCamera],
-                 device: torch.device, name: str = None, accuracy=0.25, z_min=0.5):
+                 device: torch.device, name: str = None, accuracy: float = 0.25, z_min: float = 0.5,
+                 depth_min: float = None, depth_max: float = None):
         self._left = left
         self._right = right
         # Needed parameter for the calibration left-right
@@ -56,8 +57,8 @@ class StereoSetup(StereoCamera):
 
         super(StereoSetup, self).__init__(Tensor(P1).to(device=device).unsqueeze(0),
                                           Tensor(P2).to(device=device).unsqueeze(0))
-        self.depth_min = Tensor([z_min]).to(self.device)
-        self.depth_max = Tensor([abs(P2[0, -1] * accuracy)]).to(self.device)
+        self.depth_min = Tensor([z_min]).to(self.device) if depth_min is None else depth_min
+        self.depth_max = Tensor([abs(P2[0, -1] * accuracy)]).to(self.device) if depth_max is None else depth_max
         self._init_maps_(R1, R2, P1, P2)
         self._name = name if name is not None else f'{left.id}&{right.id}'
 
@@ -188,6 +189,8 @@ class StereoSetup(StereoCamera):
             t = t[:, :, :, -1].unsqueeze(1)
             sample[key] = torch.clip(t, self.depth_min, self.depth_max)
             sample[key].pass_attr(t)
+            sample[key].max_value = self.depth_max
+            sample[key].min_value = self.depth_min
         return sample
 
     def depth_to_disparity(self, depth, *args):
@@ -293,9 +296,11 @@ class DepthSetup:
     _intrinsics = torch.eye(3)
     _f = 10e-3
     _shape = 0, 0
+    _depth_min = 0
+    _depth_max = 10
 
     def __init__(self, ref: Union[IRCamera, RGBCamera], target: Union[IRCamera, RGBCamera],
-                 device: torch.device, name: str = None, accuracy_min: float = 10.):
+                 device: torch.device, name: str = None, depth_min: float = None, depth_max: float = None):
         assert ref.im_type == target.im_type
         self.device = device
         self._intrinsics = ref.intrinsics[:, :3, :3].to(torch.float32)
@@ -303,6 +308,8 @@ class DepthSetup:
         self._ref = ref
         self._target = target
         self._f = ref.f
+        self._depth_max = depth_max
+        self._depth_min = depth_min
         self._shape = ref.im_calib.shape[-2:]
         self._name = name if name is not None else f'{ref.id}&{target.id}'
 
@@ -315,13 +322,28 @@ class DepthSetup:
                     'depth': True}
         else:
             res = {}
-            res.update({self.ref.id: sample['ref']}) if 'ref' in sample.keys() else res.update({self.target.id: sample['target']})
-            res.update({self.target.id: sample['target']}) if 'target' in sample.keys() else res.update({self.ref.id: sample['ref']})
+            res.update({self.ref.id: self.clip(sample['ref'])}) if 'ref' in sample.keys()\
+                else res.update({self.target.id: self.clip(sample['target'])})
+            # res.update({self.target.id: sample['target']}) if 'target' in sample.keys() else res.update({self.ref.id: sample['ref']})
             return res
+
+    def clip(self, depth):
+        depth = depth.clip(self.depth_min, self.depth_max)
+        depth.max_value = self.depth_max
+        depth.min_value = self.depth_min
+        return depth
 
     @property
     def ref(self):
         return self._ref
+
+    @property
+    def depth_max(self):
+        return self._depth_max
+
+    @property
+    def depth_min(self):
+        return self._depth_min
 
     @property
     def target(self):

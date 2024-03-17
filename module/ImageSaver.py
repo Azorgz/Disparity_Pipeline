@@ -15,5 +15,5 @@ class ImageSaver(BaseModule):
     @timeit
     def __call__(self, var: dict, path: Union[str, Path], *args, **kwargs):
         for key, im in var.items():
-            name = f'{im.im_name}.png'
-            im.save(path + f'/{key}', name)
+            # name = f'{im.im_name}.png'
+            im.save(path + f'/{key}')

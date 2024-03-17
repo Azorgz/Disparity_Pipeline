@@ -20,6 +20,8 @@ save_reg_images: True # Save the final Registered image
 # Cameras Setup #########
 setup: # Paths to the config file of the pre-calibrated camera's setup
   path: Setup_Camera.yaml
+  max_depth: 200 # in metric unit
+  min_depth: 1
 
 
 # Dataset #########

@@ -88,7 +88,7 @@ class ImageTensor(Tensor):
     _color_mode = None
     _mode_list = ['1', 'L', 'RGB', 'RGBA', 'CMYK', 'LAB', 'HSV']
     _channel_pos = None
-
+    _depth = '8'
     def __init__(self, *args, **kwargs):
         super(ImageTensor, self).__init__()
 
@@ -115,8 +115,14 @@ class ImageTensor(Tensor):
             raise NotImplementedError
         if isinstance(inp_, PIL.Image.Image):
             array = pil_to_numpy(inp_)
-            color_mode = inp_.mode
-            inp_ = torch.from_numpy(array)
+            color_mode = inp_.mode.split(';')[0]
+            if len(inp_.mode.split(';')) > 1:
+                color_mode = 'L'
+                depth = inp_.mode.split(';')[1]
+                inp_ = torch.from_numpy(array/255)
+            else:
+                depth = '8'
+                inp_ = torch.from_numpy(array)
             if len(inp_.shape) == 3:
                 inp_ = inp_.permute([2, 0, 1])
             # t = transforms.ToTensor()
@@ -142,6 +148,7 @@ class ImageTensor(Tensor):
         image._im_type = im_type
         image._color_mode = color_mode
         image._im_name = name
+        image._depth = depth
         return image
 
     # Base Methods
@@ -328,11 +335,19 @@ class ImageTensor(Tensor):
             return a
 
     # utils methods
-    def opencv(self):
+    def opencv(self, **kwargs):
         if self.color_mode == 'L':
             a = np.ascontiguousarray(Tensor.numpy(self.squeeze().cpu()) * 255, dtype=np.uint8)
         else:
             a = np.ascontiguousarray(self.RGB().put_channel_at(-1).squeeze().cpu().numpy()[..., [2, 1, 0]] * 255,
+                                     dtype=np.uint8)
+        return a
+
+    def to_numpy(self, **kwargs):
+        if self.color_mode == 'L':
+            a = np.ascontiguousarray(Tensor.numpy(self.squeeze().cpu()) * 255, dtype=np.uint8)
+        else:
+            a = np.ascontiguousarray(self.RGB().put_channel_at(-1).squeeze().cpu().numpy() * 255,
                                      dtype=np.uint8)
         return a
 
@@ -366,7 +381,7 @@ class ImageTensor(Tensor):
         plt.show()
         return ax
 
-    def save(self, path, name=None, ext='png'):
+    def save(self, path, name=None, ext='png', **kwargs):
         name = self.im_name + f'.{ext}' if name is None else name
         if not os.path.exists(path):
             os.makedirs(path, exist_ok=True)
@@ -380,6 +395,14 @@ class ImageTensor(Tensor):
     @im_name.setter
     def im_name(self, name) -> None:
         self._im_name = name
+
+    @property
+    def depth(self) -> str:
+        return self._depth
+
+    @depth.setter
+    def depth(self, value) -> None:
+        self._depth = value
 
     @property
     def im_type(self) -> str:
@@ -578,17 +601,24 @@ class DepthTensor(ImageTensor):
         plt.show()
         return ax
 
-    def save(self, path, name=None):
-        ImageTensor(self.inverse_depth(remove_zeros=True)
-                    .normalize()).RGB().save(path, name=name)
+    def save(self, path, name=None, save_image=False, **kwargs):
+        if save_image:
+            ImageTensor(self.inverse_depth(remove_zeros=True)
+                        .normalize()).RGB().save(path, name=name)
+        else:
+            name = self.im_name + '.tiff' if name is None else name
+            im = self.opencv()
+            if not os.path.exists(path):
+                os.makedirs(path, exist_ok=True)
+            if not cv.imwrite(path + f'/{name}', im):
+                raise Exception("Could not write image")
 
-    def opencv(self):
+    def opencv(self, **kwargs):
         if self.color_mode == 'L':
-            a = np.ascontiguousarray(Tensor.numpy(self.unscale().squeeze().cpu()) * 255, dtype=np.uint8)
+            a = np.ascontiguousarray(Tensor.numpy(self.unscale().squeeze().cpu()) * 255**2, dtype=np.uint16)
         else:
             a = np.ascontiguousarray(
-                Tensor.numpy(self.unscale().put_channel_at(-1).squeeze().cpu())[..., [2, 1, 0]] * 255,
-                dtype=np.uint8)
+                Tensor.numpy(self.unscale().put_channel_at(-1).squeeze().cpu())[..., [2, 1, 0]] * 255**2, dtype=np.uint16)
         return a
 
     def clamp(self, mini=None, maxi=None, *, out=None):
@@ -647,7 +677,7 @@ class DepthTensor(ImageTensor):
 
     @max_value.setter
     def max_value(self, v):
-        self.max_value = v
+        self._max_value = v
 
     @property
     def min_value(self):
@@ -655,7 +685,7 @@ class DepthTensor(ImageTensor):
 
     @min_value.setter
     def min_value(self, v):
-        self.min_value = v
+        self._min_value = v
 
     @property
     def ori_shape(self):

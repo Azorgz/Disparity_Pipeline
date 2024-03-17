@@ -40,5 +40,5 @@ def quick_process(idx, script_path):
 
 
 if __name__ == '__main__':
-    quick_process(None, 'Process_test.yaml')
+    quick_process(None, 'Process_dataset_creation.yaml')
     #[1324, 2159, 2543, 3493]

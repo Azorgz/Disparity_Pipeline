@@ -8,6 +8,7 @@ from kornia.utils import get_cuda_device_if_available
 from tqdm import tqdm
 
 from utils.classes import ImageTensor
+from utils.classes.Image import DepthTensor
 from utils.classes.VideoGenerator import VideoGenerator
 from utils.gradient_tools import grad_tensor_image, grad_image
 
@@ -419,5 +420,5 @@ class Visualizer:
 if __name__ == '__main__':
     pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/results/'
     perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/results/'
-    path = perso + "camera_position_rgb/Disparity-Depth"
+    path = perso + "DatasetCreation/Lynred_vis"
     Visualizer(path, search_exp=False).run()

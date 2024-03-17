@@ -16,7 +16,7 @@ from module.SuperNetwork import SuperNetwork
 from module.Validation import Validation
 from utils.manipulation_tools import merge_dict
 # Utils
-from utils.misc import time2str, update_name_tree # , form_cloud_data
+from utils.misc import time2str, update_name_tree  # , form_cloud_data
 
 
 # Networks
@@ -78,7 +78,9 @@ class Pipe:
                     name = None
                     for i, s in enumerate(self.setup):
                         if self.config["setup"]['multi']:
-                            s = CameraSetup(from_file=s, device=self.device)
+                            s = CameraSetup(from_file=s, device=self.device,
+                                            max_depth=self.config["setup"]['max_depth'],
+                                            min_depth=self.config["setup"]['min_depth'])
                             self._init_dataloader_(s)
                             self.dataloader.camera_used = process.camera_used
                             self._init_wrapper_(s, verbose=False)
@@ -194,7 +196,9 @@ class Pipe:
                                           desc=f"Configuration of the different Setup")]
             self.config["setup"]['multi'] = len(self.setup)
         else:
-            self.setup = [CameraSetup(from_file=self.config["setup"]['path'], device=self.device)]
+            self.setup = [CameraSetup(from_file=self.config["setup"]['path'], device=self.device,
+                                      max_depth=self.config["setup"]['max_depth'],
+                                      min_depth=self.config["setup"]['min_depth'])]
             self.config["setup"]['multi'] = 0
 
     @torch.no_grad()
