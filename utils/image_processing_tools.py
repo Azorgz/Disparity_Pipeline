@@ -4,6 +4,7 @@ import kornia
 import numpy as np
 import torch
 
+
 # from classes.Image import ImageCustom
 
 
@@ -18,6 +19,92 @@ def perspective2grid(matrix, shape, device):
     grid_transformed[:, :, :, 0] = 2 * (grid_transformed[:, :, :, 0] / alpha) / width - 1  # [1 H W 3]
     grid_transformed[:, :, :, 1] = 2 * (grid_transformed[:, :, :, 1] / alpha) / height - 1  # [1 H W 3]
     return grid_transformed[..., :2]  # [1 H W 2]
+
+
+def reproject(src_img, depth_img, target_frame_res, K_ref, K_cam, Rt_ref, Rt_cam):
+    """
+    This function reprojects RGB images.
+    rgb_img: RGB_src image (h, w, 3)
+    depth_img: Depth_src image (h, w)
+    K_ref: Intrinsic matrix from src
+    K_cam: Intrinsic matrix from dst
+    Rt_ref: Extrinsic matrix from src
+    Rt_cam: Extrinsic matrix from dst
+    """
+
+    i = np.tile(np.arange(depth_img.shape[1]), depth_img.shape[0])
+    j = np.repeat(np.arange(depth_img.shape[0]), depth_img.shape[1])
+    ones_vect = np.ones(depth_img.shape[0] * depth_img.shape[1])
+    z = depth_img[j, i]
+    z[z == 0] = 1
+    img_mx = np.stack([i, j, ones_vect, 1 / z], axis=0)
+    # ************ REPROJECTION ************
+    low_vect = np.array([0, 0, 0, 1])
+    left_mx = np.matmul(K_cam, Rt_cam)
+    right_mx = np.linalg.inv(np.vstack((np.matmul(K_ref, Rt_ref), low_vect)))
+    P = np.multiply(np.matmul(right_mx, img_mx), z)
+    res_mx_d = np.matmul(left_mx, P) / z
+    u = res_mx_d[0, :]
+    v = res_mx_d[1, :]
+    del_u_ix = np.where(u > target_frame_res[0])
+    del_v_ix = np.where(v > target_frame_res[1])
+    del_u_ix_neg = np.where(u < 0)
+    del_v_ix_neg = np.where(v < 0)
+    del_ix_neg = np.unique(np.append(del_u_ix_neg, del_v_ix_neg))
+    del_ix_excess = np.unique(np.append(del_u_ix, del_v_ix))
+    del_ix = np.unique(np.append(del_ix_neg, del_ix_excess))
+    u = np.delete(u, del_ix)
+    v = np.delete(v, del_ix)
+    i = np.delete(i, del_ix)
+    j = np.delete(j, del_ix)
+    u = np.around(u, 0).astype('int')
+    v = np.around(v, 0).astype('int')
+    out_img = np.zeros((target_frame_res[1], target_frame_res[0], target_frame_res[2]))
+    out_img[v, u, :] = src_img[j, i, :]
+    return out_img
+
+
+def reproject_RGB(rgb_img, depth_img, K_ref, K_cam, Rt_ref, Rt_cam):
+    """
+    This function reprojects RGB images.
+    rgb_img: RGB_src image (h, w, 3)
+    depth_img: Depth_src image (h, w)
+    K_ref: Intrinsic matrix from src
+    K_cam: Intrinsic matrix from dst
+    Rt_ref: Extrinsic matrix from src
+    Rt_cam: Extrinsic matrix from dst
+    """
+    i = np.tile(np.arange(depth_img.shape[1]), depth_img.shape[0])
+    j = np.repeat(np.arange(depth_img.shape[0]), depth_img.shape[1])
+    ones_vect = np.ones(depth_img.shape[0] * depth_img.shape[1])
+    z = depth_img[j, i]
+    z[z == 0] = 1
+    img_mx = np.stack([i, j, ones_vect, 1 / z], axis=0)
+    # ************ REPROJECTION ************
+    low_vect = np.array([0, 0, 0, 1])
+    left_mx = np.matmul(K_cam, Rt_cam)
+    temp = np.vstack((np.matmul(K_ref, Rt_ref), low_vect))
+    right_mx = np.linalg.inv(temp)
+    P = np.multiply(np.matmul(right_mx, img_mx), z)
+    res_mx_d = np.matmul(left_mx, P) / z
+    u = res_mx_d[0, :]
+    v = res_mx_d[1, :]
+    del_u_ix = np.where(u > rgb_img.shape[-1]-1)
+    del_v_ix = np.where(v > rgb_img.shape[-2]-1)
+    del_u_ix_neg = np.where(u < 0)
+    del_v_ix_neg = np.where(v < 0)
+    del_ix_neg = np.unique(np.append(del_u_ix_neg, del_v_ix_neg))
+    del_ix_excess = np.unique(np.append(del_u_ix, del_v_ix))
+    del_ix = np.unique(np.append(del_ix_neg, del_ix_excess))
+    u = np.delete(u, del_ix)
+    v = np.delete(v, del_ix)
+    i = np.delete(i, del_ix)
+    j = np.delete(j, del_ix)
+    u = np.around(u, 0).astype('int')
+    v = np.around(v, 0).astype('int')
+    out_img = rgb_img*0
+    out_img[:, :, v, u] = rgb_img[:, :, j, i]
+    return out_img
 
 
 def histogram_equalization(image, method=0):
@@ -69,10 +156,10 @@ def normalization_maps(image, image2=None):
         M = max(image.max(), image2.max())
         mi = min(image.min(), image2.min())
         m = image.mean() / 2 + image2.mean() / 2
-        im2 = 1 - abs(image2 / 1.0 - m) / M #Compute the distance to the mean of the image
-        im2 = (im2 - im2.min()) / (2 * (im2.max() - im2.min())) + 0.5 #Normalize this distance between 0.5 and 1
-        res2 = image2 * im2 #Normalize the input image between 0 and 1 and weight it by the mask computed before
-        res2 = (res2 - res2.min()) / (res2.max() - res2.min()) * 255 #Normalize the output between 0 and 255
+        im2 = 1 - abs(image2 / 1.0 - m) / M  # Compute the distance to the mean of the image
+        im2 = (im2 - im2.min()) / (2 * (im2.max() - im2.min())) + 0.5  # Normalize this distance between 0.5 and 1
+        res2 = image2 * im2  # Normalize the input image between 0 and 1 and weight it by the mask computed before
+        res2 = (res2 - res2.min()) / (res2.max() - res2.min()) * 255  # Normalize the output between 0 and 255
     im = 1 - abs(image / 1.0 - m) / M
     im = (im - im.min()) / (2 * (im.max() - im.min())) + 0.5
     res = image * im
@@ -156,7 +243,7 @@ def laplacian_fusion(pyramid, pyramid2, mask_fusion, verbose=False):
             temp = ImageCustom(cv.pyrUp(temp) + details * 255, pyramid[0])
         else:
             temp = temp + details * 255
-            temp = ImageCustom((temp - temp.min()) / (temp.max() - temp.min())*255, pyramid[0])
+            temp = ImageCustom((temp - temp.min()) / (temp.max() - temp.min()) * 255, pyramid[0])
         if verbose:
             cv.imshow('fusion', temp)
             cv.waitKey(0)

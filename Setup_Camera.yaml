@@ -194,27 +194,27 @@ cameras:
     - 960
 depth_pair:
   name:
-  - mainIR&subIR
-  - mainRGB&subRGB
+  - IR&IR2
+  - RGB&RGB2
   ref:
-  - mainIR
-  - mainRGB
+  - IR
+  - RGB
   target:
-  - subIR
-  - subRGB
+  - IR2
+  - RGB2
 stereo_pair:
   left:
-  - mainRGB
-  - mainRGB
-  - mainIR
-  - mainIR
+  - RGB
+  - RGB
+  - IR
+  - IR
   name:
-  - mainRGB&subRGB
-  - mainRGB&mainIR
-  - mainIR&subRGB
-  - mainIR&subIR
+  - RGB&RGB2
+  - RGB&IR
+  - IR&RGB2
+  - IR&IR2
   right:
-  - subRGB
-  - mainIR
-  - subRGB
-  - subIR
+  - RGB2
+  - IR
+  - RGB2
+  - IR2

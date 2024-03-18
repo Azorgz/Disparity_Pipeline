@@ -159,13 +159,20 @@ class CameraSetup(object):
     _depth_pair = StereoPairs()
     _base2Ref = torch.eye(4)
     _coplanarity_tolerance = 0.15
+    _max_depth = 200
+    _min_depth = 0
 
-    def __init__(self, *args, device=None, from_file=False, model=None, name=None, **kwargs):
+    def __init__(self, *args, device=None, from_file=False, model=None, name=None, max_depth=None, min_depth=None, **kwargs):
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = model
+        if max_depth:
+            self._max_depth = max_depth
+        if min_depth:
+            self._min_depth = min_depth
         # self.registration = Registration(self.device, self.model)
         # self.manual_calibration_available = True if self.registration.model is not None else False
-        if from_file and os.path.exists(from_file):
+        if from_file:
+            assert os.path.exists(from_file)
             self._init_from_file_(from_file, self.device)
             self.name = path_leaf(from_file)
         else:
@@ -232,6 +239,7 @@ class CameraSetup(object):
             self.calibration_for_stereo(**conf['stereo_pair'])
         if conf['depth_pair']['ref']:
             self.calibration_for_depth(**conf['depth_pair'])
+
 
     def save(self, path, name='Setup_Camera.yaml'):
         dict_setup = {'cameras': {key: cam.save_dict() for key, cam in self.cameras.items()},
@@ -308,7 +316,7 @@ class CameraSetup(object):
     def recover_pose_from_keypoints(self, cam: Union[IRCamera, RGBCamera, str], *args, ref=None,
                                     t=None) -> IRCamera or RGBCamera:
         """
-        This function re-set the intrinsics parameters of a camera using consecutively the fundamental matrix
+        This function re-set the extrinsic parameters of a camera using consecutively the fundamental matrix
         determination by the 8-points method, then extracting the Essential matrix from it (according the intrinsic is known...)
         and finally recovering R and T matrix from Essential.
         :param t: The known translation distance for one direction
@@ -480,7 +488,7 @@ class CameraSetup(object):
                 left, right = right, left
             elif left.extrinsics[0, 0, -1] == right.extrinsics[0, 0, -1]:
                 warnings.warn('The Camera are not spaced enough to compute disparity')
-            s = StereoSetup(left, right, self.device, name)
+            s = StereoSetup(left, right, self.device, name, depth_max=self.max_depth, depth_min=self.min_depth)
             self.stereo_pair += s
 
     def calibration_for_depth(self, ref, target, name=None):
@@ -511,7 +519,7 @@ class CameraSetup(object):
             except AssertionError:
                 warnings.warn("The chosen Cameras don't have the same intrinsics matrix")
                 return 0
-            d = DepthSetup(ref, target, self.device, name=name)
+            d = DepthSetup(ref, target, self.device, name=name, depth_max=self.max_depth, depth_min=self.min_depth)
             self.depth_pair += d
 
     # def update_model(self, model):
@@ -606,6 +614,14 @@ class CameraSetup(object):
     @property
     def pos(self):
         return {key: cam.extrinsics for key, cam in self.cameras.items()}
+
+    @property
+    def max_depth(self):
+        return self._max_depth
+
+    @property
+    def min_depth(self):
+        return self._min_depth
 
     @property
     def model(self):

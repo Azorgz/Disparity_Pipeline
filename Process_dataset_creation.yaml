@@ -1,0 +1,35 @@
+Option:
+  name_experiment: DatasetCreation
+  setup: # Paths to the config file of the pre-calibrated camera's setup
+    path: Setup_Camera.yaml
+  dataset:
+    number_of_sample: 0
+    shuffle: False
+  depth_network:
+    name: unimatch
+  disparity_network:
+    name: unimatch
+
+
+Lynred_vis:
+  disparity:
+    cameras: [RGB, RGB2]
+    option: []
+  wrap:
+    cameras: [IR, RGB]
+    method: depth
+    source: pred_disp
+    option: [return_depth_reg, return_occlusion, []]
+  save: [pred_disp, image_reg, disp_reg, occlusion]
+
+
+Lynred_ir:
+  disparity:
+    cameras: [IR, IR2]
+    option: []
+  wrap:
+    cameras: [RGB2, IR]
+    method: depth
+    source: pred_disp
+    option: [return_depth_reg, return_occlusion, []]
+  save: [pred_disp, image_reg, disp_reg, occlusion]

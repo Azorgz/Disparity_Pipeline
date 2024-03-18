@@ -59,7 +59,7 @@ class ConfigPipe(dict):
             self["dataset"]["number_of_sample"] = len(config["indexes"])
             self["dataset"]["indexes"] = config["indexes"]
         else:
-            self["dataset"]["number_of_sample"] = eval(config["number_of_sample"])
+            self["dataset"]["number_of_sample"] = eval(config["number_of_sample"]) if not isinstance(config["number_of_sample"], int) else config["number_of_sample"]
             self["dataset"]["indexes"] = None
 
     def config_setup(self, config):
@@ -71,6 +71,8 @@ class ConfigPipe(dict):
         else:
             self["setup"]['path'] = config['path']
             self["setup"]['multi'] = False
+        self["setup"]['max_depth'] = config['max_depth']
+        self["setup"]['min_depth'] = config['min_depth']
 
     def config_disparity_network(self, config):
         self["disparity_network"] = {}

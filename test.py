@@ -24,6 +24,7 @@ from module.SetupCameras import CameraSetup
 from utils.classes import ImageTensor, Metric_nec_tensor
 from utils.classes.Image import DepthTensor
 from utils.gradient_tools import grad_tensor
+from utils.image_processing_tools import reproject_RGB
 from utils.misc import time_fct, name_generator
 
 # import cv2 as cv
@@ -32,14 +33,16 @@ from utils.misc import time_fct, name_generator
 from utils.gradient_tools import grad_tensor
 
 
-# device = torch.device('cuda')
-# R = CameraSetup(from_file="/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera_FLIR.yaml")
+device = torch.device('cuda')
+R = CameraSetup(from_file="/home/aurelien/PycharmProjects/Disparity_Pipeline/Setup_Camera.yaml", device='cpu')
 # NN = KenburnDepth(path_ckpt=os.getcwd() + "/Networks/KenburnDepth/pretrained",
 #                   semantic_adjustment=False,
 #                   device=device)
 # # Depth
-# src = 'IR'
-# dst = 'RGB'
+src = 'RGB2'
+dst = 'RGB'
+depth = ImageTensor('/home/aurelien/PycharmProjects/Disparity_Pipeline/results/DatasetCreation/Lynred_vis/pred_disp/RGB/RGB_0000-Setup_Camera.tiff', device='cpu').to_numpy()
+img_src = ImageTensor('/home/aurelien/Images/Images_LYNRED/Day/master/visible/1594113918043_03_4103616527.png', device='cpu')
 # im, idx = R.cameras['RGB'].random_image(autopad=True)
 # im.show()
 #
@@ -47,28 +50,15 @@ from utils.gradient_tools import grad_tensor
 # im_dst = R.cameras['RGB'].__getitem__(0)
 # im_src = R.cameras[src].__getitem__(0).RGB('gray')
 import torch.nn.functional as F
-p1 = '/home/godeta/PycharmProjects/FLIR_ADAS_v2/images_thermal_train/data'
-p2 = '/home/godeta/PycharmProjects/FLIR_ADAS_v2/images_thermal_val/data'
-n_p = '/home/godeta/PycharmProjects/FLIR_ADAS_v2/images_thermal_processed'
-files = glob.glob(p1 + '/*.jpg') + glob.glob(p2 + '/*.jpg')
-# im_src_new = ImageTensor("/home/aurelien/PycharmProjects/Disparity_Pipeline/results/methods_comparison/Depth-Depth/image_reg/IR_to_RGB/IR_000-Setup_Camera.png")
-for idx, im in enumerate(tqdm.tqdm(files)):
-    split_name = (im.split('/')[-1]).split('-')
-    video_name = split_name[1]
-    frame = split_name[3]
-    path = f'{n_p}/{video_name}'
-    im = ImageTensor(f"{im}")
-    # if not os.path.isdir(f'{n_p}/{video_name}'):
-    #     os.makedirs(path)
-    im.im_name = f'{frame}'
-    im.save(path)
 
 
+K_ref = R.cameras[dst].intrinsics[:, :3, :].squeeze().numpy()
+P_ref = R.cameras[dst].extrinsics.squeeze().numpy()
+K_cam = R.cameras[src].intrinsics[:, :3, :].squeeze().numpy()
+P_cam = R.cameras[src].extrinsics.squeeze().numpy()
 
-# matrix_dst = R.cameras[dst].intrinsics[:, :3, :3]
-# f_dst = R.cameras[dst].f
-# var_dst = {'focal': f_dst, 'intrinsics': matrix_dst}
-# matrix_src = R.cameras[src].intrinsics[:, :3, :3]
+out = reproject_RGB(img_src, depth, K_ref, K_cam, P_ref, P_cam)
+
 # f_src = R.cameras[src].f
 # var_src = {'focal': f_src, 'intrinsics': matrix_src}
 

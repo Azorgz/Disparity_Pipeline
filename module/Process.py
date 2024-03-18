@@ -371,6 +371,9 @@ class Process(OrderedDict):
                           'focal': [setup_.cameras[cam].f for cam in cams],
                           'intrinsics': [setup_.cameras[cam].intrinsics for cam in cams]}
             output = pipe.network(**new_sample, task='monocular')
+            output = output.clip(setup_.depth_min, setup_.depth_max)
+            output.max_value = setup_.depth_max
+            output.min_value = setup_.depth_min
             res['pred_depth'].update(output)
 
         return _monocular_estimation, cams
