@@ -4,6 +4,7 @@ from glob import glob
 
 from kornia.utils import get_cuda_device_if_available
 
+from Networks.Depth_anything.metric_depth.zoedepth.utils.config import get_config
 from Networks.UniMatch.parser import get_args_parser_depth
 import yaml
 import torch
@@ -137,6 +138,14 @@ class ConfigPipe(dict):
                                     path_config='Networks/KenburnDepth/config_Kenburn.yml',
                                     dict_vars=self["dataset"])
             self["monocular_network"]["network_args"] = args
+        elif self["monocular_network"]["name"] == "DEPTHANYTHING":
+            from Networks.UniMatch.parser import get_args_parser_disparity
+            parser = get_config('zoedepth', "infer")
+            args = configure_parser(parser,
+                                    config["preprocessing"],
+                                    path_config='Networks/Depth_anything/config_Depth_anything.yml',
+                                    dict_vars=self["dataset"])
+            self["monocular_network"]["network_args"] = args
         else:
             pass
         if args.path_checkpoint:
@@ -157,6 +166,8 @@ class ConfigPipe(dict):
             transform = [transforms.Pad(self[target]["network_args"].inference_size, keep_ratio=True)]
         elif config['name'].upper() == 'KENBURN':
             transform = [transforms.Resize(self[target]["network_args"].inference_size, 0)]
+        elif config['name'].upper() == 'DEPTHANYTHING':
+            transform = [transforms.Resize(self[target]["network_args"].img_size, 0)]
         # else:
         #     if isinstance(config["preprocessing"]["normalize"], tuple or list):
         #         m, std = config["preprocessing"]["normalize"]
@@ -189,7 +200,12 @@ class ConfigPipe(dict):
 
 
 def configure_parser(parser, config, path_config=None, dict_vars=None):
-    dict_pars = vars(parser.parse_args()) if parser is not None else {}
+    dict_pars = {}
+    if parser is not None:
+        if isinstance(parser, argparse.ArgumentParser):
+            dict_pars = vars(parser.parse_args())
+        elif isinstance(parser, dict):
+            dict_pars = parser
     config_vars = {}
     if path_config:
         if isinstance(path_config, str or os.path):

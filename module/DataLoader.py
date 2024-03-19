@@ -4,43 +4,51 @@ from collections import OrderedDict
 from glob import glob
 import numpy as np
 import yaml
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from module.SetupCameras import CameraSetup
 from utils.classes.Image import ImageTensor
 from utils.manipulation_tools import list_to_dict
 from utils.misc import timeit, name_generator
 
 
-# class StereoDataLoader(DataLoader):
-#     """
-#     This class implement a DataLoader instance from the StereoDataset class implemented from the camera setup
-#     """
-#     def __init__(self, setup: CameraSetup, config, batch_size=1):
-#         self.config = config
-#         stereoDataSet = StereoDataSet(setup, config)
-#         super(StereoDataLoader, self).__init__(stereoDataSet,
-#                                                batch_size=batch_size,
-#                                                shuffle=stereoDataSet.shuffle)
-#
-#     @property
-#     def timeit(self):
-#         if self.config["timeit"]:
-#             return self.dataset.timeit
-#
-#     @timeit.setter
-#     def timeit(self, value):
-#         if self.config["timeit"]:
-#             self.dataset.timeit = value
+class StereoDataLoader(DataLoader):
+    """
+    This class implement a DataLoader instance from the StereoDataset class implemented from the camera setup
+    """
+    def __init__(self, setup: CameraSetup, config, batch_size=1):
+        self.config = config
+        stereoDataSet = StereoDataSet(setup, config)
+        super(StereoDataLoader, self).__init__(stereoDataSet,
+                                               batch_size=batch_size,
+                                               shuffle=stereoDataSet.shuffle)
+
+    @property
+    def camera_used(self):
+        return self.dataset.camera_used
+
+    @camera_used.setter
+    def camera_used(self, value):
+        self.dataset.camera_used = value
+
+    @property
+    def timeit(self):
+        if self.config["timeit"]:
+            return self.dataset.timeit
+
+    @timeit.setter
+    def timeit(self, value):
+        if self.config["timeit"]:
+            self.dataset.timeit = value
 
 
-class StereoDataLoader(Dataset):
+class StereoDataSet(Dataset):
     """
     This dataloader loads the files according to the options set.
     With an input stereo + mono, specify the geometry on the camera disposition
     """
 
     def __init__(self, setup: CameraSetup, config):
-        super(StereoDataLoader, self).__init__()
+        super(StereoDataSet, self).__init__()
         self.__update_conf__(config)
         if config["timeit"]:
             self.timeit = []
@@ -92,12 +100,25 @@ class StereoDataLoader(Dataset):
         self.reset_images_name = config['reset_images_name']
 
     @timeit
-    def __getitem__(self, index):
-        sample = {key: ImageTensor(p, device=self.device) for key, p in self.samples[index].items()}
+    def __getitem__(self, index, batched=True):
+        if batched:
+            sample = {key: ImageTensor(p, device=self.device) for key, p in self.samples[index].items()}
+        else:
+            sample = {key: ImageTensor(p, device=self.device).squeeze(0) for key, p in self.samples[index].items()}
         if self.reset_images_name:
             for key in sample.keys():
                 sample[key].im_name = f'{key}_{name_generator(index, max_number=len(self))}'
         return sample
+
+    @timeit
+    def __getitems__(self, indexes: list):
+        if len(indexes) == 1:
+            return [self.__getitem__(indexes[0], batched=False)]
+        else:
+            temp = []
+            for idx in indexes:
+                temp.append(self.__getitem__(idx, batched=False))
+        return temp
 
     def __get_ref_images__(self):
         sample = {key: cam.im_calib for key, cam in self.camera_setup.cameras.items()}

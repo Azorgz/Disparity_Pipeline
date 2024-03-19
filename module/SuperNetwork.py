@@ -1,3 +1,5 @@
+import os
+import sys
 import time
 import warnings
 
@@ -14,7 +16,7 @@ from utils.misc import timeit, count_parameter, time_fct
 
 
 class SuperNetwork(BaseModule):
-    Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch'], 'monocular': ['Kenburn']}
+    Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch'], 'monocular': ['Kenburn', 'DepthAnything']}
     """
     This class add a layer for the data post-processing & the inputs args according each Network implemented.
     To Run it, a normal Forward call with 2 images as inputs would do it.
@@ -159,6 +161,12 @@ class SuperNetwork(BaseModule):
                                  semantic_adjustment=self.config['monocular_network']['network_args'].semantic_adjustment,
                                  semantic_network=self.config['monocular_network']['network_args'].semantic_network,
                                  device=self.device)
+        elif self.name_monocular == "DEPTHANYTHING":
+            self.name_monocular = "DepthAnything"
+            self.args_monocular.pretrained_resource = self.args_monocular.path_checkpoint
+            from Networks.Depth_anything.metric_depth.zoedepth.models.builder import build_model
+            sys.path.append(os.getcwd() + '/Networks/Depth_anything/metric_depth')
+            model = build_model(self.args_monocular).eval()
         elif config['depth_network']["name"] == "to_be_implemented":
             self.name_monocular = "custom"
             model = None
@@ -168,6 +176,7 @@ class SuperNetwork(BaseModule):
         self.model_monocular = model.to(device=self.device)
         self.preprocessing_monocular = Preprocessing(config["monocular_network"]["preprocessing"], self.device,
                                                      task='monocular')
+
 
     def __str__(self):
         string = super().__str__()
@@ -270,6 +279,10 @@ class SuperNetwork(BaseModule):
             sample = self.preprocessing_monocular(sample)
             if self.name_monocular == "KenBurnDepth":
                 res = self.model_monocular(sample, focal=focal, intrinsics=intrinsics)
+            elif self.name_monocular == "DepthAnything":
+                for key, im in sample.items():
+                    res = {}
+                    res[key] = self.model_monocular(im, focal=focal)['metric_depth']
             else:
                 warnings.warn('This Network is not implemented')
                 return 0

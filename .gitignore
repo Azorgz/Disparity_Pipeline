@@ -3,6 +3,8 @@ Networks/ACVNet/models/__pycache__/
 Networks/UniMatch/__pycache__/
 Networks/UniMatch/unimatch/__pycache__/
 Networks/__pycache__/
+Networks/Depth_anything/checkpoints/depth_anything_vitl14.pth
+Networks/Depth_anything/metric_depth/checkpoints/depth_anything_metric_depth_outdoor.pt
 Result_analysis/__pycache__/
 Setup_Camera/position_ir/
 Setup_Camera/position_ir_finer/
@@ -14,12 +16,12 @@ config/__pycache__/
 module/__pycache__/
 utils/__pycache__/
 utils/classes/__pycache__/
-test.py
+test/test.py
 Full_process.py
 /results
 /dataset
-Setup_Camera_test.yaml
-Test.yaml
+Setup_Camera/Setup_Camera_test.yaml
+test/Test.yaml
 bin/
 lib/
-script_setup_test.py
+Setup_Camera/script_setup_test.py

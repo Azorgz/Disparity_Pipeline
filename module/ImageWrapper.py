@@ -45,6 +45,7 @@ class ImageWrapper(BaseModule):
                  depth=False,
                  return_depth_reg=False,
                  return_occlusion=False,
+                 reverse_wrap=False,
                  **kwargs) -> (ImageTensor, DepthTensor):
         """
         :param depth_tensors: Depth tensor computed using network
@@ -53,12 +54,14 @@ class ImageWrapper(BaseModule):
         :param cam_dst: name of the dst camera (destination of the image to be projected)
         :param args: other cameras to be used to complete the occluded pixels
         :param depth: if the wrapper use Depth wrapping or disparity wrapping
+        :param inverse_wrap: If True the image will be projected from dst to src
         :param kwargs: Further implementation?
         :return: ImageTensor of the projected image
         """
         if depth:
             res = self.depth_wrapper(sample[cam_src].clone(),
-                                     depth_tensors[cam_dst].clone(),
+                                     sample[cam_dst].clone(),
+                                     depth_tensors[cam_dst].clone() if not reverse_wrap else depth_tensors[cam_src].clone(),
                                      self.setup.cameras[cam_src].intrinsics[:, :3, :3],
                                      self.setup.cameras[cam_dst].intrinsics[:, :3, :3],
                                      relative_transformation(
@@ -69,6 +72,7 @@ class ImageWrapper(BaseModule):
                                      return_occlusion=return_occlusion,
                                      post_process_image=self.post_process_image,
                                      post_process_depth=self.post_process_depth,
+                                     reverse_wrap=reverse_wrap,
                                      **kwargs)
         else:
             res = self.disparity_wrapper(sample.copy(),
@@ -80,6 +84,7 @@ class ImageWrapper(BaseModule):
                                          return_occlusion=return_occlusion,
                                          post_process_image=self.post_process_image,
                                          post_process_depth=self.post_process_depth,
+                                         reverse_wrap=reverse_wrap,
                                          **kwargs)
         res['image_reg'].pass_attr(sample[cam_src])
         return res

@@ -54,7 +54,6 @@ class Pipe:
         else:
             setup = CameraSetup(from_file=self.setup[0], device=self.device)
         self._init_dataloader_(setup)
-        self._init_dataloader_(setup)
         self._init_network_()
         self._init_wrapper_(setup, verbose=False)
         self._init_saver_(verbose=False)
@@ -73,6 +72,7 @@ class Pipe:
             if self.print_info:
                 print(process)
             for name_experiment, experiment in process.items():
+                self.save_experiment(experiment, name_experiment)
                 with tqdm(total=len(self.setup) * len(self.dataloader),
                           desc=f"Nombre d'itérations for {name_experiment}: ", leave=True, position=0) as bar:
                     name = None
@@ -93,7 +93,7 @@ class Pipe:
                             self.save_timers(experiment, name, replace=True if i > 0 else False)
                             self.reset_timers()
                         if self.save_inputs and i == 0:
-                            self.dataloader.save_conf(experiment.path)
+                            self.dataloader.dataset.save_conf(experiment.path)
 
                         if i == len(self.setup) - 1:
                             self.validation.statistic()
@@ -148,6 +148,15 @@ class Pipe:
             # self.validation.save(self.path_output)
             # if self.timeit:
             #     self.save_timers()
+
+    def save_experiment(self, experiment, name_experiment):
+        path = experiment.path
+        if path is None:
+            path = self.path_output
+        name = os.path.join(path, f"Summary_experiment.yaml")
+        summary = experiment.summary()
+        with open(name, "w") as file:
+            yaml.dump(summary, file)
 
     def save_timers(self, experiment=None, filename=None, replace=False):
         path = experiment.path

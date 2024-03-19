@@ -44,7 +44,7 @@ cameras:
     is_positioned: true
     is_ref: false
     name: mainIR
-    path: /home/aurelien/Images/Images_LYNRED/Day/master/infrared_corrected
+    path: /home/godeta/PycharmProjects/Datasets/Lynred/Day/master/infrared_corrected
     sensor_resolution:
     - 640
     - 480
@@ -92,7 +92,7 @@ cameras:
     is_positioned: true
     is_ref: false
     name: subIR
-    path: /home/aurelien/Images/Images_LYNRED/Day/slave/infrared_corrected
+    path: /home/godeta/PycharmProjects/Datasets/Lynred/Day/slave/infrared_corrected
     sensor_resolution:
     - 640
     - 480
@@ -140,7 +140,7 @@ cameras:
     is_positioned: true
     is_ref: true
     name: mainRGB
-    path: /home/aurelien/Images/Images_LYNRED/Day/master/visible
+    path: /home/godeta/PycharmProjects/Datasets/Lynred/Day/master/visible
     sensor_resolution:
     - 1280
     - 960
@@ -188,7 +188,7 @@ cameras:
     is_positioned: true
     is_ref: false
     name: subRGB
-    path: /home/aurelien/Images/Images_LYNRED/Day/slave/visible
+    path: /home/godeta/PycharmProjects/Datasets/Lynred/Day/slave/visible
     sensor_resolution:
     - 1280
     - 960

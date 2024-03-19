@@ -78,7 +78,7 @@ monocular_depth_network:
 # Reconstruction
 reconstruction:
   remove_occlusion: True # If True the occluded pixels will be suppressed of the resampled image
-  post_process_depth: 5 # If method_3d is >0 a median blurring and a dilation for disparity will be done
+  post_process_depth: 3 # median blurring and a dilation for disparity will be done
   post_process_image: 3
 
 

@@ -3,9 +3,140 @@ import cv2 as cv
 import kornia
 import numpy as np
 import torch
+from kornia.filters import MedianBlur
+from kornia.morphology import dilation, erosion, closing
+import torch.nn.functional as F
+
+from utils.classes.Image import DepthTensor, ImageTensor
 
 
 # from classes.Image import ImageCustom
+
+def simple_project_cloud_to_image(cloud, image_size, post_process, image=None, return_occlusion=False):
+    if image is not None:
+        assert cloud.shape[1:3] == image.shape[-2:]
+        _, cha, _, _ = image.shape
+        image_flatten = torch.tensor(image.flatten(start_dim=2), dtype=cloud.dtype).squeeze(0)  # shape c x H*W
+    else:
+        cha = 1
+    # Put all the point into a H*W x 3 vector
+    c = torch.tensor(cloud.flatten(start_dim=0, end_dim=2))  # H*W x 3
+    # Remove the point landing outside the image
+    c[:, 0] *= cloud.shape[2] / image_size[1]
+    c[:, 1] *= cloud.shape[1] / image_size[0]
+    mask_out = ((c[:, 0] < 0) + (c[:, 0] >= (cloud.shape[2] - 1)) + (c[:, 1] < 0) + (c[:, 1] >= (cloud.shape[1] - 1))) != 0
+    # Sort the point by decreasing depth
+    _, indexes = c[:, -1].sort(descending=True, dim=0)
+    c[mask_out] = 0
+    c_sorted = c[indexes, :]
+    if image is not None:
+        sample = image_flatten[:, indexes]
+        # sample[..., mask_out] = 0
+    else:
+        sample = c_sorted[:, 2:].permute([1, 0])
+    # Transform the landing positions in accurate pixels
+    c_ = torch.round(c_sorted[:, :2]).to(torch.int)
+    result = torch.zeros([1, cha, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
+    result[0, :, c_[:, 1], c_[:, 0]] = sample
+    mask = result == 0
+    if post_process:
+        blur = MedianBlur(post_process)
+        kernel = torch.ones([5, 3], device=cloud.device)
+        res_ = result.clone()
+        if return_occlusion:
+            occ = mask*1.
+        for i in range(2):
+            res_ = blur(res_)
+            if return_occlusion:
+                occ = blur(occ)
+            if image is None:
+                res_ = erosion(res_, kernel)
+        result[mask] = res_[mask]
+    result = F.interpolate(result, image_size)
+    if return_occlusion:
+        occ = F.interpolate(occ, image_size).to(torch.bool)
+        return result, occ
+    else:
+        return result
+
+
+def project_cloud_to_image(cloud, image_size, post_process, image=None, return_occlusion=False):
+    if image is not None:
+        assert cloud.shape[1:3] == image.shape[-2:]
+        _, cha, _, _ = image.shape
+        image_flatten = torch.tensor(image.flatten(start_dim=2), dtype=cloud.dtype).squeeze(0)  # shape c x H*W
+    else:
+        cha = 1
+    # Put all the point into a H*W x 3 vector
+    c = torch.tensor(cloud.flatten(start_dim=0, end_dim=2))  # H*W x 3
+    # Remove the point landing outside the image
+    c[:, 0] *= cloud.shape[2] / image_size[1]
+    c[:, 1] *= cloud.shape[1] / image_size[0]
+    mask_out = ((c[:, 0] < 0) + (c[:, 0] >= (cloud.shape[2] - 1)) + (c[:, 1] < 0) + (c[:, 1] >= (cloud.shape[1] - 1))) != 0
+    # Sort the point by decreasing depth
+    _, indexes = c[:, -1].sort(descending=False, dim=0)
+    c[mask_out] = 0
+    c_sorted = c[indexes, :]
+    if image is not None:
+        sample = image_flatten[:, indexes]
+    else:
+        sample = c_sorted[:, 2:].permute([1, 0])
+    # Transform the landing positions in accurate pixels
+    c_x = torch.floor(c_sorted[:, 0:1]).to(torch.int)
+    dist_c_x = torch.abs(c_x - c_sorted[:, 0:1])
+    c_X = torch.ceil(c_sorted[:, 0:1]).to(torch.int)
+    dist_c_X = torch.abs(c_X - c_sorted[:, 0:1])
+    c_y = torch.floor(c_sorted[:, 1:2]).to(torch.int)
+    dist_c_y = torch.abs(c_y - c_sorted[:, 1:2])
+    c_Y = torch.floor(c_sorted[:, 1:2]).to(torch.int)
+    dist_c_Y = torch.abs(c_Y - c_sorted[:, 1:2])
+
+    rays = [torch.concatenate([c_x, c_y], dim=1),
+            torch.concatenate([c_X, c_y], dim=1),
+            torch.concatenate([c_x, c_Y], dim=1),
+            torch.concatenate([c_X, c_Y], dim=1)]
+    dists = [2 - torch.sqrt(dist_c_x ** 2 + dist_c_y ** 2),
+             2 - torch.sqrt(dist_c_X ** 2 + dist_c_y ** 2),
+             2 - torch.sqrt(dist_c_x ** 2 + dist_c_Y ** 2),
+             2 - torch.sqrt(dist_c_X ** 2 + dist_c_Y ** 2)]
+    if image is not None:
+        result = torch.zeros([1, cha, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
+    else:
+        result = torch.zeros([1, cha, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
+    total_dist = torch.zeros([1, cha, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
+    for dist, ray in zip(dists, rays):
+        temp = torch.zeros([1, 1, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
+        temp_dist = torch.zeros([1, 1, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
+        temp[0, :, ray[:, 1], ray[:, 0]] = sample
+        temp_dist[0, 0, ray[:, 1], ray[:, 0]] = 1/dist[:, 0]
+        result += temp*temp_dist
+        total_dist += temp_dist
+    result[total_dist!=0] /= total_dist[total_dist!=0]
+    mask = result == 0
+    if post_process:
+        blur = MedianBlur(post_process)
+        kernel = torch.ones([5, 3], device=cloud.device)
+        res_ = result.clone()
+        if return_occlusion:
+            occ = mask * 1.
+        for i in range(1):
+            res_ = blur(res_)
+            if return_occlusion:
+                occ = closing(occ, kernel)
+                occ = blur(occ)
+            if image is None:
+                res_ = dilation(res_, kernel)
+        result[mask] = res_[mask]
+    result = F.interpolate(result, image_size)
+    if image is not None:
+        result = ImageTensor(result)
+    else:
+        result = DepthTensor(result).scale()
+    if return_occlusion:
+        occ = ImageTensor(F.interpolate(occ, image_size)).to(torch.bool)
+        return result, occ
+    else:
+        return result
 
 
 def perspective2grid(matrix, shape, device):
@@ -89,8 +220,8 @@ def reproject_RGB(rgb_img, depth_img, K_ref, K_cam, Rt_ref, Rt_cam):
     res_mx_d = np.matmul(left_mx, P) / z
     u = res_mx_d[0, :]
     v = res_mx_d[1, :]
-    del_u_ix = np.where(u > rgb_img.shape[-1]-1)
-    del_v_ix = np.where(v > rgb_img.shape[-2]-1)
+    del_u_ix = np.where(u > rgb_img.shape[-1] - 1)
+    del_v_ix = np.where(v > rgb_img.shape[-2] - 1)
     del_u_ix_neg = np.where(u < 0)
     del_v_ix_neg = np.where(v < 0)
     del_ix_neg = np.unique(np.append(del_u_ix_neg, del_v_ix_neg))
@@ -102,7 +233,7 @@ def reproject_RGB(rgb_img, depth_img, K_ref, K_cam, Rt_ref, Rt_cam):
     j = np.delete(j, del_ix)
     u = np.around(u, 0).astype('int')
     v = np.around(v, 0).astype('int')
-    out_img = rgb_img*0
+    out_img = rgb_img * 0
     out_img[:, :, v, u] = rgb_img[:, :, j, i]
     return out_img
 

@@ -76,10 +76,22 @@ def pil_to_numpy(im):
     return data
 
 
+def find_best_grid(param):
+    srt = int(np.floor(np.sqrt(param)))
+    i = 0
+    while srt * (srt + i) < param:
+        i += 1
+    return srt, srt + i
+
+
 class ImageTensor(Tensor):
     """
     A class defining the general basic framework of a TensorImage.
     It can use all the methods from Torch plus some new ones.
+    To create a new instance:
+    --> From file (a str or path pointing towards an image file)
+    --> From numpy array (shape h, w, c / h, w, c, a or h, w in case of mono-layered image)
+    --> From a torch tensor (shape c, h, w  or b, c, h, w for batched tensor)
     An instance is created using a numpy array or a path to an image file or a PIL image
     """
     _im_type = None
@@ -89,6 +101,8 @@ class ImageTensor(Tensor):
     _mode_list = ['1', 'L', 'RGB', 'RGBA', 'CMYK', 'LAB', 'HSV']
     _channel_pos = None
     _depth = '8'
+    _batched = False
+
     def __init__(self, *args, **kwargs):
         super(ImageTensor, self).__init__()
 
@@ -101,9 +115,16 @@ class ImageTensor(Tensor):
             name = basename(inp).split('.')[0] if name == 'new_image' else name
             inp_ = Image.open(inp)
         elif isinstance(inp, np.ndarray):
-            inp_ = to_pil_image(inp)
+            if inp.dtype == np.float64:
+                inp_ = to_pil_image(np.float32(inp))
+            else:
+                inp_ = to_pil_image(inp)
         elif isinstance(inp, Tensor):
-            inp_ = to_pil_image(inp.squeeze())
+            # Case of batched tensors
+            if len(inp.squeeze().shape) > 3 or (len(inp.shape) == 3 and inp.shape[0] > 3):
+                inp_ = inp.clone()
+            else:
+                inp_ = to_pil_image(inp.squeeze())
         elif isinstance(inp, PIL.Image.Image):
             inp_ = inp
         elif isinstance(inp, ImageTensor):
@@ -116,10 +137,11 @@ class ImageTensor(Tensor):
         if isinstance(inp_, PIL.Image.Image):
             array = pil_to_numpy(inp_)
             color_mode = inp_.mode.split(';')[0]
+            batched = False
             if len(inp_.mode.split(';')) > 1:
                 color_mode = 'L'
                 depth = inp_.mode.split(';')[1]
-                inp_ = torch.from_numpy(array/255)
+                inp_ = torch.from_numpy(array / 255)
             else:
                 depth = '8'
                 inp_ = torch.from_numpy(array)
@@ -128,16 +150,33 @@ class ImageTensor(Tensor):
             # t = transforms.ToTensor()
             # color_mode = inp_.mode
             # inp_ = t(inp_)
+        elif isinstance(inp_, torch.Tensor):
+            if len(inp_.shape) == 4:
+                _, c, _, _ = inp_.shape
+            elif len(inp_.shape) == 3:
+                c, _, _ = inp_.shape
+            else:
+                raise NotImplementedError
+            if c == 3:
+                color_mode = 'RGB'
+            elif c == 4:
+                color_mode = 'RGBA'
+            else:
+                color_mode = 'L'
+            depth = '8'
+            if inp_.max() <= 1:
+                inp_ *= 255
+            batched = True
         else:
             raise NotImplementedError
 
         if isinstance(device, torch.device):
-            image = inp_.to(device)/255
+            image = inp_.to(device) / 255
         else:
             if torch.cuda.is_available():
-                image = inp_.to(torch.device('cuda'))/255
+                image = inp_.to(torch.device('cuda')) / 255
             else:
-                image = inp_.to(torch.device('cpu'))/255
+                image = inp_.to(torch.device('cpu')) / 255
         image = super().__new__(cls, image)
         if isinstance(inp, ImageTensor):
             image.pass_attr(inp)
@@ -149,6 +188,7 @@ class ImageTensor(Tensor):
         image._color_mode = color_mode
         image._im_name = name
         image._depth = depth
+        image._batched = batched
         return image
 
     # Base Methods
@@ -178,6 +218,8 @@ class ImageTensor(Tensor):
             else:
                 im_type = 'RGB'
                 cmap = 'RGB'
+        elif len(temp.shape) == 4:
+            return self, 'IR', 'RGB', 1
         else:
             return self, 'unknown', 'unknown', 'unknown'
         while len(temp.shape) < 4:
@@ -208,6 +250,22 @@ class ImageTensor(Tensor):
                 self.__dict__[arg] = image.__dict__[arg]
         else:
             self.__dict__ = image.__dict__.copy()
+
+    def batch(self, images: list):
+        """
+        Function to batch ImageTensor together
+        :param images: list of ImageTensor to batch
+        :return: batched ImageTensor
+        """
+        assert isinstance(images, list)
+        assert len(images) > 0
+        for i, im in enumerate(images):
+            if im.shape != self.shape:
+                images[i] = im.match_shape(self)
+        new = torch.concatenate([self, *images], dim=0)
+        new.pass_attribute(self)
+        new.batched = True
+        return new
 
     # Image manipulation methods
     def pad(self, im, **kwargs):
@@ -297,8 +355,8 @@ class ImageTensor(Tensor):
     def match_shape(self, other: Union[Tensor, tuple, list], keep_ratio=False):
         temp = self.put_channel_at()
         if isinstance(other, tuple) or isinstance(other, list):
-           shape = other
-           dims = len(other)
+            shape = other
+            dims = len(other)
         elif isinstance(other, ImageTensor) or isinstance(other, DepthTensor):
             b = other.put_channel_at()
             dims = len(b.shape) - 2
@@ -310,9 +368,9 @@ class ImageTensor(Tensor):
         mode = 'bilinear' if dims <= 2 else 'trilinear'
         if keep_ratio:
             shape_temp = temp.shape[-dims:]
-            ratio = torch.tensor(shape_temp)/torch.tensor(shape)
+            ratio = torch.tensor(shape_temp) / torch.tensor(shape)
             ratio = ratio.max()
-            temp = F.interpolate(temp, mode=mode, scale_factor=float((1/ratio).cpu().numpy()))
+            temp = F.interpolate(temp, mode=mode, scale_factor=float((1 / ratio).cpu().numpy()))
         else:
             temp = F.interpolate(temp, size=shape, mode=mode, align_corners=True)
         if keep_ratio:
@@ -352,17 +410,18 @@ class ImageTensor(Tensor):
         return a
 
     def show(self, num=None, cmap='gray', roi: list = None, point: Union[list, Tensor] = None):
-        im_display = [*self]
-        if not num:
-            num = self.im_name
-        fig, ax = plt.subplots(ncols=len(im_display), num=num, squeeze=False)
-        for i, img in enumerate(im_display):
-            img = img.unsqueeze(0)
-            img.pass_attr(self)
-            if img.im_type == 'IR':
-                img, cmap = img.put_channel_at(-1).squeeze(), cmap
+        im_display = self.put_channel_at(1)
+        batch, layers = im_display.shape[:2]
+        if layers > 3 or batch > 1:
+            im_display._multiple_show(num=num, cmap=cmap)
+        else:
+            if not num:
+                num = self.im_name
+            fig, ax = plt.subplots(ncols=1, nrows=1, num=num, squeeze=False)
+            if im_display.im_type == 'IR':
+                img, cmap = im_display.put_channel_at(-1).squeeze(), cmap
             else:
-                img, cmap = img.put_channel_at(-1).squeeze(), None
+                img, cmap = im_display.put_channel_at(-1).squeeze(), None
             if point is not None:
                 if img.im_type == 'IR':
                     img = img.RGB('gray')
@@ -370,16 +429,43 @@ class ImageTensor(Tensor):
                     center = center.cpu().long().numpy()
                     img = ImageTensor(cv.circle(img.opencv(), center, 5, (0, 255, 0), -1)[..., [2, 1, 0]])
                 img = img.put_channel_at(-1).squeeze()
-            ax[0, i].imshow(img.cpu().numpy(), cmap=cmap)
+            ax[0, 0].imshow(img.cpu().numpy(), cmap=cmap)
             if roi is not None:
                 for r, color in zip(roi, ['r', 'g', 'b']):
                     rect = patches.Rectangle((r[1], r[0]), r[3] - r[1], r[2] - r[0]
                                              , linewidth=2, edgecolor=color, facecolor='none')
-                    ax[0, i].add_patch(rect)
+                    ax.add_patch(rect)
+            ax[0, 0].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+            plt.show()
+            return ax[0, 0]
 
-            ax[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+    def _multiple_show(self, num=None, cmap='gray'):
+        im = self.put_channel_at()
+        batch, layers = im.shape[:2]
+        if layers > 3:
+            im.im_type = 'IR'
+            im_display = [*im.reshape([batch * layers, 1, *self.shape[2:]])]
+        else:
+            im_display = [*im]
+        if not num:
+            num = self.im_name
+        rows, cols = find_best_grid(len(im_display))
+        fig = plt.figure(num=num)
+        axes = [(fig.add_subplot(rows, cols, r * cols + c + 1) if (r * cols + c + 1 <= len(im_display)) else None) for r
+                in range(rows) for c in range(cols)]
+        for i, img in enumerate(im_display):
+            img = img.unsqueeze(0)
+            img.pass_attr(self)
+            if img.im_type == 'IR':
+                img, cmap = img.put_channel_at(-1).squeeze(), cmap
+            else:
+                img, cmap = img.put_channel_at(-1).squeeze(), None
+            axes[i].imshow(img.cpu().numpy(), cmap=cmap)
+        for a in axes:
+            if a is not None:
+                a.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
         plt.show()
-        return ax
+        return axes
 
     def save(self, path, name=None, ext='png', **kwargs):
         name = self.im_name + f'.{ext}' if name is None else name
@@ -395,6 +481,14 @@ class ImageTensor(Tensor):
     @im_name.setter
     def im_name(self, name) -> None:
         self._im_name = name
+
+    @property
+    def batched(self) -> bool:
+        return self._batched
+
+    @batched.setter
+    def batched(self, value) -> None:
+        self._batched = value
 
     @property
     def depth(self) -> str:
@@ -615,10 +709,11 @@ class DepthTensor(ImageTensor):
 
     def opencv(self, **kwargs):
         if self.color_mode == 'L':
-            a = np.ascontiguousarray(Tensor.numpy(self.unscale().squeeze().cpu()) * 255**2, dtype=np.uint16)
+            a = np.ascontiguousarray(Tensor.numpy(self.unscale().squeeze().cpu()) * 255 ** 2, dtype=np.uint16)
         else:
             a = np.ascontiguousarray(
-                Tensor.numpy(self.unscale().put_channel_at(-1).squeeze().cpu())[..., [2, 1, 0]] * 255**2, dtype=np.uint16)
+                Tensor.numpy(self.unscale().put_channel_at(-1).squeeze().cpu())[..., [2, 1, 0]] * 255 ** 2,
+                dtype=np.uint16)
         return a
 
     def clamp(self, mini=None, maxi=None, *, out=None):

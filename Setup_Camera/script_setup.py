@@ -8,7 +8,7 @@ from module.SetupCameras import CameraSetup
 
 name_path = '/'
 perso = '/home/aurelien/Images/Images_LYNRED/'
-pro = '/home/godeta/PycharmProjects/LYNRED/Images/'
+pro = '/home/godeta/PycharmProjects/Datasets/Lynred/'
 
 p = pro if 'godeta' in os.getcwd() else perso
 
@@ -63,8 +63,8 @@ R.calibration_for_depth('RGB', 'RGB2')
 
 print(R)
 
-perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/'
-pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/'
+perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/Setup_Camera/'
+pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera/'
 p = pro if 'godeta' in os.getcwd() else perso
 path_result = p + name_path
 R.save(path_result, 'Setup_Camera.yaml')

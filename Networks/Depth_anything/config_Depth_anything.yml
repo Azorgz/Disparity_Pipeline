@@ -1,0 +1,3 @@
+inference_size: [518, 518]
+path_checkpoint: local::Networks/Depth_anything/metric_depth/checkpoints/depth_anything_metric_depth_outdoor.pt
+

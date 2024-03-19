@@ -106,10 +106,17 @@ class Visualizer:
                 self.dx_max, self.dy_max, self.dz_max, self.da_max, self.f_max, self.px_max = 0, 0, 0, 0, 0, 0
                 self.dx, self.dy, self.dz, self.da, self.f, self.px = 0, 0, 0, 0, 0, 0
                 self.define_delta(self.experiment[p]['new_list'][-1], init_max=True)
+            if os.path.exists(f'{P}/Summary_experiment.yaml'):
+                with open(f'{P}/Summary_experiment.yaml', "r") as file:
+                    summary = yaml.safe_load(file)
+                warp_inverted = summary['Wrap']['reverse']
+            else:
+                warp_inverted = False
             try:
                 self.experiment[p]['target_disp_path'], _, target_disp_list = os.walk(
-                    f'{P}/pred_disp/{target}').__next__()
-                self.experiment[p]['ref_disp_path'], _, ref_disp_list = os.walk(f'{P}/disp_reg/{ref}').__next__()
+                    f'{P}/pred_disp/{target if not warp_inverted else ref}').__next__()
+                self.experiment[p]['ref_disp_path'], _, ref_disp_list = os.walk(
+                    f'{P}/disp_reg/{ref if not warp_inverted else target}').__next__()
                 self.experiment[p]['target_disp_list'] = sorted(target_disp_list)
                 self.experiment[p]['ref_disp_list'] = sorted(ref_disp_list)
                 self.experiment[p]['disp_ok'] = True
@@ -117,8 +124,10 @@ class Visualizer:
                 self.experiment[p]['disp_ok'] = False
                 print(f'Disparity images wont be available for the {p} couple')
             try:
-                self.experiment[p]['target_depth_path'], _, target_depth_list = os.walk(f'{P}/pred_depth/{target}').__next__()
-                self.experiment[p]['ref_depth_path'], _, ref_depth_list = os.walk(f'{P}/depth_reg/{ref}').__next__()
+                self.experiment[p]['target_depth_path'], _, target_depth_list = os.walk(
+                    f'{P}/pred_depth/{target if not warp_inverted else ref}').__next__()
+                self.experiment[p]['ref_depth_path'], _, ref_depth_list = os.walk(
+                    f'{P}/depth_reg/{ref if not warp_inverted else target}').__next__()
                 self.experiment[p]['target_depth_list'] = sorted(target_depth_list)
                 self.experiment[p]['ref_depth_list'] = sorted(ref_depth_list)
                 self.experiment[p]['depth_ok'] = True
