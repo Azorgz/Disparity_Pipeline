@@ -53,7 +53,7 @@ R.calibration_for_stereo('RGB', 'RGB2')
 
 R.calibration_for_stereo('IR', 'RGB')
 R.calibration_for_stereo('IR', 'RGB2')
-# R.stereo_pair('RGB', 'IR').show_image_calibration()
+R.stereo_pair('RGB', 'IR').show_image_calibration()
 
 R.calibration_for_stereo('IR', 'IR2')
 # R.stereo_pair('IR', 'IR2').show_image_calibration()

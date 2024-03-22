@@ -211,10 +211,10 @@ class DisparityWrapper:
 
     def _grid_sample(self, image, disparity, padding_mode='zeros', **kwargs):
         h, w = disparity.shape[-2:]
-        mask = disparity[0, :, :, :] + torch.sum(image, dim=1) == 0
+        # mask = disparity[0, :, :, :] + torch.sum(image, dim=1) == 0
         grid = kornia.utils.create_meshgrid(h, w, normalized_coordinates=False, device=self.device).to(
             disparity.dtype)  # [1 H W 2]
         grid[:, :, :, 0] -= disparity[0, :, :, :]
         grid_norm: Tensor = normalize_pixel_coordinates(grid, h, w).to(image.dtype)  # BxHxWx2
-        grid_norm[:, :, :, 0][mask] = -2
+        # grid_norm[:, :, :, 0][mask] = -2
         return F.grid_sample(image, grid_norm, padding_mode=padding_mode)

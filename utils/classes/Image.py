@@ -434,7 +434,7 @@ class ImageTensor(Tensor):
                 for r, color in zip(roi, ['r', 'g', 'b']):
                     rect = patches.Rectangle((r[1], r[0]), r[3] - r[1], r[2] - r[0]
                                              , linewidth=2, edgecolor=color, facecolor='none')
-                    ax.add_patch(rect)
+                    ax[0, 0].add_patch(rect)
             ax[0, 0].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
             plt.show()
             return ax[0, 0]

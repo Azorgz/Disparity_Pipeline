@@ -41,23 +41,10 @@ class DepthWrapper:
         """
         if not reverse_wrap:
             res = {}
-            kernel = torch.ones(3, 3).to(self.device)
-            depth_dst = dilation(depth, kernel)
+            # kernel = torch.ones(3, 3).to(self.device)
+            # depth_dst = dilation(depth, kernel)
+            depth_dst = depth
             points_3d_dst: Tensor = depth_to_3d_v2(depth_dst[0], matrix_dst[0], False)  # Bx3xHxW
-            # points_3d_dst[:, :1] *= -1
-            # points_3d_dst[:, 2] *= -1
-            # pcd = o3d.geometry.PointCloud()
-            # cloud_flat = torch.flatten(points_3d_dst.put_channel_at(-1).squeeze(), start_dim=0, end_dim=1).squeeze().cpu().numpy()
-            # pcd.points = o3d.utility.Vector3dVector(cloud_flat)
-            # im_flat = torch.flatten(image_dst.put_channel_at(-1).squeeze(), start_dim=0, end_dim=1).cpu().numpy()
-            # pcd.colors = o3d.utility.Vector3dVector(im_flat)
-            # o3d.visualization.draw_geometries([pcd],
-            #                                   mesh_show_wireframe=True,
-            #                                   window_name="_pointCloud_",
-            #                                   point_show_normal=True,
-            #                                   mesh_show_back_face=True)
-            # transform points from source to destination
-            # points_3d_dst = points_3d_dst.permute(0, 2, 3, 1)  # BxHxWx3
 
             # apply transformation to the 3d points
             points_3d_src = transform_points(src_trans_dst[:, None].to(torch.float32), points_3d_dst)  # BxHxWx3
@@ -115,8 +102,9 @@ class DepthWrapper:
             the warped tensor in the source frame with shape :math:`(B,3,H,W)`.
         """
         res = {}
-        kernel = torch.ones(3, 3).to(self.device)
-        depth_src = dilation(depth, kernel)
+        # kernel = torch.ones(3, 3).to(self.device)
+        # depth_src = dilation(depth, kernel)
+        depth_src = depth
         points_3d_src: Tensor = depth_to_3d_v2(depth_src[0], matrix_src[0], False)  # Bx3xHxW
 
         # apply transformation to the 3d points

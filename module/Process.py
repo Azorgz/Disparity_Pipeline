@@ -11,7 +11,10 @@ from utils.misc import path_leaf
 
 
 class Process(OrderedDict):
-
+    """
+    This class is the backbone of any pipeline of processing you want to make.
+    It's an Ordered Dict which contain all the experiments the Pipe will process
+    """
     def __init__(self, path: str = None, process_dict: dict = None):
         super(Process, self).__init__()
         self.isInit = False
@@ -75,7 +78,7 @@ class Process(OrderedDict):
             Exp = pipe.name_experiment if Exp[:3] == 'tbd' else Exp
             path = path_result + f'/{Exp}'
             pred = {}
-            res = {'image_reg': [], 'depth_reg': [], 'disp_reg': []}
+            res = {'image_reg': [], 'depth_reg': []}
             process = []
             for idx, instruction in enumerate(p):
                 key, val = instruction[0], instruction[1]
@@ -84,7 +87,7 @@ class Process(OrderedDict):
                         f'The chosen cameras for disparity dont exist, available cameras are :{setup.cameras.keys()}'
                     assert setup.disparity_ready(val['cam1'], val['cam2']), \
                         'The chosen cameras for disparity are not stereo rectified'
-                    name_var = 'pred_disp'
+                    name_var = 'pred_depth'
                     if val['pred_bidir']:
                         cam = [val['cam1'], val['cam2']]
                     elif val['pred_right']:
@@ -150,34 +153,19 @@ class Process(OrderedDict):
                     else:
                         assert setup.disparity_ready(val['cam_src'], val['cam_dst']), \
                             'The chosen cameras for wrap are not disparity ready'
-                        for cam in val['cams']:
-                            assert cam in setup.cameras, \
-                                f'The secondary camera for wrap doesnt exist in the setup, available cameras are :{setup.cameras.keys()}'
-                            assert setup.disparity_ready(val['cam_src'], cam), \
-                                'The chosen cameras for wrap are not disparity ready'
-                            assert cam in pred[val['depth_tensors']], \
-                                'The chosen tensor doesnt contain the depth of the chosen camera for wrap'
-                    assert val['cam_dst'] in pred[val['depth_tensors']] or val['cam_src'] in pred[val['depth_tensors']], \
+                    assert val['cam_dst'] in pred['pred_depth'] or val['cam_src'] in pred['pred_depth'], \
                         'The chosen tensor doesnt contain the depth of the chosen camera for wrap'
                     cam_to_cam = f'{val["cam_src"]}_to_{val["cam_dst"]}'
-                    if val['cam_dst'] not in pred[val['depth_tensors']]:
+                    if val['cam_dst'] not in pred['pred_depth']:
                         val['reverse_wrap'] = True
                     else:
                         val['reverse_wrap'] = False
                     if val['return_depth_reg']:
-                        if val['depth_tensors'] == 'pred_depth':
-                            res['depth_reg'].append(val["cam_src" if not val['reverse_wrap'] else "cam_dst"])
-                            if 'depth_reg' in pred.keys():
-                                pred['depth_reg'].append(val["cam_src" if not val['reverse_wrap'] else "cam_dst"])
-                            else:
-                                pred.update({'depth_reg': [val["cam_src" if not val['reverse_wrap'] else "cam_dst"]]})
+                        res['depth_reg'].append(val["cam_src" if not val['reverse_wrap'] else "cam_dst"])
+                        if 'depth_reg' in pred.keys():
+                            pred['depth_reg'].append(val["cam_src" if not val['reverse_wrap'] else "cam_dst"])
                         else:
-                            res['disp_reg'].append(val["cam_src" if not val['reverse_wrap'] else "cam_dst"])
-                            if 'disp_reg' in pred.keys():
-                                pred['disp_reg'].append(val["cam_src" if not val['reverse_wrap'] else "cam_dst"])
-                            else:
-                                pred.update({'disp_reg': [val["cam_src" if not val['reverse_wrap'] else "cam_dst"]]})
-
+                            pred.update({'depth_reg': [val["cam_src" if not val['reverse_wrap'] else "cam_dst"]]})
                     if val['return_occlusion']:
                         if 'occlusion' in res.keys():
                             res['occlusion'].append(cam_to_cam)
@@ -225,7 +213,7 @@ class Process(OrderedDict):
                             if not os.path.exists(path_res + f'/{cam}'):
                                 os.mkdir(path_res + f'/{cam}')
                                 os.chmod(path_res + f'/{cam}', 0o777)
-                    elif val["variable_name"] == 'pred_depth' or val["variable_name"] == 'pred_disp':
+                    elif val["variable_name"] == 'pred_depth':
                         if val["variable_name"] in pred.keys():
                             for cam in pred[val["variable_name"]]:
                                 path_used = path_res + f'/{cam}'
@@ -299,13 +287,10 @@ class Process(OrderedDict):
             elif key == 'WRAP':
                 assert len(p['cameras']) == 2, \
                     'The WRAP instruction needs 2 cameras : cam_src, cam_dst'
-                assert p['source'] in ['pred_depth', 'pred_disp', 'depth_reg', 'disp_reg'], \
-                    'The chosen WRAP tensor name is not allowed, choice:[pred_depth, pred_disp, depth_reg, disp_reg]'
-                option = {'cam_src': p['cameras'][0], 'cam_dst': p['cameras'][1], 'depth_tensors': p['source'],
+                option = {'cam_src': p['cameras'][0], 'cam_dst': p['cameras'][1],
                           'depth': True if p['method'] == 'depth' else False,
                           'return_depth_reg': True if 'return_depth_reg' in p['option'] else False,
-                          'return_occlusion': True if 'return_occlusion' in p['option'] else False,
-                          'cams': True if 'cams' in p['option'] else []}
+                          'return_occlusion': True if 'return_occlusion' in p['option'] else False}
                 proc.append([key, option])
             elif key == 'VALID':
                 assert len(p) == 2, 'The VALID instruction needs 2 positional argument : cam_reg, cam_ref'
@@ -314,12 +299,11 @@ class Process(OrderedDict):
             elif key == 'SAVE':
                 assert len(p) >= 0, 'The SAVE instruction needs at least 1 positional argument : name_variable'
                 if 'all' in p:
-                    p = ['inputs', 'pred_depth', 'pred_disp', 'image_reg', 'depth_reg', 'disp_reg', 'occlusion']
+                    p = ['inputs', 'pred_depth', 'image_reg', 'depth_reg', 'occlusion']
                 for p_ in p:
-                    assert p_ in ['inputs', 'pred_depth', 'pred_disp', 'image_reg', 'depth_reg', 'disp_reg',
-                                  'occlusion'], \
+                    assert p_ in ['inputs', 'pred_depth', 'image_reg', 'depth_reg', 'occlusion'], \
                         'The chosen variable has to be in this list: ' \
-                        '[pred_depth, pred_disp, image_reg, depth_reg, disp_reg, inputs, occlusion]'
+                        '[pred_depth, image_reg, depth_reg, inputs, occlusion]'
                     option = {'variable_name': p_}
                     proc.append([key, option])
         if 'SAVE' not in [k.upper() for k in process.keys()]:
@@ -386,14 +370,13 @@ class Process(OrderedDict):
         return _monocular_estimation, cams, cams
 
     @staticmethod
-    def wrap(pipe, cam_src, cam_dst, depth_tensors, depth, return_depth_reg, return_occlusion, cams, reverse_wrap, **kwargs0):
+    def wrap(pipe, cam_src, cam_dst, depth, return_depth_reg, return_occlusion, reverse_wrap, **kwargs0):
         descr = [f'from {cam_src} to {cam_dst} ' + 'with depth' if depth else 'with disparity']
         summary = {"cam_src": cam_src, "cam_dst": cam_dst, "reverse": reverse_wrap}
 
         def _wrap(sample, res, **kwargs):
-            pred_depth = res[depth_tensors]
             wrapper = kwargs['wrapper'] if 'wrapper' in kwargs.keys() else pipe.wrapper
-            result = wrapper(pred_depth, sample, cam_src, cam_dst, *cams,
+            result = wrapper(res['pred_depth'], sample, cam_src, cam_dst,
                              depth=depth,
                              return_depth_reg=return_depth_reg,
                              return_occlusion=return_occlusion,
@@ -402,10 +385,7 @@ class Process(OrderedDict):
             cam_to_cam = f'{cam_src}_to_{cam_dst}'
             if return_depth_reg:
                 cam = cam_dst if reverse_wrap else cam_src
-                if depth_tensors == 'pred_depth':
-                    res['depth_reg'].update({cam: result['depth_reg']})
-                else:
-                    res['disp_reg'].update({cam: result['depth_reg']})
+                res['depth_reg'].update({cam: result['depth_reg']})
             if return_occlusion:
                 res['occlusion'].update({cam_to_cam: result['occlusion']})
             res['image_reg'].update({cam_to_cam: result['image_reg']})

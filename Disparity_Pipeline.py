@@ -60,7 +60,6 @@ class Pipe:
         self._init_validation_()
 
         # self._init_pointsCloud_()
-
         # self.time_consistency_block = Time_consistency_block(config.time_consistency_block)
         # self.post_processing = Post_processing(config.Post_processing)
         # self.reconstruction_module = self._initialize_reconstruction_(config)
@@ -72,7 +71,7 @@ class Pipe:
             if self.print_info:
                 print(process)
             for name_experiment, experiment in process.items():
-                self.save_experiment(experiment, name_experiment)
+                self.save_experiment(experiment)
                 with tqdm(total=len(self.setup) * len(self.dataloader),
                           desc=f"Nombre d'itérations for {name_experiment}: ", leave=True, position=0) as bar:
                     name = None
@@ -84,7 +83,6 @@ class Pipe:
                             self._init_dataloader_(s)
                             self.dataloader.camera_used = process.camera_used
                             self._init_wrapper_(s, verbose=False)
-                            # name = s.name
                         for idx, sample in enumerate(self.dataloader):
                             update_name_tree(sample, s.name)
                             experiment(sample, setup=s, wrapper=self.wrapper)
@@ -149,7 +147,7 @@ class Pipe:
             # if self.timeit:
             #     self.save_timers()
 
-    def save_experiment(self, experiment, name_experiment):
+    def save_experiment(self, experiment):
         path = experiment.path
         if path is None:
             path = self.path_output
