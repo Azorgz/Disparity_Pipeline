@@ -327,7 +327,7 @@ class Process(OrderedDict):
             new_sample = setup_(sample, cut_roi_min=cut_roi_min, cut_roi_max=cut_roi_max)
             output = pipe.network(new_sample, task='disparity')
             output = setup_(output, reverse=True)
-            res['pred_disp'].update(setup_.disparity_to_depth(output))
+            res['pred_depth'].update(setup_.disparity_to_depth(output))
 
         return _disparity, descr, summary
 
@@ -371,7 +371,7 @@ class Process(OrderedDict):
 
     @staticmethod
     def wrap(pipe, cam_src, cam_dst, depth, return_depth_reg, return_occlusion, reverse_wrap, **kwargs0):
-        descr = [f'from {cam_src} to {cam_dst} ' + 'with depth' if depth else 'with disparity']
+        descr = [f'from {cam_src} to {cam_dst} ' + ('with depth' if depth else 'with disparity')]
         summary = {"cam_src": cam_src, "cam_dst": cam_dst, "reverse": reverse_wrap}
 
         def _wrap(sample, res, **kwargs):
@@ -452,7 +452,7 @@ class Experiment(list):
         return f'\n{self.name} : {" / ".join([f"{instruction[0].__name__[1:].capitalize()} {space.join(instruction[1])}" for instruction in self])}'
 
     def __call__(self, sample, *args, **kwargs):
-        res = {'pred_disp': {}, 'pred_depth': {}, 'image_reg': {}, 'depth_reg': {}, 'disp_reg': {}, 'occlusion': {}}
+        res = {'pred_depth': {}, 'image_reg': {}, 'depth_reg': {}, 'occlusion': {}}
         for instruction in self:
             instruction[0](sample, res, **kwargs)
 

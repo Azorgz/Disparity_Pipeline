@@ -113,17 +113,6 @@ class Visualizer:
             else:
                 warp_inverted = False
             try:
-                self.experiment[p]['target_disp_path'], _, target_disp_list = os.walk(
-                    f'{P}/pred_disp/{target if not warp_inverted else ref}').__next__()
-                self.experiment[p]['ref_disp_path'], _, ref_disp_list = os.walk(
-                    f'{P}/disp_reg/{ref if not warp_inverted else target}').__next__()
-                self.experiment[p]['target_disp_list'] = sorted(target_disp_list)
-                self.experiment[p]['ref_disp_list'] = sorted(ref_disp_list)
-                self.experiment[p]['disp_ok'] = True
-            except StopIteration:
-                self.experiment[p]['disp_ok'] = False
-                print(f'Disparity images wont be available for the {p} couple')
-            try:
                 self.experiment[p]['target_depth_path'], _, target_depth_list = os.walk(
                     f'{P}/pred_depth/{target if not warp_inverted else ref}').__next__()
                 self.experiment[p]['ref_depth_path'], _, ref_depth_list = os.walk(
@@ -171,12 +160,8 @@ class Visualizer:
                 experiment = self.experiment[exp]
                 cv.setWindowProperty(f'Experience {exp}', cv.WND_PROP_FULLSCREEN, cv.WINDOW_FULLSCREEN)
                 cv.setWindowProperty(f'Experience {exp}', cv.WND_PROP_FULLSCREEN, cv.WINDOW_NORMAL)
-                if self.show_disp_overlay == 1:
-                    if not experiment['disp_ok']:
-                        self.show_disp_overlay += 1
-                if self.show_disp_overlay >= 2:
-                    if not experiment['depth_ok']:
-                        self.show_disp_overlay = 0
+                if self.show_disp_overlay > 1:
+                    self.show_disp_overlay = 0
             self.idx = self.idx % self.experiment[exp]['idx_max']
         cv.destroyAllWindows()
 
@@ -230,12 +215,9 @@ class Visualizer:
         if self.key == ord('d'):
             self.show_disp_overlay += 1
             if self.show_disp_overlay == 1:
-                if not experiment['disp_ok']:
-                    self.show_disp_overlay += 1
-            if self.show_disp_overlay == 2:
                 if not experiment['depth_ok']:
                     self.show_disp_overlay = 0
-            if self.show_disp_overlay > 2:
+            if self.show_disp_overlay > 1:
                 self.show_disp_overlay = 0
         if self.key == ord('i'):
             self.show_idx = not self.show_idx
@@ -263,9 +245,9 @@ class Visualizer:
             elif self.key == ord('z'):
                 self.dz = (self.dz + 1) % max(self.dz_max, 1)
                 self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
-                        self.dy * self.dz_max * self.da_max +
-                        self.dz * self.da_max + self.da +
-                        self.f * self.px_max + self.px)
+                            self.dy * self.dz_max * self.da_max +
+                            self.dz * self.da_max + self.da +
+                            self.f * self.px_max + self.px)
             elif self.key == ord('a'):
                 self.da = (self.da + 1) % max(self.da_max, 1)
                 self.idx = (self.dx * self.dy_max * self.dz_max * self.da_max +
@@ -310,12 +292,8 @@ class Visualizer:
             visu = visu.hstack(grad_im)
 
         if self.show_disp_overlay:
-            if self.show_disp_overlay == 1:
-                disp_overlay = self._create_disp_overlay(experiment, ref_im, target_im, mask)
-                visu = visu.hstack(disp_overlay)
-            elif self.show_disp_overlay == 2:
-                depth_overlay = self._create_depth_overlay(experiment, ref_im, target_im, mask)
-                visu = visu.hstack(depth_overlay)
+            depth_overlay = self._create_depth_overlay(experiment, ref_im, target_im, mask)
+            visu = visu.hstack(depth_overlay)
 
         h, w = ref_im.shape[-2:]
 
@@ -329,12 +307,12 @@ class Visualizer:
                               self.thickness, cv.LINE_AA)
         if self.multi_setup:
             org = self.org_idx[0], self.org_idx[1] + 15
-            visu = cv.putText(visu, f'{f"dx : {self.dx}," if self.dx_max>0 else ""}'
-                                    f'{f"dy : {self.dy}," if self.dy_max>0 else ""}'
-                                    f'{f"dz : {self.dz}," if self.dz_max>0 else ""}'
-                                    f'{f"da : {self.da}," if self.da_max>0 else ""}'
-                                    f'{f"df : {self.f}," if self.f_max>0 else ""}'
-                                    f'{f"dpx : {self.px}," if self.px_max>0 else ""}',
+            visu = cv.putText(visu, f'{f"dx : {self.dx}," if self.dx_max > 0 else ""}'
+                                    f'{f"dy : {self.dy}," if self.dy_max > 0 else ""}'
+                                    f'{f"dz : {self.dz}," if self.dz_max > 0 else ""}'
+                                    f'{f"da : {self.da}," if self.da_max > 0 else ""}'
+                                    f'{f"df : {self.f}," if self.f_max > 0 else ""}'
+                                    f'{f"dpx : {self.px}," if self.px_max > 0 else ""}',
                               org, self.font, self.fontScale, self.color, self.thickness, cv.LINE_AA)
         if self.show_grad_im:
             org = self.org_idx[0] + w, self.org_idx[1]
@@ -407,20 +385,13 @@ class Visualizer:
 
         return im
 
-    def _create_disp_overlay(self, experiment, ref_im, target_im, mask):
-        disp_target = ImageTensor(
-            f'{experiment["target_disp_path"]}/{experiment["target_disp_list"][self.idx]}').RGB()
-        disp_ref = ImageTensor(f'{experiment["ref_disp_path"]}/{experiment["ref_disp_list"][self.idx]}').RGB()
-        disp_overlay_ref = disp_ref.match_shape(ref_im)
-        disp_overlay_target = disp_target.match_shape(ref_im) * mask
-        return (disp_overlay_ref / disp_overlay_ref.max()).vstack(disp_overlay_target / disp_overlay_target.max())
-
     def _create_depth_overlay(self, experiment, ref_im, target_im, mask):
-        depth_target = ImageTensor(
-            f'{experiment["target_depth_path"]}/{experiment["target_depth_list"][self.idx]}').RGB()
-        depth_ref = ImageTensor(f'{experiment["ref_depth_path"]}/{experiment["ref_depth_list"][self.idx]}').RGB()
+        depth_target = ImageTensor(DepthTensor(ImageTensor(
+            f'{experiment["target_depth_path"]}/{experiment["target_depth_list"][self.idx]}'))).RGB()
+        depth_ref = ImageTensor(
+            DepthTensor(ImageTensor(f'{experiment["ref_depth_path"]}/{experiment["ref_depth_list"][self.idx]}'))).RGB()
         depth_overlay_ref = depth_ref.match_shape(ref_im)
-        depth_overlay_target = depth_target * mask
+        depth_overlay_target = depth_target.match_shape(ref_im) * mask
         return (depth_overlay_ref / depth_overlay_ref.max()).vstack(depth_overlay_target / depth_overlay_target.max())
 
     # def _write_video(self):
@@ -429,5 +400,6 @@ class Visualizer:
 if __name__ == '__main__':
     pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/results/'
     perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/results/'
-    path = perso + "DatasetCreation/Lynred_vis"
+    p = pro if 'godeta' in os.getcwd() else perso
+    path = p + "/Test/Disparity-Depth_night"
     Visualizer(path, search_exp=False).run()

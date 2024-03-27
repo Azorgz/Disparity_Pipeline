@@ -107,7 +107,6 @@ class StereoSetup(StereoCamera):
         self.map_left = Tensor(self.map_left).permute(1, 2, 0).unsqueeze(0).to(self.device)
 
     def _init_map_inv_(self):
-        pass
         n_h, n_w = self.new_shape
         l_h, l_w = self.shape_left
         r_h, r_w = self.shape_right

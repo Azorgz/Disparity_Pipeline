@@ -60,21 +60,25 @@ def simple_project_cloud_to_image(cloud, image_size, post_process, image=None, r
         return result
 
 
-def project_cloud_to_image(cloud, image_size, post_process, image=None, return_occlusion=False):
+def project_cloud_to_image(cloud, image_size, post_process, image=None, return_occlusion=False, upsample=1 / 2):
     if image is not None:
         assert cloud.shape[1:3] == image.shape[-2:]
         _, cha, _, _ = image.shape
+        if upsample > 1:
+            image = F.interpolate(image, scale_factor=upsample)
         image_flatten = torch.tensor(image.flatten(start_dim=2), dtype=cloud.dtype).squeeze(0)  # shape c x H*W
     else:
         cha = 1
     # Put all the point into a H*W x 3 vector
+    if upsample > 1:
+        cloud = F.interpolate(cloud.permute([0, 3, 1, 2]), scale_factor=upsample).permute([0, 2, 3, 1])
     c = torch.tensor(cloud.flatten(start_dim=0, end_dim=2))  # H*W x 3
     # Remove the point landing outside the image
     c[:, 0] *= cloud.shape[2] / image_size[1]
     c[:, 1] *= cloud.shape[1] / image_size[0]
     mask_out = ((c[:, 0] < 0) + (c[:, 0] >= (cloud.shape[2] - 1)) + (c[:, 1] < 0) + (c[:, 1] >= (cloud.shape[1] - 1))) != 0
     # Sort the point by decreasing depth
-    _, indexes = c[:, -1].sort(descending=False, dim=0)
+    _, indexes = c[:, -1].sort(descending=True, dim=0)
     c[mask_out] = 0
     c_sorted = c[indexes, :]
     if image is not None:
@@ -139,6 +143,85 @@ def project_cloud_to_image(cloud, image_size, post_process, image=None, return_o
         return result
 
 
+def project_grid_to_image(grid, image_size, post_process, image=None, return_occlusion=False):
+    if image is not None:
+        assert grid.shape[1:3] == image.shape[-2:]
+        _, cha, _, _ = image.shape
+        image_flatten = torch.tensor(image.flatten(start_dim=2), dtype=grid.dtype).squeeze(0)  # shape c x H*W
+    else:
+        cha = 1
+    # Put all the point into a H*W x 2 vector
+    c = torch.tensor(grid.flatten(start_dim=0, end_dim=2))  # H*W x 3
+    # Remove the point without disparity
+    c[:, 0] *= grid.shape[2] / image_size[1]
+    # mask_out = c[:, 1] == 0
+    # Sort the point by increasing disp
+    _, indexes = torch.abs(c[:, -1]).sort(descending=False, dim=0)
+    # c[mask_out] = 0
+    c_sorted = c[indexes, :]
+    if image is not None:
+        sample = image_flatten[:, indexes]
+    else:
+        sample = c_sorted[:, 1:].permute([1, 0])
+    # Transform the landing positions in accurate pixels
+    # Transform the landing positions in accurate pixels
+    c_x = torch.floor(c_sorted[:, 0:1]).to(torch.int)
+    dist_c_x = torch.abs(c_x - c_sorted[:, 0:1])
+    c_X = torch.ceil(c_sorted[:, 0:1]).to(torch.int)
+    dist_c_X = torch.abs(c_X - c_sorted[:, 0:1])
+    c_y = torch.floor(c_sorted[:, 1:2]).to(torch.int)
+    dist_c_y = torch.abs(c_y - c_sorted[:, 1:2])
+    c_Y = torch.floor(c_sorted[:, 1:2]).to(torch.int)
+    dist_c_Y = torch.abs(c_Y - c_sorted[:, 1:2])
+
+    rays = [torch.concatenate([c_x, c_y], dim=1),
+            torch.concatenate([c_X, c_y], dim=1),
+            torch.concatenate([c_x, c_Y], dim=1),
+            torch.concatenate([c_X, c_Y], dim=1)]
+    dists = [2 - torch.sqrt(dist_c_x ** 2 + dist_c_y ** 2),
+             2 - torch.sqrt(dist_c_X ** 2 + dist_c_y ** 2),
+             2 - torch.sqrt(dist_c_x ** 2 + dist_c_Y ** 2),
+             2 - torch.sqrt(dist_c_X ** 2 + dist_c_Y ** 2)]
+
+    if image is not None:
+        result = torch.zeros([1, cha, grid.shape[1], grid.shape[2]]).to(grid.dtype).to(grid.device)
+    else:
+        result = torch.zeros([1, cha, grid.shape[1], grid.shape[2]]).to(grid.dtype).to(grid.device)
+    total_dist = torch.zeros([1, cha, grid.shape[1], grid.shape[2]]).to(grid.dtype).to(grid.device)
+    for dist, ray in zip(dists, rays):
+        temp = torch.zeros([1, 1, grid.shape[1], grid.shape[2]]).to(grid.dtype).to(grid.device)
+        temp_dist = torch.zeros([1, 1, grid.shape[1], grid.shape[2]]).to(grid.dtype).to(grid.device)
+        temp[0, :, ray[:, 1], ray[:, 0]] = sample
+        temp_dist[0, 0, ray[:, 1], ray[:, 0]] = 1 / dist[:, 0]
+        result += temp * temp_dist
+        total_dist += temp_dist
+    result[total_dist != 0] /= total_dist[total_dist != 0]
+    mask = result == 0
+    if post_process:
+        blur = MedianBlur(post_process)
+        kernel = torch.ones([5, 3], device=cloud.device)
+        res_ = result.clone()
+        if return_occlusion:
+            occ = mask * 1.
+        for i in range(1):
+            res_ = blur(res_)
+            if return_occlusion:
+                occ = closing(occ, kernel)
+                occ = blur(occ)
+            if image is None:
+                res_ = dilation(res_, kernel)
+        result[mask] = res_[mask]
+    result = F.interpolate(result, image_size)
+    if image is not None:
+        result = ImageTensor(result)
+    else:
+        result = DepthTensor(result).scale()
+    if return_occlusion:
+        occ = ImageTensor(F.interpolate(occ, image_size)).to(torch.bool)
+        return result, occ
+    else:
+        return result
+
 def perspective2grid(matrix, shape, device):
     height, width = shape[0], shape[1]
     grid_reg = kornia.utils.create_meshgrid(height, width, normalized_coordinates=False, device=device)  # [1 H W 2]
@@ -150,92 +233,6 @@ def perspective2grid(matrix, shape, device):
     grid_transformed[:, :, :, 0] = 2 * (grid_transformed[:, :, :, 0] / alpha) / width - 1  # [1 H W 3]
     grid_transformed[:, :, :, 1] = 2 * (grid_transformed[:, :, :, 1] / alpha) / height - 1  # [1 H W 3]
     return grid_transformed[..., :2]  # [1 H W 2]
-
-
-def reproject(src_img, depth_img, target_frame_res, K_ref, K_cam, Rt_ref, Rt_cam):
-    """
-    This function reprojects RGB images.
-    rgb_img: RGB_src image (h, w, 3)
-    depth_img: Depth_src image (h, w)
-    K_ref: Intrinsic matrix from src
-    K_cam: Intrinsic matrix from dst
-    Rt_ref: Extrinsic matrix from src
-    Rt_cam: Extrinsic matrix from dst
-    """
-
-    i = np.tile(np.arange(depth_img.shape[1]), depth_img.shape[0])
-    j = np.repeat(np.arange(depth_img.shape[0]), depth_img.shape[1])
-    ones_vect = np.ones(depth_img.shape[0] * depth_img.shape[1])
-    z = depth_img[j, i]
-    z[z == 0] = 1
-    img_mx = np.stack([i, j, ones_vect, 1 / z], axis=0)
-    # ************ REPROJECTION ************
-    low_vect = np.array([0, 0, 0, 1])
-    left_mx = np.matmul(K_cam, Rt_cam)
-    right_mx = np.linalg.inv(np.vstack((np.matmul(K_ref, Rt_ref), low_vect)))
-    P = np.multiply(np.matmul(right_mx, img_mx), z)
-    res_mx_d = np.matmul(left_mx, P) / z
-    u = res_mx_d[0, :]
-    v = res_mx_d[1, :]
-    del_u_ix = np.where(u > target_frame_res[0])
-    del_v_ix = np.where(v > target_frame_res[1])
-    del_u_ix_neg = np.where(u < 0)
-    del_v_ix_neg = np.where(v < 0)
-    del_ix_neg = np.unique(np.append(del_u_ix_neg, del_v_ix_neg))
-    del_ix_excess = np.unique(np.append(del_u_ix, del_v_ix))
-    del_ix = np.unique(np.append(del_ix_neg, del_ix_excess))
-    u = np.delete(u, del_ix)
-    v = np.delete(v, del_ix)
-    i = np.delete(i, del_ix)
-    j = np.delete(j, del_ix)
-    u = np.around(u, 0).astype('int')
-    v = np.around(v, 0).astype('int')
-    out_img = np.zeros((target_frame_res[1], target_frame_res[0], target_frame_res[2]))
-    out_img[v, u, :] = src_img[j, i, :]
-    return out_img
-
-
-def reproject_RGB(rgb_img, depth_img, K_ref, K_cam, Rt_ref, Rt_cam):
-    """
-    This function reprojects RGB images.
-    rgb_img: RGB_src image (h, w, 3)
-    depth_img: Depth_src image (h, w)
-    K_ref: Intrinsic matrix from src
-    K_cam: Intrinsic matrix from dst
-    Rt_ref: Extrinsic matrix from src
-    Rt_cam: Extrinsic matrix from dst
-    """
-    i = np.tile(np.arange(depth_img.shape[1]), depth_img.shape[0])
-    j = np.repeat(np.arange(depth_img.shape[0]), depth_img.shape[1])
-    ones_vect = np.ones(depth_img.shape[0] * depth_img.shape[1])
-    z = depth_img[j, i]
-    z[z == 0] = 1
-    img_mx = np.stack([i, j, ones_vect, 1 / z], axis=0)
-    # ************ REPROJECTION ************
-    low_vect = np.array([0, 0, 0, 1])
-    left_mx = np.matmul(K_cam, Rt_cam)
-    temp = np.vstack((np.matmul(K_ref, Rt_ref), low_vect))
-    right_mx = np.linalg.inv(temp)
-    P = np.multiply(np.matmul(right_mx, img_mx), z)
-    res_mx_d = np.matmul(left_mx, P) / z
-    u = res_mx_d[0, :]
-    v = res_mx_d[1, :]
-    del_u_ix = np.where(u > rgb_img.shape[-1] - 1)
-    del_v_ix = np.where(v > rgb_img.shape[-2] - 1)
-    del_u_ix_neg = np.where(u < 0)
-    del_v_ix_neg = np.where(v < 0)
-    del_ix_neg = np.unique(np.append(del_u_ix_neg, del_v_ix_neg))
-    del_ix_excess = np.unique(np.append(del_u_ix, del_v_ix))
-    del_ix = np.unique(np.append(del_ix_neg, del_ix_excess))
-    u = np.delete(u, del_ix)
-    v = np.delete(v, del_ix)
-    i = np.delete(i, del_ix)
-    j = np.delete(j, del_ix)
-    u = np.around(u, 0).astype('int')
-    v = np.around(v, 0).astype('int')
-    out_img = rgb_img * 0
-    out_img[:, :, v, u] = rgb_img[:, :, j, i]
-    return out_img
 
 
 def histogram_equalization(image, method=0):

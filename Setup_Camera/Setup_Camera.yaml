@@ -43,7 +43,7 @@ cameras:
       - 1.0
     is_positioned: true
     is_ref: false
-    name: mainIR
+    name: SmartIR640
     path: /home/godeta/PycharmProjects/Datasets/Lynred/Day/master/infrared_corrected
     sensor_resolution:
     - 640
