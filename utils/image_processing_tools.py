@@ -24,7 +24,8 @@ def simple_project_cloud_to_image(cloud, image_size, post_process, image=None, r
     # Remove the point landing outside the image
     c[:, 0] *= cloud.shape[2] / image_size[1]
     c[:, 1] *= cloud.shape[1] / image_size[0]
-    mask_out = ((c[:, 0] < 0) + (c[:, 0] >= (cloud.shape[2] - 1)) + (c[:, 1] < 0) + (c[:, 1] >= (cloud.shape[1] - 1))) != 0
+    mask_out = ((c[:, 0] < 0) + (c[:, 0] >= (cloud.shape[2] - 1)) + (c[:, 1] < 0) + (
+                c[:, 1] >= (cloud.shape[1] - 1))) != 0
     # Sort the point by decreasing depth
     _, indexes = c[:, -1].sort(descending=True, dim=0)
     c[mask_out] = 0
@@ -44,7 +45,7 @@ def simple_project_cloud_to_image(cloud, image_size, post_process, image=None, r
         kernel = torch.ones([5, 3], device=cloud.device)
         res_ = result.clone()
         if return_occlusion:
-            occ = mask*1.
+            occ = mask * 1.
         for i in range(2):
             res_ = blur(res_)
             if return_occlusion:
@@ -76,7 +77,8 @@ def project_cloud_to_image(cloud, image_size, post_process, image=None, return_o
     # Remove the point landing outside the image
     c[:, 0] *= cloud.shape[2] / image_size[1]
     c[:, 1] *= cloud.shape[1] / image_size[0]
-    mask_out = ((c[:, 0] < 0) + (c[:, 0] >= (cloud.shape[2] - 1)) + (c[:, 1] < 0) + (c[:, 1] >= (cloud.shape[1] - 1))) != 0
+    mask_out = ((c[:, 0] < 0) + (c[:, 0] >= (cloud.shape[2] - 1)) + (c[:, 1] < 0) + (
+                c[:, 1] >= (cloud.shape[1] - 1))) != 0
     # Sort the point by decreasing depth
     _, indexes = c[:, -1].sort(descending=True, dim=0)
     c[mask_out] = 0
@@ -112,10 +114,10 @@ def project_cloud_to_image(cloud, image_size, post_process, image=None, return_o
         temp = torch.zeros([1, 1, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
         temp_dist = torch.zeros([1, 1, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
         temp[0, :, ray[:, 1], ray[:, 0]] = sample
-        temp_dist[0, 0, ray[:, 1], ray[:, 0]] = 1/dist[:, 0]
-        result += temp*temp_dist
+        temp_dist[0, 0, ray[:, 1], ray[:, 0]] = 1 / dist[:, 0]
+        result += temp * temp_dist
         total_dist += temp_dist
-    result[total_dist!=0] /= total_dist[total_dist!=0]
+    result[total_dist != 0] /= total_dist[total_dist != 0]
     mask = result == 0
     if post_process:
         blur = MedianBlur(post_process)
@@ -162,7 +164,7 @@ def project_grid_to_image(grid, image_size, post_process, image=None, return_occ
     if image is not None:
         sample = image_flatten[:, indexes]
     else:
-        sample = c_sorted[:, 1:].permute([1, 0])
+        sample = c_sorted[:, 2:].permute([1, 0])
     # Transform the landing positions in accurate pixels
     # Transform the landing positions in accurate pixels
     c_x = torch.floor(c_sorted[:, 0:1]).to(torch.int)
@@ -170,18 +172,10 @@ def project_grid_to_image(grid, image_size, post_process, image=None, return_occ
     c_X = torch.ceil(c_sorted[:, 0:1]).to(torch.int)
     dist_c_X = torch.abs(c_X - c_sorted[:, 0:1])
     c_y = torch.floor(c_sorted[:, 1:2]).to(torch.int)
-    dist_c_y = torch.abs(c_y - c_sorted[:, 1:2])
-    c_Y = torch.floor(c_sorted[:, 1:2]).to(torch.int)
-    dist_c_Y = torch.abs(c_Y - c_sorted[:, 1:2])
 
     rays = [torch.concatenate([c_x, c_y], dim=1),
-            torch.concatenate([c_X, c_y], dim=1),
-            torch.concatenate([c_x, c_Y], dim=1),
-            torch.concatenate([c_X, c_Y], dim=1)]
-    dists = [2 - torch.sqrt(dist_c_x ** 2 + dist_c_y ** 2),
-             2 - torch.sqrt(dist_c_X ** 2 + dist_c_y ** 2),
-             2 - torch.sqrt(dist_c_x ** 2 + dist_c_Y ** 2),
-             2 - torch.sqrt(dist_c_X ** 2 + dist_c_Y ** 2)]
+            torch.concatenate([c_X, c_y], dim=1)]
+    dists = [1 - dist_c_x, 1 - dist_c_X]
 
     if image is not None:
         result = torch.zeros([1, cha, grid.shape[1], grid.shape[2]]).to(grid.dtype).to(grid.device)
@@ -199,7 +193,7 @@ def project_grid_to_image(grid, image_size, post_process, image=None, return_occ
     mask = result == 0
     if post_process:
         blur = MedianBlur(post_process)
-        kernel = torch.ones([5, 3], device=cloud.device)
+        kernel = torch.ones([5, 3], device=grid.device)
         res_ = result.clone()
         if return_occlusion:
             occ = mask * 1.
@@ -215,12 +209,13 @@ def project_grid_to_image(grid, image_size, post_process, image=None, return_occ
     if image is not None:
         result = ImageTensor(result)
     else:
-        result = DepthTensor(result).scale()
+        result = DepthTensor(torch.abs(result)).scale()
     if return_occlusion:
-        occ = ImageTensor(F.interpolate(occ, image_size)).to(torch.bool)
+        occ = ImageTensor(F.interpolate(occ, image_size))
         return result, occ
     else:
         return result
+
 
 def perspective2grid(matrix, shape, device):
     height, width = shape[0], shape[1]

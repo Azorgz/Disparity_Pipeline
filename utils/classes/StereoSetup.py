@@ -38,7 +38,7 @@ class StereoSetup(StereoCamera):
         self._shape_right = np.array(right.im_calib.shape[-2:])
         self._new_shape = self.shape_left if self.shape_left[0] * self.shape_left[1] > self.shape_right[0] * \
                                              self.shape_right[1] else self.shape_right
-        self.scale = 0.2
+        self.scale = 0.25
         self.dx = int(self.scale * self._new_shape[1])
         self.dy = int(self.scale * self._new_shape[0])
         self._new_shape = (self.new_shape[0] + self.dy, self.new_shape[1] + self.dx)
@@ -184,6 +184,7 @@ class StereoSetup(StereoCamera):
 
     def disparity_to_depth(self, sample: dict, *args):
         for key, t in sample.items():
+            mask = t == 0
             t = self.reproject_disparity_to_3D((t + 1e-8).put_channel_at(-1))
             t = t[:, :, :, -1].unsqueeze(1)
             sample[key] = torch.clip(t, self.depth_min, self.depth_max)
@@ -197,7 +198,9 @@ class StereoSetup(StereoCamera):
         t_ = depth.clone()
         t_[mask] = 1
         disp = self.tx / t_ * self.fx
-        disp[mask] = self.tx / self.depth_min * self.fx
+        disp.max_value = disp.max()
+        disp.min_value = disp.min()
+        disp[mask] = 0
         return disp
 
     @staticmethod

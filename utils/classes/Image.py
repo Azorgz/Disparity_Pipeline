@@ -753,10 +753,14 @@ class DepthTensor(ImageTensor):
         else:
             return new
 
-    def inverse_depth(self, remove_zeros=False):
+    def inverse_depth(self, remove_zeros=False, remove_max=True, factor=100):
+        temp = self.clone()
         if remove_zeros:
-            self[self == 0] = self.max() + 1
-        return 10 / (self + 1)
+            temp[temp == 0] = temp.max()
+        if remove_max:
+            temp[temp == temp.max()] = temp.min()
+        temp = factor / (temp + 1)
+        return temp.normalize()
 
     @property
     def color_mode(self) -> str:

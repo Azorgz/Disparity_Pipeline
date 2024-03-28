@@ -18,9 +18,9 @@ class DisparityWrapper:
         self.device = device
         self.setup = setup
 
-    def __call__(self, images_src: dict, depth_tensor: dict, cam_src: str, cam_dst: str, *args,
+    def __call__(self, images: dict, depth_tensor: dict, cam_src: str, cam_dst: str, *args,
                  return_occlusion=True, post_process_image=3,
-                 post_process_depth=3, return_depth_reg=False, inverse_wrap=False, **kwargs) -> (
+                 post_process_depth=3, return_depth_reg=False, reverse_wrap=False, **kwargs) -> (
             ImageTensor, DepthTensor):
 
         """Warp a tensor from a source to destination frame by the disparity in the destination.
@@ -39,10 +39,10 @@ class DisparityWrapper:
         Return:
             the warped tensor in the source frame with shape :math:`(B,3,H,W)`.
         """
-        if not inverse_wrap:
+        if not reverse_wrap:
             # selection of the right stereo setup and src image
             setup = self.setup.stereo_pair(cam_src, cam_dst)
-            image_src = images_src[cam_src]
+            image_src = images[cam_src]
             sample = {cam_src: image_src}
 
             # rectification of the src image into the rectified frame using the appropriate homography
@@ -78,43 +78,13 @@ class DisparityWrapper:
                 res['depth_reg'] = setup.disparity_to_depth({cam_src: disparity_src})[cam_src]
             return res
         else:
-            return self._reverse_call(images_src, depth_tensor, cam_src, cam_dst, *args,
+            return self._reverse_call(images, depth_tensor, cam_src, cam_dst, *args,
                                       return_occlusion=return_occlusion,
                                       post_process_image=post_process_image,
                                       post_process_depth=post_process_depth,
-                                      return_depth_reg=False, **kwargs)
+                                      return_depth_reg=return_depth_reg, **kwargs)
 
-        # mask = img_dst == 0
-        # for cam_dst_bis in cams:
-        #     setup_bis = self.setup.stereo_pair(cam_src, cam_dst_bis)
-        #     # Transformation of the depth into signed Disparity
-        #     disparity_bis = setup.depth_to_disparity(depth_tensor[cam_dst_bis])
-        #     sign_bis = 1 if setup_bis.left.name == cam_src else -1
-        #     disparity_dst_bis = sign_bis * disparity_bis
-        #     # Rectification of the signed Disparity
-        #     sample = {cam_dst_bis: disparity_dst_bis}
-        #     side_bis, disparity_proj_bis = list(setup_bis(sample).items())[0]
-        #     # Rectification of the signed Disparity
-        #     sample = {cam_dst_bis: disparity_dst}
-        #     disparity_dst_bis = list(setup(sample).values())[0]
-        #     mask = disparity_proj[0, :, :, :] == 0
-        #
-        #     # grid for resampling
-        #     h, w = disparity_proj_bis.shape[-2:]
-        #     grid_bis = kornia.utils.create_meshgrid(h, w, normalized_coordinates=False, device=self.device).to(
-        #         disparity_proj_bis.dtype)  # [1 H W 2]
-        #     grid_bis[:, :, :, 0] -= disparity_proj_bis[0, :, :, :]
-        #     grid_bis_norm: Tensor = normalize_pixel_coordinates(grid, h, w).to(image_src.dtype)  # BxHxWx2
-        #     grid_bis_norm[:, :, :, 0][mask] = -2
-        #     disparity_dst_bis = F.grid_sample(disparity_dst_bis, grid_bis_norm, padding_mode='zeros')
-        #
-        #     # side_bis = 'left' if side_bis == 'right' else 'right'
-        #     # sample = {side_bis: grid_sample(disparity_proj_bis * factor, -disparity_proj_bis, **kwargs)}
-        #     sample = {cam_src: list(setup_bis(sample, reverse=True, scale=False).values())[0]}
-        #     disparity_proj_bis = list(setup(sample).values())[0]
-        #     disparity_src[mask] = disparity_proj_bis[mask]
-
-    def _reverse_call(self, images_src: dict, depth_tensor: dict, cam_src: str, cam_dst: str, *args,
+    def _reverse_call(self, images: dict, depth_tensor: dict, cam_src: str, cam_dst: str, *args,
                       return_occlusion=True,
                       post_process_image=3,
                       post_process_depth=3,
@@ -138,7 +108,7 @@ class DisparityWrapper:
         """
         # selection of the right stereo setup and src image
         setup = self.setup.stereo_pair(cam_src, cam_dst)
-        image_src = images_src[cam_src]
+        image_src = images[cam_src]
         sample = {cam_src: image_src}
 
         # rectification of the src image into the rectified frame using the appropriate homography
@@ -148,7 +118,7 @@ class DisparityWrapper:
         disparity = setup.depth_to_disparity(depth_tensor[cam_src])
         kernel = torch.ones(3, 3).to(self.device)
         disparity = dilation(disparity, kernel)
-        sign = -1 if setup.left.name == cam_src else 1
+        sign = 1 if setup.left.name == cam_src else -1
         disparity_src = sign * disparity
 
         # Rectification of the signed Disparity into the rectified frame using the appropriate homography
@@ -157,27 +127,30 @@ class DisparityWrapper:
         opp_side = 'left' if side == 'right' else 'right'
 
         # resampling with disparity
-        size_im = disparity_src.shape[-2:]
+        size_im = disparity_proj.shape[-2:]
         grid = kornia.utils.create_meshgrid(size_im[0], size_im[1], normalized_coordinates=False,
-                                            device=self.device).to(
-            disparity.dtype)  # [1 H W 2]
-        grid[:, :, :, 0] -= disparity[0, :, :, :]
-        grid = torch.concatenate([grid, disparity.permute([0, 2, 3, 1])], dim=-1)
-        img_dst = project_grid_to_image(grid, size_im, post_process_depth, image=img_src_proj)
+                                            device=self.device).to(disparity_proj.dtype)  # [1 H W 2]
 
-        sample = {side: img_dst}
-        res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
+        grid[:, :, :, 0] -= disparity_proj[0, :, :, :]
+        grid = torch.concatenate([grid, disparity_proj.permute([0, 2, 3, 1])], dim=-1)
         if return_occlusion:
-            sample = {side: self.find_occlusion(disparity_proj, img_dst)}
+            img_dst, occ = project_grid_to_image(grid, size_im, post_process_depth, image=img_src_proj, return_occlusion=return_occlusion)
+            sample = {opp_side: img_dst}
+            res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
+            sample = {opp_side: occ}
             res['occlusion'] = setup(sample, reverse=True)[cam_dst].to(torch.bool)
             res['occlusion'].im_name = image_src.im_name + '_occlusion'
+        else:
+            img_dst = project_grid_to_image(grid, size_im, post_process_depth, image=img_src_proj)
+            sample = {opp_side: img_dst}
+            res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
         if return_depth_reg:
-            disparity_src = self.compute_disp_src(disparity_proj, post_process_depth=post_process_depth)
-            disparity_src.pass_attr(disparity)
-            disparity_src.im_name = image_src.im_name + '_disp'
-            sample = {opp_side: disparity_src}
-            disparity_src = setup(sample, reverse=True)[cam_src]
-            res['depth_reg'] = setup.disparity_to_depth({cam_src: disparity_src})[cam_src]
+            disparity_dst = project_grid_to_image(grid, size_im, post_process_depth)
+            # disparity_dst.pass_attr(disparity)
+            disparity_dst.im_name = images[cam_dst].im_name + '_disp'
+            sample = {opp_side: disparity_dst}
+            disparity_dst = setup(sample, reverse=True)[cam_dst]
+            res['depth_reg'] = setup.disparity_to_depth({cam_dst: disparity_dst})[cam_dst]
         return res
 
     def compute_disp_src(self, disparity, post_process_depth=0, **kwargs):
