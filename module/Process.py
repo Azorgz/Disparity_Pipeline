@@ -258,39 +258,43 @@ class Process(OrderedDict):
                     f'The {key} instructions need 2 cameras : cam_src, cam_dst'
                 option = {'cam1': p['cameras'][0], 'cam2': p['cameras'][1], 'pred_bidir': False, 'pred_right': False,
                           'cut_roi_max': False, 'cut_roi_min': False}
-                for p_ in p['option']:
-                    if isinstance(p_, dict):
-                        assert 'inference_size' in p_.keys(), f'The option given in {key} doesnt exist'
-                        option['inference_size'] = p_['inference_size']
-                    elif p_.upper() == 'PRED_BIDIR':
-                        option['pred_bidir'] = True
-                    elif p_.upper() == 'PRED_RIGHT':
-                        option['pred_right'] = True
-                    elif p_.upper() == 'CUT_ROI_MAX':
-                        option['cut_roi_max'] = True
-                    elif p_.upper() == 'CUT_ROI_MIN':
-                        option['cut_roi_min'] = True
-                    else:
-                        pass
+                if 'option' in p:
+                    for p_ in p['option']:
+                        if isinstance(p_, dict):
+                            assert 'inference_size' in p_.keys(), f'The option given in {key} doesnt exist'
+                            option['inference_size'] = p_['inference_size']
+                        elif p_.upper() == 'PRED_BIDIR':
+                            option['pred_bidir'] = True
+                        elif p_.upper() == 'PRED_RIGHT':
+                            option['pred_right'] = True
+                        elif p_.upper() == 'CUT_ROI_MAX':
+                            option['cut_roi_max'] = True
+                        elif p_.upper() == 'CUT_ROI_MIN':
+                            option['cut_roi_min'] = True
+                        else:
+                            pass
                 proc.append([key, option])
             elif key == 'MONOCULAR_DEPTH' or key == 'MONOCULAR' or key == 'MONO':
                 assert len(p['cameras']) >= 1, \
                     f'The {key} instructions need at least one camera'
                 option = {'cams': p['cameras']}
-                for p_ in p['option']:
-                    if isinstance(p_, dict):
-                        assert 'inference_size' in p_.keys(), f'The option given in {key} doesnt exist'
-                        option['inference_size'] = p_['inference_size']
-                    else:
-                        pass
+                if 'option' in p:
+                    for p_ in p['option']:
+                        if isinstance(p_, dict):
+                            assert 'inference_size' in p_.keys(), f'The option given in {key} doesnt exist'
+                            option['inference_size'] = p_['inference_size']
+                        else:
+                            pass
                 proc.append(['MONOCULAR', option])
             elif key == 'WRAP':
                 assert len(p['cameras']) == 2, \
                     'The WRAP instruction needs 2 cameras : cam_src, cam_dst'
                 option = {'cam_src': p['cameras'][0], 'cam_dst': p['cameras'][1],
                           'depth': True if p['method'] == 'depth' else False,
-                          'return_depth_reg': True if 'return_depth_reg' in p['option'] else False,
-                          'return_occlusion': True if 'return_occlusion' in p['option'] else False}
+                          'return_depth_reg': False, 'return_occlusion': False}
+                if 'option' in p:
+                    option['return_depth_reg'] = True if 'return_depth_reg' in p['option'] else False
+                    option['return_occlusion'] = True if 'return_occlusion' in p['option'] else False
                 proc.append([key, option])
             elif key == 'VALID':
                 assert len(p) == 2, 'The VALID instruction needs 2 positional argument : cam_reg, cam_ref'

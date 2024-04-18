@@ -7,10 +7,10 @@ import oyaml as yaml
 from kornia.utils import get_cuda_device_if_available
 from tqdm import tqdm
 
-from utils.classes import ImageTensor
+from utils.classes import ImageTensor, Metric_nec_tensor
 from utils.classes.Image import DepthTensor
 from utils.classes.VideoGenerator import VideoGenerator
-from utils.gradient_tools import grad_tensor_image, grad_image
+from utils.gradient_tools import grad_tensor_image, grad_image, grad_tensor
 
 
 class Visualizer:
@@ -373,16 +373,17 @@ class Visualizer:
         return visu
 
     def _create_grad_im(self, new_im, ref_im, target_im, mask):
+
         if self.tensor:
-            grad_new = grad_tensor_image(new_im, self.device)
-            grad_ref = grad_tensor_image(ref_im, self.device)
-            grad_target = grad_tensor_image(target_im, self.device)
+            nec = Metric_nec_tensor(self.device)
+            new_target = nec(new_im, target_im, return_image=True).unsqueeze(0).match_shape(new_im).RGB('gray')
+            grad_ref_target = nec(ref_im, target_im, return_image=True).unsqueeze(0).match_shape(new_im).RGB('gray')
+            im = new_target.vstack(grad_ref_target)
         else:
             grad_new = grad_image(new_im)
             grad_ref = grad_image(ref_im)
             grad_target = grad_image(target_im)
-        im = (grad_new * mask / 2 + grad_target * mask / 2).vstack(grad_ref / 2 + grad_target / 2)
-
+            im = (grad_new * mask / 2 + grad_target * mask / 2).vstack(grad_ref / 2 + grad_target / 2)
         return im
 
     def _create_depth_overlay(self, experiment, ref_im, target_im, mask):
@@ -400,5 +401,6 @@ if __name__ == '__main__':
     pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/results/'
     perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/results/'
     p = pro if 'godeta' in os.getcwd() else perso
-    path = p + "/Test/Disparity-Depth_night"
-    Visualizer(path, search_exp=False).run()
+    path = p + "/methods_comparison_night/"
+    # path = p + "/Test/Disparity-Depth_night"
+    Visualizer(path, search_exp=True).run()

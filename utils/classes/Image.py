@@ -36,7 +36,8 @@ def find_class(args, class_name):
 def update_channel_pos(im):
     shape = np.array(im.shape)
     channel_pos = np.argwhere(shape == 3)
-    channel_pos = channel_pos[0][0] if len(channel_pos >= 1) else None
+    channel_pos = channel_pos[0][0] if len(channel_pos >= 1) else \
+        (np.argwhere(shape == 1)[0][0] if len(np.argwhere(shape == 1)) >= 1 else None)
     if channel_pos is None:
         return -1
     else:
@@ -110,7 +111,6 @@ class ImageTensor(Tensor):
     def __new__(cls, inp, *args, name: str = 'new_image',
                 device: torch.device = None, cmap: str = None, **kwargs):
         # Input array is a path to an image OR an already formed ndarray instance
-        color_mode = None
         if isinstance(inp, str):
             name = basename(inp).split('.')[0] if name == 'new_image' else name
             inp_ = Image.open(inp)
@@ -474,6 +474,13 @@ class ImageTensor(Tensor):
         if not cv.imwrite(path + f'/{name}', self.opencv()):
             raise Exception("Could not write image")
 
+    def to_tensor(self):
+        """
+        Remove all attributes to keep only the data as a torch tensor.
+        :return: Tensor
+        """
+        return torch.Tensor(self.data)
+
     @property
     def im_name(self) -> str:
         return self._im_name
@@ -513,7 +520,11 @@ class ImageTensor(Tensor):
 
     @property
     def channel_pos(self) -> int:
-        return self._channel_pos
+        if self._channel_pos is not None:
+            return self._channel_pos
+        else:
+            self.channel_pos = update_channel_pos(self)
+            return self._channel_pos
 
     @channel_pos.setter
     def channel_pos(self, pos) -> None:
@@ -731,11 +742,7 @@ class DepthTensor(ImageTensor):
 
     @scaled.setter
     def scaled(self, value):
-        """Only settable by the scale and unscale and new methods"""
-        # Ref: https://stackoverflow.com/a/57712700/
-        name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
-        if name == 'scale' or name == 'unscale' or name == '__new__':
-            self._scaled = value
+        self._scaled = value
 
     def scale(self):
         new = self.clone()

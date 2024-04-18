@@ -139,6 +139,7 @@ class StereoSetup(StereoCamera):
             for key, im in sample.items():
                 if key == left:
                     temp = grid_sample(im, self.map_left, align_corners=True)
+                    # temp[temp==0] = im.min() if im.min() >=0 else im.max()
                     if cut_roi_min:
                         temp = self.cut_to_roi(temp, self.roi_min)
                     elif cut_roi_max:
@@ -146,6 +147,7 @@ class StereoSetup(StereoCamera):
                     new_sample['left'] = temp
                 elif key == right:
                     temp = grid_sample(im, self.map_right, align_corners=True)
+                    # temp[temp == 0] = im.min() if im.min() >=0 else im.max()
                     if cut_roi_min:
                         temp = self.cut_to_roi(temp, self.roi_min)
                     elif cut_roi_max:
@@ -191,6 +193,7 @@ class StereoSetup(StereoCamera):
             sample[key].pass_attr(t)
             sample[key].max_value = self.depth_max
             sample[key].min_value = self.depth_min
+            sample[key].scaled = True
         return sample
 
     def depth_to_disparity(self, depth, *args):
@@ -201,6 +204,7 @@ class StereoSetup(StereoCamera):
         disp.max_value = disp.max()
         disp.min_value = disp.min()
         disp[mask] = 0
+        disp.scaled = True
         return disp
 
     @staticmethod

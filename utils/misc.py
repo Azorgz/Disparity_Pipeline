@@ -7,15 +7,11 @@ import stat
 import shutil
 import json
 import time
-
 import torch
+import os
+import struct
 
 
-# def read_text_lines(filepath):
-#     with open(filepath, 'r') as f:
-#         lines = f.readlines()
-#     lines = [l.rstrip() for l in lines]
-#     return lines
 def print_tuple(t, link=' '):
     t = [*t]
     string = ''

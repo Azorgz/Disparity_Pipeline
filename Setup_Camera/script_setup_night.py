@@ -67,4 +67,4 @@ perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/Setup_Camera/'
 pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera/'
 p = pro if 'godeta' in os.getcwd() else perso
 path_result = p + name_path
-R.save(path_result, 'Setup_Camera_night.yaml')
+R.save(path_result, 'Lynred_night.yaml')

@@ -28,6 +28,7 @@ def quick_process(idx, script_path):
         if k.upper() != 'OPTION':
             proc = process_dict[k]
             proc['save'] = 'all'
+            proc['wrap']['option'].append('return_depth_reg')
     process = Process(process_dict=process_dict)
     config = ConfigPipe(process.option)
     config['validation']['stats']['mean'] = False

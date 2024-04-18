@@ -11,6 +11,10 @@ from types import FrameType
 from typing import cast, Union
 from utils.misc import print_tuple
 from utils.classes.Image import ImageTensor
+from glob import glob
+import imagesize
+
+ext_available = ['/*.png', '/*.jpg', '/*.jpeg', '/*.tif', '/*.tiff']
 
 
 class BaseCamera(PinholeCamera):
@@ -52,6 +56,8 @@ class BaseCamera(PinholeCamera):
     _aspect_ratio = None
     _sensor_size = None
     _sensor_resolution = None
+    _path = []
+    _files = []
 
     def __init__(self,
                  path: (str or Path) = None,
@@ -152,27 +158,40 @@ class BaseCamera(PinholeCamera):
                 'aperture': self.aperture}
 
     def _init_path(self, path):
-        try:
-            assert os.path.exists(path)
-            self.path = path
-            return 0
-        except AssertionError:
-            print(f'There is no image file at {path}, a source is necessary to configure a new camera')
-            raise AssertionError
+        if isinstance(path, list):
+            for p in path:
+                self._init_path(p)
+        else:
+            try:
+                assert os.path.exists(path)
+                self.path = [*self.path, path]
+                files_grabbed = []
+                for ext in ext_available:
+                    files_grabbed.extend(glob(path + ext))
+                self.files = sorted([*self.files, *files_grabbed])
+                return 0
+            except AssertionError:
+                print(f'There is no image file at {path}, a source is necessary to configure a new camera')
+                raise AssertionError
 
     def _init_size_(self) -> tuple:
-        try:
-            im_path = ''
-            for im in os.listdir(self.path):
-                if 'calibration_image' in im:
-                    im_path = f'{self.path}/{im}'
-                    break
-            im_calib = ImageTensor(im_path)
-        except Exception as e:
-            # print('There is no Calibration image, the calibration default image will be the 1st of '
-            #       'the list')
-            im_path = f'{self.path}/{sorted(os.listdir(self.path))[0]}'
-            im_calib = ImageTensor(im_path)
+        im_path = ''
+        im_size = None
+        for f in self.files:
+            if im_size is None:
+                im_size = imagesize.get(f)
+            else:
+                assert im_size == imagesize.get(f), print(
+                    f'Several images size have been found, image_size enforced at {im_size}')
+            if 'calibration_image' in f:
+                if im_path == '':
+                    im_path = f
+                # else:
+                #     print('There are several Calibration images, the calibration default image will be the 1st found')
+        if im_path == '':
+            # print('There is no Calibration image, the calibration default image will be the 1st of the list')
+            im_path = self.files[0]
+        im_calib = ImageTensor(im_path)
         _, c, h, w = im_calib.shape
         im_type = im_calib.im_type
         return h, w, im_type, im_calib
@@ -248,13 +267,6 @@ class BaseCamera(PinholeCamera):
             self.extrinsics = extrinsics
         self.is_positioned = True
 
-    # def is_in_fov(self, point:Union[Tensor, tuple, list, np.ndarray]):
-    #     try:
-    #         assert isinstance(point, Tensor) or isinstance(point, tuple) or isinstance(point, list) or isinstance(point, np.ndarray):
-    #         assert len(point) == 3
-    #     except AssertionError:
-    #         print("the point must be a sequence of length 3")
-
     def pixel_size_at(self, distance=0):
         """
         :param distance: distance of interest or list of a point of interest coordinates
@@ -271,7 +283,7 @@ class BaseCamera(PinholeCamera):
         return fov_h / self.width, fov_v / self.height
 
     def __getitem__(self, index, autopad=False, **kwargs):
-        im_path = f'{self.path}/{sorted(os.listdir(self.path))[index]}'
+        im_path = self.files[index]
         im = ImageTensor(im_path, device=self.device)
         if autopad:
             temp = torch.zeros(*im.shape[:-2], self.sensor_resolution[1], self.sensor_resolution[0])
@@ -280,9 +292,7 @@ class BaseCamera(PinholeCamera):
 
     def random_image(self, autopad=False, **kwargs):
         # list_im = os.listdir(self.path))
-        index = torch.randint(0, len(os.listdir(self.path)), [1])
-        # im_path = f'{self.path}/{list_im[index]}'
-        # im = ImageTensor(im_path, device=self.device)
+        index = torch.randint(0, len(self.files), [1])
         im = self.__getitem__(index, autopad=autopad)
         return im, index
 
@@ -293,6 +303,14 @@ class BaseCamera(PinholeCamera):
     @property
     def f(self):
         return self._f
+
+    @property
+    def path(self):
+        return self._path
+
+    @path.setter
+    def path(self, value):
+        self._path = value
 
     @property
     def aperture(self):
@@ -323,6 +341,10 @@ class BaseCamera(PinholeCamera):
         return self._HFOV
 
     @property
+    def pixel_FOV(self):
+        return (self.VFOV / self.sensor_resolution[0], self.HFOV / self.sensor_resolution[1])
+
+    @property
     def name(self):
         return self._name
 
@@ -333,6 +355,14 @@ class BaseCamera(PinholeCamera):
     @id.setter
     def id(self, value):
         self._id = value
+
+    @property
+    def files(self):
+        return self._files
+
+    @files.setter
+    def files(self, value):
+        self._files = value
 
     @property
     def extrinsics(self):
@@ -597,6 +627,7 @@ class IRCamera(BaseCamera):
             in_degree=in_degree,
             **kwargs)
         assert self.im_type == 'IR', 'The Folder does not contain IR images'
+        i = self.__getitem__(0)
 
 
 def intrinsics_parameters_from_matrix(sensor_resolution, **kwargs) -> (np.ndarray, dict):

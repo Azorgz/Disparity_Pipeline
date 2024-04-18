@@ -5,6 +5,7 @@ import cv2 as cv
 import numpy as np
 import oyaml as yaml
 import pandas as pd
+from matplotlib import pyplot as plt
 from pandas import DataFrame
 from pandas._typing import ArrayLike
 from utils.classes import ImageTensor
@@ -25,7 +26,7 @@ class ResultFrame:
         data_val = []
         timer_val = []
         dataset = {'Files': {}}
-        self._visu = Visualizer(path, search_exp=False)
+        # self._visu = Visualizer(path, search_exp=False)
         for file in files:
             with open(direct + '/' + file, "r") as f:
                 val = yaml.safe_load(f)
@@ -42,7 +43,7 @@ class ResultFrame:
                         lim = np.array(data[key]['ref']).std() / 2
                         self.mask_outlier = lim > np.array(data[key]['ref'])
                     else:
-                        lim = np.array(data[key]['ref']).std()/2
+                        lim = np.array(data[key]['ref']).std() / 2
                         self.mask_outlier = (lim > np.array(data[key]['ref'])) + self.mask_outlier
                     data[key]['delta'], data[key]['delta_occ'] = data[key]['delta'].tolist(), data[key][
                         'delta_occ'].tolist()
@@ -70,7 +71,7 @@ class ResultFrame:
 
     # def plot(self, index=None):
 
-    def show(self, index=None, show_occ=False):
+    def show(self, index=None, show_occ=False, save='', dpi=300):
         ref = dict(self.values.T.ref)
         new = dict(self.values.T.new)
         occ = dict(self.values.T.new_occ)
@@ -91,7 +92,11 @@ class ResultFrame:
                                  f'{idx}_new': new[idx]}
                     if show_occ:
                         res[f'{idx}_occ'] = occ[idx]
-        ValFrame(res).plot()
+        fig = ValFrame(res).plot().get_figure()
+        if save:
+            fig.savefig(f'{save}.png', bbox_inches='tight', dpi=dpi)
+            plt.close(fig)
+        return fig
 
     @property
     def delta(self):
@@ -133,28 +138,34 @@ class ValFrame(DataFrame):
     def __getitem__(self, key):
         return ValFrame({k: vec[key] for k, vec in self.items()})
 
-    def show(self, index=None, ref=0):
+    def show(self, *args, index=None, ref=0, save: str = '', dpi=300, **kwargs):
         if index is not None:
             idx = {f'{k} delta': vec * 100 for k, vec in self.items() if k == index}
         else:
             idx = {f'{k} delta': vec * 100 for k, vec in self.items()}
         if f'{index} delta' in idx.keys():
-            idx['0%'] = ref * idx[f'{index} delta']
             m = round(idx[f'{index} delta'].mean(), 3)
             idx[f'mean : {m}%'] = m + 0 * idx[f'{index} delta']
-        ValFrame(idx).plot()
+        if ref is not None:
+            idx['0%'] = ref * list(idx.values())[0]
+        fig = ValFrame(idx).plot(*args, **kwargs).get_figure()
+        if save:
+            fig.savefig(f'{save}.png', bbox_inches='tight', dpi=dpi)
+            plt.close(fig)
+        return fig
 
     def get_column(self, index: str) -> ArrayLike:
         idx = np.array([vec for k, vec in self.items() if k == index])[0]
         return idx
 
-    def combine_column(self, str_combination: str):
+    def combine_column(self, str_combination: str, name=None):
         """
         Combine the column of the ValFrame following this layout :
         formula(index)
         """
         val_dict = {}
+        name = str_combination if name is None else name
         for key in self.keys():
             if str(key) in str_combination:
                 locals()[key] = np.nan_to_num(self.get_column(key))
-        return ValFrame({str_combination: eval(str_combination)})
+        return ValFrame({name: eval(str_combination)})

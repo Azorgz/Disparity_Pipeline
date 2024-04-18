@@ -18,9 +18,9 @@ frames_timer = pd.DataFrame()
 for f in reversed(os.listdir(base_path + folder)):
     res = ResultFrame(base_path + folder + '/' + f)
 
-#     # Without Occlusion
+    # Without Occlusion
     data = res.delta.mean().values
-    data[0] = -data[0]
+    data[0] = -data[0]  # To inverse the sign for RMSE delta
     frame_mean = pd.DataFrame(
         {f"{f}": data},
         index=res.delta.mean().index)
@@ -39,7 +39,7 @@ for f in reversed(os.listdir(base_path + folder)):
 
     # With Occlusion
     data = res.delta_occ.mean().values
-    data[0] = -data[0]
+    data[0] = -data[0]  # To inverse the sign for RMSE delta
     frame_mean_occ = pd.DataFrame(
         {f"{f}": data},
         index=res.delta_occ.mean().index)
@@ -59,7 +59,6 @@ for f in reversed(os.listdir(base_path + folder)):
     frame_timer = pd.DataFrame(
         {f"{k}": res.timer.iloc[1][k] for k in res.timer.iloc[1].keys()}, index=[f])
     frames_timer = pd.concat([frames_timer, frame_timer])
-
 
 
 with pd.ExcelWriter(f'{folder}.xlsx') as writer:

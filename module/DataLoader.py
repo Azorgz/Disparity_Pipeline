@@ -63,10 +63,11 @@ class StereoDataSet(Dataset):
         if self.cameras_paths == {}:
             raise FileNotFoundError("We need paths for the data")
         self.files = {}
-        for key, p in self.cameras_paths.items():
-            self.files[key] = sorted(glob(p + '/*.png') +
-                                     glob(p + '/*.jpg') +
-                                     glob(p + '/*.jpeg'))
+        for key, path in self.cameras_paths.items():
+            # self.files[key] = sorted([glob(p + '/*.png') +
+            #                          glob(p + '/*.jpg') +
+            #                          glob(p + '/*.jpeg') for p in path])
+            self.files[key] = self.camera_setup.cameras[key].files
 
         if config["dataset"]["number_of_sample"] <= 0:
             self.nb = len(self.files[setup.camera_ref])

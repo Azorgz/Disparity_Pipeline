@@ -111,7 +111,7 @@ def project_cloud_to_image(cloud, image_size, post_process, image=None, return_o
         result = torch.zeros([1, cha, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
     total_dist = torch.zeros([1, cha, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
     for dist, ray in zip(dists, rays):
-        temp = torch.zeros([1, 1, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
+        temp = torch.zeros([1, cha, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
         temp_dist = torch.zeros([1, 1, cloud.shape[1], cloud.shape[2]]).to(cloud.dtype).to(cloud.device)
         temp[0, :, ray[:, 1], ray[:, 0]] = sample
         temp_dist[0, 0, ray[:, 1], ray[:, 0]] = 1 / dist[:, 0]
@@ -153,10 +153,11 @@ def project_grid_to_image(grid, image_size, post_process, image=None, return_occ
     else:
         cha = 1
     # Put all the point into a H*W x 2 vector
-    c = torch.tensor(grid.flatten(start_dim=0, end_dim=2))  # H*W x 3
-    # Remove the point without disparity
+    c = torch.abs(grid.flatten(start_dim=0, end_dim=2))  # H*W x 3
+    # Remove the point outside the dst frame
     c[:, 0] *= grid.shape[2] / image_size[1]
-    # mask_out = c[:, 1] == 0
+    mask_out = (c >= image_size[1] - 1) + (c < 0)
+    c[mask_out] = 0
     # Sort the point by increasing disp
     _, indexes = torch.abs(c[:, -1]).sort(descending=False, dim=0)
     # c[mask_out] = 0

@@ -149,7 +149,7 @@ class StereoPairs:
         self._setup = value
 
 
-class CameraSetup(object):
+class CameraSetup():
     _cameras = {}
     _cameras_IR = {}
     _cameras_RGB = {}
@@ -162,7 +162,8 @@ class CameraSetup(object):
     _max_depth = 200
     _min_depth = 0
 
-    def __init__(self, *args, device=None, from_file=False, model=None, name=None, max_depth=None, min_depth=None, **kwargs):
+    def __init__(self, *args, device=None, from_file=False, model=None, name=None, max_depth=None, min_depth=None,
+                 **kwargs):
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = model
         if max_depth:
@@ -213,7 +214,7 @@ class CameraSetup(object):
                     in self.cameras_RGB.items()}
         # string = f'Cameras : {", ".join([self.cameras[key].id for key in self.cameras.keys()])}\n'
         string = f'Cameras IR : {", ".join([self.cameras[key].name + f" ({key})" + list_ir[key] for key in self.cameras_IR.keys()])}\n'
-        string += f'Cameras RGB : {", ".join([self.cameras[key].name + f" ({key})"  + list_rgb[key] for key in self.cameras_RGB.keys()])}\n'
+        string += f'Cameras RGB : {", ".join([self.cameras[key].name + f" ({key})" + list_rgb[key] for key in self.cameras_RGB.keys()])}\n'
         string += f'The Reference Camera is : {self.camera_ref}'
         return string
 
@@ -239,7 +240,6 @@ class CameraSetup(object):
             self.calibration_for_stereo(**conf['stereo_pair'])
         if conf['depth_pair']['ref']:
             self.calibration_for_depth(**conf['depth_pair'])
-
 
     def save(self, path, name='Setup_Camera.yaml'):
         dict_setup = {'cameras': {key: cam.save_dict() for key, cam in self.cameras.items()},
@@ -313,13 +313,14 @@ class CameraSetup(object):
                 break
         self.update_camera_ref(new)
 
+    @torch.no_grad()
     def recover_pose_from_keypoints(self, cam: Union[IRCamera, RGBCamera, str], *args, ref=None,
                                     t=None) -> IRCamera or RGBCamera:
         """
         This function re-set the extrinsic parameters of a camera using consecutively the fundamental matrix
         determination by the 8-points method, then extracting the Essential matrix from it (according the intrinsic is known...)
         and finally recovering R and T matrix from Essential.
-        :param t: The known translation distance for one direction
+        :param t: The known translation distance for one direction (scaling parameter)
         :param cam: Camera to position
         :param ref: is no ref is given, the reference camera of the system will be used
         :return: the newly positioned camera
@@ -334,7 +335,7 @@ class CameraSetup(object):
             if not isinstance(cam, str):
                 cam = cam.id
             if self._check_if_cam_is_in_setup_(cam):
-                Kpts_gen = KeypointsGenerator(self.device, detector='SIFT_SCALE', matcher='SNN')
+                Kpts_gen = KeypointsGenerator(self.device, detector='SIFT', matcher='SNN')
                 cam_ref = ref if ref is not None and isinstance(ref, str) else self._camera_ref
                 ref = ref if isinstance(ref, Tensor) else None
                 assert cam_ref != cam
@@ -346,8 +347,10 @@ class CameraSetup(object):
                 im_dst = self.cameras[cam].im_calib
                 im_src = self.cameras[cam_ref].im_calib
 
-                calib_method = 'manual' if im_src.im_type != im_dst.im_type else 'auto'
-                pts_src, pts_dst = Kpts_gen(im_src, im_dst, pts_ref=ref, method=calib_method, min_kpt=20, th=0.85)
+                calib_method = 'auto'
+                # calib_method = 'manual' if im_src.im_type != im_dst.im_type else 'auto'
+                pts_src, pts_dst = Kpts_gen(im_src, im_dst, pts_ref=ref, method=calib_method, min_kpt=20, th=0.85,
+                                            draw_result=True)
                 pts_src, pts_dst = pts_src.to(self.device), pts_dst.to(self.device)
                 # pts_src_opencv, pts_dst_opencv = np.float32(pts_src.squeeze().cpu()), np.float32(pts_dst.squeeze().cpu())
 
@@ -368,7 +371,7 @@ class CameraSetup(object):
                 # im_dst_new = ImageTensor(cv.warpPerspective(im_dst.opencv(), H2, (im_dst.shape[-1]+100, im_dst.shape[-2]+100))[..., [2, 1, 0]])
                 # (im_src_new*0.5 + im_dst_new).show()
                 # F_mat = cv.normalizeFundamental(F_mat)
-                pts_src, pts_dst = pts_src.to(self.device), pts_dst.to(self.device)
+                # pts_src, pts_dst = pts_src.to(self.device), pts_dst.to(self.device)
                 # pts_src_norm = normalize_points_with_intrinsics(pts_src, K1)
                 # pts_dst_norm = normalize_points_with_intrinsics(pts_dst, K2)
                 F_mat = find_fundamental(pts_src, pts_dst)
@@ -386,8 +389,8 @@ class CameraSetup(object):
                 elif t[2]:
                     T = T / T[0, 2, 0] * t[2]
                 extrinsics = torch.eye(4, dtype=torch.float64).unsqueeze(0)
-                extrinsics[0, :3, :3] = R.squeeze()
-                extrinsics[0, :3, -1] = T.squeeze()
+                extrinsics[0, :3, :3] = R.inverse().squeeze()
+                extrinsics[0, :3, -1] = -T.squeeze()
                 self.cameras[cam].update_pos(extrinsics)
                 return pts_src
 
@@ -456,7 +459,8 @@ class CameraSetup(object):
             if name == self.camera_ref:
                 self.update_camera_relative_position(name, x=dx, y=dy, z=dz, rx=drx, ry=dry, rz=drz)
             else:
-                rx, ry, rz = rotation_matrix_to_angle_axis(self.cameras[name].extrinsics[:, :3, :3]).to(device='cpu').numpy()
+                rx, ry, rz = rotation_matrix_to_angle_axis(self.cameras[name].extrinsics[:, :3, :3]).to(
+                    device='cpu').numpy()
                 x, y, z = self.cameras[name].translation_vector[0, :, 0].to(device='cpu').numpy()
                 self.update_camera_relative_position(name, x=dx + x, y=dy + y, z=dz + z,
                                                      rx=drx + rx, ry=dry + ry, rz=drz + rz)

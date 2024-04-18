@@ -215,6 +215,8 @@ def configure_parser(parser, config, path_config=None, dict_vars=None):
             raise TypeError("A path or a String is expected for the config file")
     if not dict_vars:
         dict_vars = {}
+    if not config:
+        config = {}
     config_vars = config_vars | dict_vars
     config_vars = config_vars | config
     for key, value in config_vars.items():

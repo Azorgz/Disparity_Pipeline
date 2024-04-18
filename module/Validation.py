@@ -1,7 +1,9 @@
 # from torch.fft import fft2, ifft2
 import os
 
+import torch
 import yaml
+from kornia.morphology import erosion
 
 from module.BaseModule import BaseModule
 from utils.classes import stats_dict, norms_dict
@@ -58,7 +60,8 @@ class Validation(BaseModule):
         for key, n in self.norms.items():
             if key not in self.res[name].keys():
                 self.res[name][key] = {}
-            mask = new > 0
+            mask = (new > 0) * 1.
+            mask = erosion(mask, torch.ones(3, 3).to(self.device)) > 0
             res_new = n(ref, new, mask=mask)
             res_old = n(ref, old, mask=mask)
             if occlusion is not None:
@@ -91,7 +94,8 @@ class Validation(BaseModule):
                     else:
                         self.res_stats[key][key_norms][key_stat] = {'ref': float(np.array(sample['new']).round(3)),
                                                                     'new': float(np.array(sample['ref']).round(3)),
-                                                                    'new_occ': float(np.array(sample['new_occ']).round(3))}
+                                                                    'new_occ': float(
+                                                                        np.array(sample['new_occ']).round(3))}
 
     def reset(self):
         self._update_conf(self.config)

@@ -15,14 +15,14 @@ p = pro if 'godeta' in os.getcwd() else perso
 path_RGB = p + 'visible'
 path_IR = p + 'infrared_corrected'
 
-IR = IRCamera(None, None, path_IR, device=torch.device('cuda'), name='IR', f=75e-3, pixel_size=(17e-6, 17e-6),
+IR = IRCamera(path_IR, device=torch.device('cuda'), name='IR', f=75e-3, pixel_size=(17e-6, 17e-6),
               aperture=1.2)
 
-RGB = RGBCamera(None, None, path_RGB, device=torch.device('cuda'), name='RGB', f=27e-3, pixel_size=(2.9e-6, 2.9e-6),
+RGB = RGBCamera(path_RGB, device=torch.device('cuda'), name='RGB', f=27e-3, pixel_size=(2.9e-6, 2.9e-6),
                 aperture=1.4)
 
 R = CameraSetup(RGB, IR, print_info=True)
-R.update_camera_relative_position('IR', x=-5e-2, y=4e-2, z=0, ry=0, rx=0, rz=0)
+R.update_camera_relative_position('IR', x=-5e-3, y=0, z=0, ry=0, rx=0, rz=0)
 
 R.calibration_for_stereo('IR', 'RGB')
 R.calibration_for_depth('IR', 'RGB')

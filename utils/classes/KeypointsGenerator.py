@@ -24,6 +24,7 @@ class KeypointsGenerator:
         self.matcher = DescriptorMatcher(matcher=matcher, th=th, spatial_th=spatial_th, mutual=mutual)
         self.matcher_name = self.matcher.name
 
+    @torch.no_grad()
     def __call__(self, img_src: ImageTensor, img_dst: ImageTensor, *args,
                  method: str = 'auto', pts_ref=None, min_kpt=-1, th=0, draw_result=False, max_drawn=200, **kwargs):
         if method == 'manual' or method == 'm':
@@ -176,8 +177,6 @@ class KeypointsGenerator:
         del im_temp, pts_temp, rightclick
         return Tensor(pts_src).to(dtype=torch.float32).unsqueeze(0), \
             Tensor(pts_dst).to(dtype=torch.float32).unsqueeze(0)
-
-
 
 
 class DescriptorMatcher:

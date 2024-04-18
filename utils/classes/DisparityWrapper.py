@@ -10,6 +10,7 @@ from utils.classes import ImageTensor
 from utils.classes.Image import DepthTensor
 from module.SetupCameras import CameraSetup
 from utils.image_processing_tools import project_grid_to_image
+from utils.misc import time_fct
 
 
 class DisparityWrapper:
@@ -52,6 +53,7 @@ class DisparityWrapper:
             disparity = setup.depth_to_disparity(depth_tensor[cam_dst])
             kernel = torch.ones(3, 3).to(self.device)
             disparity = dilation(disparity, kernel)
+            disparity.scaled = True
             sign = -1 if setup.left.name == cam_src else 1
             disparity_dst = sign * disparity
 
@@ -134,7 +136,9 @@ class DisparityWrapper:
         grid[:, :, :, 0] -= disparity_proj[0, :, :, :]
         grid = torch.concatenate([grid, disparity_proj.permute([0, 2, 3, 1])], dim=-1)
         if return_occlusion:
-            img_dst, occ = project_grid_to_image(grid, size_im, post_process_depth, image=img_src_proj, return_occlusion=return_occlusion)
+            img_dst, occ = project_grid_to_image(grid, size_im, post_process_depth,
+                                                 image=img_src_proj,
+                                                 return_occlusion=return_occlusion)
             sample = {opp_side: img_dst}
             res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
             sample = {opp_side: occ}
@@ -146,7 +150,6 @@ class DisparityWrapper:
             res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
         if return_depth_reg:
             disparity_dst = project_grid_to_image(grid, size_im, post_process_depth)
-            # disparity_dst.pass_attr(disparity)
             disparity_dst.im_name = images[cam_dst].im_name + '_disp'
             sample = {opp_side: disparity_dst}
             disparity_dst = setup(sample, reverse=True)[cam_dst]
@@ -170,7 +173,7 @@ class DisparityWrapper:
         c_ = torch.round(c_[indexes, :]).to(torch.int)
 
         # Create a picture with for pixel value the depth of the point landing in
-        disparity_src = torch.zeros([1, 1, h, w]).to(disparity.dtype).to(self.device)  # *(c[:, 2].max()+1)
+        disparity_src = torch.ones([1, 1, h, w]).to(disparity.dtype).to(self.device) * (c.min())
         disparity_src[0, 0, c_[:, 1], c_[:, 0]] = c[indexes]
 
         # postprocessing of the mask to remove the noise due to the round operation
