@@ -73,7 +73,7 @@ class Camera(Object):
                       pose=cam.Tcw.T[b] if cam.Twc is not None else None,
                       wh=cam.wh, scale=scale)
 
-    def i2c(self, depth=1.0, uv=None):
+    def i2c(self, depth=1.0, uv=None, scaled=None):
         """
         Project an image to camera coordinates using a depth map
 
@@ -90,6 +90,12 @@ class Camera(Object):
             Lifted 3D points in camera frame of reference
         """
         # If no grid is provided, uses depth map
+        if scaled is not None:
+            K = self.K * scaled
+            K[-1, -1] = 1
+            K = np.linalg.inv(K)
+        else:
+            K = self.iK
         if uv is None:
             if not is_float(depth):
                 # Create image grid from depth values
@@ -111,7 +117,8 @@ class Camera(Object):
                 if len(depth.shape) == 3:
                     depth = depth[:, :, 0]
                 depth = depth.reshape(-1, 1)
-        return (uv @ self.iK) * depth
+        return (uv @ K) * depth
+        # return (uv @ self.iK) * depth
 
     def c2i(self, xyz, filter=False, padding=0, return_z=False):
         """
@@ -163,9 +170,9 @@ class Camera(Object):
             xyz = add_col1(xyz)
         return (xyz @ invert(self.Tt))[:, :3]
 
-    def i2w(self, depth=1.0, uv=None):
+    def i2w(self, depth=1.0, uv=None, scaled=None):
         """Lift 2D image points to 3D space in world frame of reference"""
-        return self.c2w(self.i2c(depth, uv))
+        return self.c2w(self.i2c(depth, uv, scaled=scaled))
 
     def w2i(self, xyz, filter=False, padding=0, return_z=False):
         """Project 3D points in world frame of reference to the image plane"""

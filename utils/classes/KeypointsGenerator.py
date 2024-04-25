@@ -26,7 +26,9 @@ class KeypointsGenerator:
 
     @torch.no_grad()
     def __call__(self, img_src: ImageTensor, img_dst: ImageTensor, *args,
-                 method: str = 'auto', pts_ref=None, min_kpt=-1, th=0, draw_result=False, max_drawn=200, **kwargs):
+                 method: str = 'auto', pts_ref=None, min_kpt=-1, th=0, draw_result=False, draw_result_inplace=False,
+                 max_drawn=200,
+                 **kwargs):
         if method == 'manual' or method == 'm':
             if pts_ref is not None:
                 pts_ref = pts_ref if len(pts_ref) <= 20 else pts_ref[np.randint(0, len(pts_ref), size=20)]
@@ -65,7 +67,8 @@ class KeypointsGenerator:
 
             if draw_result:
                 self.draw_keypoints(img_src, keypoints_src, img_dst, keypoints_dst, max_drawn=max_drawn)
-
+            if draw_result_inplace:
+                self.draw_keypoints_inplace(img_src, keypoints_src, keypoints_dst, max_drawn=max_drawn)
             return keypoints_src, keypoints_dst
 
     def draw_keypoints(self, img_src, keypoints_src, img_dst, keypoints_dst, max_drawn=200):
@@ -92,6 +95,24 @@ class KeypointsGenerator:
                 ..., [2, 1, 0]])
         name = f'Detector : {self.detector_name} & Matcher : {self.matcher_name}'
         img_.show(num=name)
+
+    def draw_keypoints_inplace(self, img_src, keypoints_src, keypoints_dst, max_drawn=200):
+        if img_src.im_type == 'RGB':
+            img_src_ = img_src.opencv()
+        else:
+            img_src_ = img_src.RGB(cmap='gray').opencv()
+        keypoints_src_ = keypoints_src.squeeze().cpu().numpy()
+        keypoints_dst_ = keypoints_dst.squeeze().cpu().numpy()
+        max_drawn = min(max_drawn, keypoints_src_.shape[0])
+        keypoints_ = [(cv.KeyPoint(*kpts_src, 1), cv.KeyPoint(*kpts_dst, 1)) for kpts_src, kpts_dst in
+                      zip(keypoints_src_[:max_drawn], keypoints_dst_[:max_drawn])]
+        for kpts in keypoints_:
+            color = tuple(np.round(np.random.rand(3, ) * 255, 0).tolist())
+            cv.drawKeypoints(img_src_, kpts, img_src_, color=color)
+            img_src_ = cv.line(img_src_, (int(kpts[0].pt[0]), int(kpts[0].pt[1])),
+                               (int(kpts[1].pt[0]), int(kpts[1].pt[1])), color=color, thickness=2)
+        name = f'Detector : {self.detector_name} & Matcher : {self.matcher_name}'
+        ImageTensor(img_src_[..., [2, 1, 0]]).show(num=name)
 
     @staticmethod
     def manual_keypoints_selection(im_src: ImageTensor, im_dst: ImageTensor, pts_ref=None, nb_point=50) -> tuple:
@@ -195,7 +216,7 @@ class DescriptorMatcher:
         desc1, desc2 = desc1.squeeze(), desc2.squeeze()
         if self.name == 'NN' or self.name == 'MNN':
             m_distance, index_tensor = self.matcher(desc1, desc2)
-            m_distance = (m_distance - m_distance.max())/(m_distance.min() - m_distance.max())
+            m_distance = (m_distance - m_distance.max()) / (m_distance.min() - m_distance.max())
             return m_distance, index_tensor
         elif self.name == 'SNN' or self.name == 'SMNN':
             m_distance, index_tensor = self.matcher(desc1, desc2, th=self.th)
@@ -204,8 +225,9 @@ class DescriptorMatcher:
         elif self.name == 'FGINN':
             try:
                 lafs1, lafs2 = args[0], args[1]
-                m_distance, index_tensor = self.matcher(desc1, desc2, lafs1, lafs2, th=self.th, spatial_th=self.spatial_th,
-                                    mutual=self.mutual)
+                m_distance, index_tensor = self.matcher(desc1, desc2, lafs1, lafs2, th=self.th,
+                                                        spatial_th=self.spatial_th,
+                                                        mutual=self.mutual)
                 m_distance = (m_distance - m_distance.min()) / (m_distance.max() - m_distance.min())
                 return m_distance, index_tensor
             except IndexError:

@@ -282,6 +282,7 @@ class BaseCamera(PinholeCamera):
         fov_h = 2 * math.tan(self.HFOV / 360 * math.pi) * distance
         return fov_h / self.width, fov_v / self.height
 
+    @torch.no_grad
     def __getitem__(self, index, autopad=False, **kwargs):
         im_path = self.files[index]
         im = ImageTensor(im_path, device=self.device)

@@ -69,3 +69,9 @@ class Quaternion:
         return np.array([[1 - 2 * yy - 2 * zz, 2 * x * y - 2 * z * w, 2 * x * z + 2 * y * w],
                          [2 * x * y + 2 * z * w, 1 - 2 * xx - 2 * zz, 2 * y * z - 2 * x * w],
                          [2 * x * z - 2 * y * w, 2 * y * z + 2 * x * w, 1 - 2 * xx - 2 * yy]])
+
+
+def pose_from_extrinsics(matrix):
+    R = matrix[0, :3, :3].inverse().detach().cpu().numpy()
+    T = -matrix[0, :3, 3].detach().cpu().numpy()
+    return tuple([*T, *Quaternion(R).coefs])

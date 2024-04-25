@@ -1,10 +1,10 @@
 Option:
   name_experiment: Test
   setup: # Paths to the config file of the pre-calibrated camera's setup
-    path: Setup_Camera/Setup_Camera_night.yaml
+    path: Setup_Camera/Lynred_day&night.yaml
   dataset:
-    number_of_sample: 10
-    shuffle: False
+    number_of_sample: 25
+    shuffle: True
   monocular_depth_network:
     name: depthanything
   depth_network:
@@ -26,16 +26,16 @@ monocular_IR:
 
 
 
-Disparity-Depth:
-  disparity:
-    cameras: [ IR, IR2 ]
-    option: [ ]
-  wrap:
-    cameras: [ IR, RGB ]
-    method: depth
-    option: [ return_depth_reg, return_occlusion, [ ] ]
-  valid: [ IR, RGB ]
-  save: [ pred_depth, image_reg, depth_reg, occlusion ]
+#Disparity-Depth:
+#  disparity:
+#    cameras: [ IR, IR2 ]
+#    option: [ ]
+#  wrap:
+#    cameras: [ IR, RGB ]
+#    method: depth
+#    option: [ return_depth_reg, return_occlusion, [ ] ]
+#  valid: [ IR, RGB ]
+#  save: [ pred_depth, image_reg, depth_reg, occlusion ]
 
 
 

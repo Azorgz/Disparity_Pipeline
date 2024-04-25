@@ -25,7 +25,7 @@ from pygame.locals import *
 
 class Draw(DrawInput, DrawTexture, drawBuffer):
 
-    def __init__(self, wh=(1600, 900), rc=None, title=None, scale=1.0, width=1600):
+    def __init__(self, wh=(1600, 900), rc=None, title=None, scale=1.0, width=None):
         """
         Draw class for display visualization
 
@@ -88,13 +88,20 @@ class Draw(DrawInput, DrawTexture, drawBuffer):
         """Display object on screen"""
         obj.display(self, *args, **kwargs)
 
-    def to_image(self):
+    def to_image(self, scr=None):
+        if scr is not None:
+            if scr in self.screens:
+                l, u, w, h = self[scr].currScreen().luwh
+            else:
+                l, u, w, h = 0, 0, self.wh[0], self.wh[1]
+        else:
+            l, u, w, h = 0, 0, self.wh[0], self.wh[1]
         """Convert window into a numpy image"""
-        x, y, w, h = 0, 0, self.wh[0], self.wh[1]
-        data = glReadPixels(x, y, w, h, GL_BGR, GL_UNSIGNED_BYTE)
-        image = Image.frombytes("RGB", (w, h), data)
+        # x, y, w, h = 0, 0, self.wh[0], self.wh[1]
+        data = glReadPixels(0, 0, self.wh[0], self.wh[1], GL_BGR, GL_UNSIGNED_BYTE)
+        image = Image.frombytes("RGB", self.wh, data)
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
-        return np.asarray(image)
+        return np.asarray(image)[u:u + h, l:l + w]
 
     def currScreen(self):
         """Return current screen"""

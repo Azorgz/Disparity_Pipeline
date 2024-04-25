@@ -7,7 +7,7 @@ import oyaml as yaml
 from kornia.utils import get_cuda_device_if_available
 from tqdm import tqdm
 
-from utils.classes import ImageTensor, Metric_nec_tensor
+from utils.classes import ImageTensor, Metric_nec_tensor, Metric_ssim_tensor
 from utils.classes.Image import DepthTensor
 from utils.classes.VideoGenerator import VideoGenerator
 from utils.gradient_tools import grad_tensor_image, grad_image, grad_tensor
@@ -15,7 +15,7 @@ from utils.gradient_tools import grad_tensor_image, grad_image, grad_tensor
 
 class Visualizer:
     show_validation = False
-    show_grad_im = False
+    show_grad_im = 0
     show_occlusion = False
     show_disp_overlay = False
     show_idx = True
@@ -224,7 +224,9 @@ class Visualizer:
         if self.key == ord('v'):
             self.show_validation = not self.show_validation
         if self.key == ord('g'):
-            self.show_grad_im = not self.show_grad_im
+            self.show_grad_im += 1
+            if self.show_grad_im > 2:
+                self.show_grad_im = 0
         if self.key == ord('t') and self.device:
             self.tensor = not self.tensor
         if self.key == ord('o') and experiment['occlusion_ok']:
@@ -288,7 +290,7 @@ class Visualizer:
         visu = (target_im / 2 + new_im * mask / 2).vstack(target_im / 2 + ref_im / 2)
 
         if self.show_grad_im:
-            grad_im = self._create_grad_im(new_im, ref_im, target_im, mask)
+            grad_im = self._create_grad_im(new_im, ref_im, target_im, mask, self.show_grad_im - 1)
             visu = visu.hstack(grad_im)
 
         if self.show_disp_overlay:
@@ -316,7 +318,11 @@ class Visualizer:
                               org, self.font, self.fontScale, self.color, self.thickness, cv.LINE_AA)
         if self.show_grad_im:
             org = self.org_idx[0] + w, self.org_idx[1]
-            visu = cv.putText(visu, f'Image grad : {"with tensor" if self.tensor else "with numpy"}', org,
+            if self.show_grad_im == 1 or not self.tensor:
+                text = f'Image grad : {"with tensor" if self.tensor else "with numpy"}'
+            else:
+                text = f'Image SSIM'
+            visu = cv.putText(visu, text, org,
                               self.font,
                               self.fontScale, self.color,
                               self.thickness, cv.LINE_AA)
@@ -372,12 +378,12 @@ class Visualizer:
                 self.video_array = []
         return visu
 
-    def _create_grad_im(self, new_im, ref_im, target_im, mask):
-
+    def _create_grad_im(self, new_im, ref_im, target_im, mask, idx=0):
+        metrics = [Metric_nec_tensor, Metric_ssim_tensor]
         if self.tensor:
-            nec = Metric_nec_tensor(self.device)
-            new_target = nec(new_im, target_im, return_image=True).unsqueeze(0).match_shape(new_im).RGB('gray')
-            grad_ref_target = nec(ref_im, target_im, return_image=True).unsqueeze(0).match_shape(new_im).RGB('gray')
+            metric = metrics[idx](self.device)
+            new_target = metric(new_im, target_im, return_image=True).match_shape(new_im)
+            grad_ref_target = metric(ref_im, target_im, return_image=True).match_shape(new_im)
             im = new_target.vstack(grad_ref_target)
         else:
             grad_new = grad_image(new_im)

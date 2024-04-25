@@ -401,14 +401,25 @@ class ImageTensor(Tensor):
                                      dtype=np.uint8)
         return a
 
-    def to_numpy(self, **kwargs):
-        if self.color_mode == 'L':
-            a = np.ascontiguousarray(Tensor.numpy(self.squeeze().cpu()) * 255, dtype=np.uint8)
+    def to_numpy(self, datatype=np.uint8, **kwargs):
+        if datatype == np.uint8:
+            factor = 255
         else:
-            a = np.ascontiguousarray(self.RGB().put_channel_at(-1).squeeze().cpu().numpy() * 255,
-                                     dtype=np.uint8)
+            factor = 1
+        if self.color_mode == 'L':
+            if self.requires_grad:
+                a = np.ascontiguousarray(Tensor.numpy(self.detach().squeeze().cpu()) * factor, dtype=datatype)
+            else:
+                a = np.ascontiguousarray(Tensor.numpy(self.squeeze().cpu()) * factor, dtype=datatype)
+        else:
+            if self.requires_grad:
+                a = np.ascontiguousarray(self.detach().RGB().cpu().put_channel_at(-1).squeeze().numpy() * factor,
+                                         dtype=datatype)
+            else:
+                a = np.ascontiguousarray(self.RGB().put_channel_at(-1).squeeze().cpu().numpy() * factor, dtype=datatype)
         return a
 
+    @torch.no_grad()
     def show(self, num=None, cmap='gray', roi: list = None, point: Union[list, Tensor] = None):
         im_display = self.put_channel_at(1)
         batch, layers = im_display.shape[:2]
@@ -429,7 +440,7 @@ class ImageTensor(Tensor):
                     center = center.cpu().long().numpy()
                     img = ImageTensor(cv.circle(img.opencv(), center, 5, (0, 255, 0), -1)[..., [2, 1, 0]])
                 img = img.put_channel_at(-1).squeeze()
-            ax[0, 0].imshow(img.cpu().numpy(), cmap=cmap)
+            ax[0, 0].imshow(img.to_numpy(), cmap=cmap)
             if roi is not None:
                 for r, color in zip(roi, ['r', 'g', 'b']):
                     rect = patches.Rectangle((r[1], r[0]), r[3] - r[1], r[2] - r[0]
@@ -460,7 +471,7 @@ class ImageTensor(Tensor):
                 img, cmap = img.put_channel_at(-1).squeeze(), cmap
             else:
                 img, cmap = img.put_channel_at(-1).squeeze(), None
-            axes[i].imshow(img.cpu().numpy(), cmap=cmap)
+            axes[i].imshow(img.to_numpy(), cmap=cmap)
         for a in axes:
             if a is not None:
                 a.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])

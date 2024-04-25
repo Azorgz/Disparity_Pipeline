@@ -5,10 +5,11 @@ import OpenGL.GLUT as glut
 import numpy as np
 from OpenGL.GL import GL_PROJECTION, GL_DEPTH_TEST, GL_MODELVIEW, GL_BLEND, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
 from OpenGL.GL import glMatrixMode, glEnable, glDisable, glLoadIdentity, glMultMatrixf, glBlendFunc
+from OpenGL.GL import glReadPixels, GL_BGR, GL_UNSIGNED_BYTE
 from OpenGL.GLU import gluPerspective, gluLookAt, gluOrtho2D
 from camviz.objects.pose import Pose
 from camviz.screen.screen import Screen
-
+from PIL import Image, ImageOps
 
 class Screen3Dworld(Screen):
     """
@@ -157,3 +158,4 @@ class Screen3Dworld(Screen):
         gl.glPopMatrix()
         gl.glMatrixMode(gl.GL_PROJECTION)
         gl.glPopMatrix()
+

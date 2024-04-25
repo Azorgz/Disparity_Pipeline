@@ -92,19 +92,23 @@ class Metric_ssim_tensor(BaseMetric_Tensor):
         self.metric = "SSIM"
         self.commentary = "The higher, the better"
 
-    def __call__(self, im1, im2, *args, mask=None, **kwargs):
+    def __call__(self, im1, im2, *args, mask=None, return_image=False, **kwargs):
         super().__call__(im1, im2, *args, mask=mask, **kwargs)
         if mask is None:
-            self.value, temp = self.ssim(self.image_test.to_tensor(), self.image_true.to_tensor())
+            temp, image = self.ssim(self.image_test, self.image_true)
+            self.value = torch.abs(image).mean()
             self.ssim.reset()
-            del temp
         else:
-            temp, image = self.ssim(self.image_test.to_tensor(), self.image_true.to_tensor())
+            temp, image = self.ssim(self.image_test, self.image_true)
+            image = torch.abs(image)
             self.value = image[:, :, self.mask[0, 0, :, :]].mean()
             self.ssim.reset()
-            del temp
+        del temp
             # self.value = self.ssim(self.image_test * mask, self.image_true * mask)
-        return self.value
+        if return_image:
+            return image.GRAYSCALE().RGB('gray')
+        else:
+            return self.value
 
     def scale(self):
         self.range_max += self.range_max
@@ -169,7 +173,7 @@ class Metric_rmse_tensor(BaseMetric_Tensor):
         self.metric = "RMSE"
         self.range_max = 1
 
-    def __call__(self, im1, im2, *args, mask=None, **kwargs):
+    def __call__(self, im1, im2, *args, mask=None, return_image=False, **kwargs):
         super().__call__(im1, im2, *args, mask=mask, **kwargs)
         if mask is None:
             self.value = self.rmse(self.image_true, self.image_test)
@@ -229,13 +233,13 @@ class Metric_nec_tensor(BaseMetric_Tensor):
         if mask is not None:
             ref_true = ref_true * self.mask
             ref_test = ref_test * self.mask
-        dot_prod = torch.abs(torch.cos(ref_true[:, 1, :, :] - ref_test[:, 1, :, :])) * (
-                (ref_true[:, 1, :, :] != 0) + (ref_test[:, 1, :, :] != 0))
+        dot_prod = (torch.abs(torch.cos(ref_true[:, 1, :, :] - ref_test[:, 1, :, :])) *
+                    ((ref_true[:, 1, :, :] != 0) + (ref_test[:, 1, :, :] != 0)))
         image_nec = (ref_true[:, 0, :, :] * ref_test[:, 0, :, :] * dot_prod)
-        nec_ref = torch.sqrt(torch.sum(ref_true[:, 0, :, :] * ref_true[:, 0, :, :]) * torch.sum(
-            ref_test[:, 0, :, :] * ref_test[:, 0, :, :]))
+        nec_ref = torch.sqrt(torch.sum(ref_true[:, 0, :, :] * ref_true[:, 0, :, :]) *
+                             torch.sum(ref_test[:, 0, :, :] * ref_test[:, 0, :, :]))
         self.value = image_nec.sum() / nec_ref
         if return_image:
-            return image_nec
+            return image_nec.unsqueeze(0).RGB('gray')
         else:
             return self.value

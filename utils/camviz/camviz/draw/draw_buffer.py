@@ -176,7 +176,7 @@ class drawBuffer:
         wire : buffer
             Buffer with wire (color and width)
         """
-        # If wire is avaialble
+        # If wire is available
         if wire is not None:
             csw = self.getCSW()
             self.width(wire[1])
