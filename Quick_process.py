@@ -2,12 +2,11 @@ import os
 import shutil
 import warnings
 
-import numpy as np
 import oyaml as yaml
 from Disparity_Pipeline import Pipe
 from config.Config import ConfigPipe
 from module.Process import Process
-from utils.classes.Visualizer import Visualizer
+from utils.classes.Vizualisation.Visualizer import Visualizer
 
 
 def quick_process(idx, script_path):

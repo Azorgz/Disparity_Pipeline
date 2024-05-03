@@ -1,7 +1,7 @@
 Option:
   name_experiment: Test
   setup: # Paths to the config file of the pre-calibrated camera's setup
-    path: Setup_Camera/Lynred_day&night.yaml
+    path: Setup_Camera/Lynred_day.yaml
   dataset:
     number_of_sample: 25
     shuffle: True
@@ -13,19 +13,40 @@ Option:
     name: unimatch
 
 
-monocular_IR:
+monocular_depth:
   monocular:
     cameras: [IR]
     option: []
   wrap:
     cameras: [ IR, RGB ]
-    method: disp
-    option: [return_depth_reg, return_occlusion, []]
+    method: depth
+    option: [ [ ] ]
   valid: [ IR, RGB ]
-  save: [pred_depth, image_reg, depth_reg, occlusion]
+  save: [ pred_depth, image_reg ]
+  #, depth_reg, occlusion]
 
-
-
+monocular_disp:
+  monocular:
+    cameras: [ IR ]
+    option: [ ]
+  wrap:
+    cameras: [ IR, RGB ]
+    method: disparity
+    option: [ [ ] ]
+  valid: [ IR, RGB ]
+  save: [ pred_depth, image_reg ]
+#
+#Disparity-Disparity:
+#  disparity:
+#    cameras: [RGB, RGB2]
+#    option: [inference_size: [480, 640]]
+#  wrap:
+#    cameras: [IR, RGB]
+#    method: disparity
+#    option: [return_depth_reg, return_occlusion, []]
+#  valid: [IR, RGB]
+#  save: [pred_disp, image_reg, disp_reg, occlusion]
+#
 #Disparity-Depth:
 #  disparity:
 #    cameras: [ IR, IR2 ]
@@ -36,7 +57,7 @@ monocular_IR:
 #    option: [ return_depth_reg, return_occlusion, [ ] ]
 #  valid: [ IR, RGB ]
 #  save: [ pred_depth, image_reg, depth_reg, occlusion ]
-
+#
 
 
 #Depth-Disparity:
@@ -63,13 +84,3 @@ monocular_IR:
 #  save: [pred_disp, image_reg, disp_reg, occlusion]
 #
 
-#Disparity-Disparity:
-#  disparity:
-#    cameras: [RGB, RGB2]
-#    option: [inference_size: [480, 640]]
-#  wrap:
-#    cameras: [IR, RGB]
-#    method: disparity
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [IR, RGB]
-#  save: [pred_disp, image_reg, disp_reg, occlusion]

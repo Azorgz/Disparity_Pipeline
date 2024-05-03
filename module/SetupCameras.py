@@ -8,16 +8,14 @@ import numpy as np
 import torch
 import yaml
 from kornia.geometry import find_fundamental, essential_from_fundamental, motion_from_essential_choose_solution, \
-    normalize_points_with_intrinsics, compute_correspond_epilines, relative_transformation, \
-    angle_axis_to_rotation_matrix, rotation_matrix_to_angle_axis
+    relative_transformation, \
+    rotation_matrix_to_angle_axis
 from torch import Tensor
 from torch.linalg import vector_norm
-import cv2 as cv
 from utils.classes.Cameras import IRCamera, RGBCamera
-from utils.classes.Image import ImageTensor
-from utils.classes.KeypointsGenerator import KeypointsGenerator
+from utils.classes.Geometry.KeypointsGenerator import KeypointsGenerator
 # from utils.classes.Registration import Registration
-from utils.classes.StereoSetup import StereoSetup, DepthSetup
+from utils.classes.Cameras.StereoSetup import StereoSetup, DepthSetup
 from utils.misc import path_leaf
 from utils.visualization import show_epipolar
 

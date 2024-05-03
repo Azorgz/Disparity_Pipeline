@@ -10,7 +10,7 @@ import inspect
 from types import FrameType
 from typing import cast, Union
 from utils.misc import print_tuple
-from utils.classes.Image import ImageTensor
+from utils.classes.Image.Image import ImageTensor
 from glob import glob
 import imagesize
 

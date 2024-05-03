@@ -1,12 +1,11 @@
 import os
 import random
 from collections import OrderedDict
-from glob import glob
 import numpy as np
 import yaml
 from torch.utils.data import Dataset, DataLoader
 from module.SetupCameras import CameraSetup
-from utils.classes.Image import ImageTensor
+from utils.classes.Image.Image import ImageTensor
 from utils.manipulation_tools import list_to_dict
 from utils.misc import timeit, name_generator
 

@@ -1,25 +1,17 @@
 import os
 import sys
-import time
-import cv2
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
-from kornia.geometry import depth_to_3d, depth_to_3d_v2
-from kornia.morphology import dilation
-from open3d.examples.pipelines.robust_icp import draw_registration_result
 from torch import Tensor
 
 from Networks.Depth_anything.metric_depth.zoedepth.models.builder import build_model
 from Networks.Depth_anything.metric_depth.zoedepth.utils.config import get_config
 from config.Config import configure_parser
 from module.SetupCameras import CameraSetup
-import open3d as o3d
 
-from utils.classes.Image import DepthTensor
 import torch.nn.functional as F
 
-from utils.classes.KeypointsGenerator import KeypointsGenerator
+from utils.classes.Geometry.KeypointsGenerator import KeypointsGenerator
 
 sys.path.append(os.getcwd() + '/Networks/Depth_anything/metric_depth')
 
@@ -46,16 +38,17 @@ for i in range(1000):
     dist_corr_max = 200
     keypointDetector = KeypointsGenerator(device, detector='sift_scale', matcher='snn', num_feature=10000)
     kpts = keypointDetector(im_dst, im_src, draw_result_inplace=False)
-    depth_dst = F.interpolate(NN(Tensor(im_dst), focal=matrix_dst[0, 0, 0])['metric_depth'].clip(0, dist_corr_max),
-                              im_dst.shape[-2:])
-    depth_src = F.interpolate(NN(Tensor(im_src), focal=matrix_src[0, 0, 0])['metric_depth'].clip(0, dist_corr_max),
-                              im_src.shape[-2:])
-    depth_dist = DepthTensor(depth_src - depth_dst)
-    # (im_dst.hstack(im_src)).show()
-    print(f'{torch.median(depth_dist) * 30 * 3.6} km/h')
-    cv2.imshow('Image', im_dst.opencv())
-    cv2.imshow('depth dist', depth_dist.opencv())
-    cv2.waitKey(1)
+    depth_dst = F.interpolate(NN(im_dst)['metric_depth'].clip(0, dist_corr_max), im_dst.shape[-2:])
+    depth_src = F.interpolate(NN(im_src)['metric_depth'].clip(0, dist_corr_max), im_src.shape[-2:])
+    # depth_dist = depth_src - depth_dst
+    depth_dist = (depth_src.interpolate(kpts[0][0])) - Tensor(depth_dst.interpolate(kpts[1][0]))
+    plt.hist(depth_dist.cpu().detach().numpy(), bins='auto')
+    plt.title("Histogram with 'auto' bins")
+    plt.show()
+    print(f'{torch.mean(depth_dist) * 3.6} km/h')
+    # cv2.imshow('Image', im_dst.opencv())
+    # cv2.imshow('depth dist', depth_dist.opencv())
+    # cv2.waitKey(1)
     # kernel = torch.ones(3, 3).to(device)
     # depth_dst = DepthTensor(dilation(depth_dst, kernel)).scale()
     # depth_src = DepthTensor(dilation(depth_src, kernel)).scale()

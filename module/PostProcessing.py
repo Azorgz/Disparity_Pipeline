@@ -1,4 +1,4 @@
-from utils.classes.transforms import Unpad, ResizeDisp, Compose, ResizeDepth
+from utils.classes.Geometry.transforms import Unpad, ResizeDisp, Compose, ResizeDepth
 from torchvision.transforms.functional import hflip
 
 

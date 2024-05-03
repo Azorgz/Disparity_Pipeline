@@ -8,12 +8,6 @@ from matplotlib import cm
 from os.path import *
 from pathlib import Path
 from scipy.ndimage import median_filter
-from FUSION.classes.Image import ImageCustom
-from FUSION.classes.Metrics import Image_ssim
-from FUSION.tools.gradient_tools import create_gaborfilter, apply_filter
-from FUSION.tools.image_processing_tools import normalization_maps, scaled_fusion
-from FUSION.tools.manipulation_tools import function_timer
-from FUSION.tools.method_fusion import mask_fusion_intensity, mean
 
 
 class Mask(np.ndarray):

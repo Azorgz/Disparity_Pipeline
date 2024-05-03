@@ -1,16 +1,13 @@
-import numpy as np
+import time
+
 import torch
 import torch.nn.functional as F
-from kornia.filters import MedianBlur
-from kornia.geometry import depth_to_3d, transform_points, project_points, normalize_pixel_coordinates, depth_to_3d_v2
-from kornia.morphology import dilation, opening, closing
-from torch import Tensor, nn
-from torch.nn import MaxPool2d, Sequential, Conv2d
+from kornia.geometry import transform_points, project_points, normalize_pixel_coordinates, depth_to_3d_v2
+from torch import Tensor
+from torch.nn import MaxPool2d, Sequential
 
-from utils.classes import ImageTensor
-from utils.classes.Image import DepthTensor
-from utils.image_processing_tools import project_cloud_to_image, simple_project_cloud_to_image
-from utils.misc import time_fct
+from utils.classes import ImageTensor, DepthTensor
+from utils.image_processing_tools import project_cloud_to_image, project_cloud_to_image_np, projector
 
 
 class DepthWrapper:
@@ -52,11 +49,13 @@ class DepthWrapper:
             # project back to pixels
             camera_matrix_tmp: Tensor = matrix_src[:, None, None]  # Bx1x1x3x3
             points_2d_src: Tensor = project_points(points_3d_src, camera_matrix_tmp)  # BxHxWx2
+
+            # define a cloud with the depth information added to the pixels position
             cloud = torch.concatenate([points_2d_src, points_3d_src[:, :, :, -1:]], dim=-1)
             height, width = image_src.shape[-2:]
 
             if return_depth_reg:
-                depth_reg = project_cloud_to_image(cloud, [height, width], post_process=post_process_depth)
+                depth_reg = projector(cloud, [height, width], post_process=post_process_depth, numpy=True)
                 depth_reg.im_name = image_src.im_name + '_depth'
                 conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
                 conv_upsampling = Sequential(conv_upsampling)
@@ -67,11 +66,15 @@ class DepthWrapper:
             points_2d_src_norm: Tensor = normalize_pixel_coordinates(points_2d_src, height, width).to(
                 image_src.dtype)  # BxHxWx2
             grid = Tensor(points_2d_src_norm)
-            res['image_reg'] = F.grid_sample(image_src, grid, align_corners=True)
-
             if return_occlusion:
+                res['image_reg'], res['occlusion'] = projector(cloud, [height, width],
+                                                               post_process=post_process_depth,
+                                                               numpy=True,
+                                                               return_occlusion=True)
                 res['occlusion'] = self.find_occlusion(cloud, [height, width])
                 res['occlusion'].im_name = image_src.im_name + '_occlusion'
+            else:
+                res['image_reg'] = F.grid_sample(image_src, grid, align_corners=True)
             return res
         else:
             return self._reverse_call(image_src, image_dst, depth, matrix_src, matrix_dst, torch.inverse(src_trans_dst),
@@ -117,7 +120,7 @@ class DepthWrapper:
         height, width = image_dst.shape[-2:]
 
         if return_depth_reg:
-            depth_reg = project_cloud_to_image(cloud, [height, width], post_process=post_process_depth)
+            depth_reg = projector(cloud, [height, width], post_process=3, numpy=True)
             depth_reg.im_name = image_dst.im_name + '_depth'
             conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
             conv_upsampling = Sequential(conv_upsampling)
@@ -125,15 +128,16 @@ class DepthWrapper:
             res['depth_reg'][depth_reg == 0] = conv_upsampling(depth_reg)[depth_reg == 0]
 
         if return_occlusion:
-            res['image_reg'], res['occlusion'] = project_cloud_to_image(cloud, [height, width],
-                                                                        post_process=post_process_image,
-                                                                        image=image_src,
-                                                                        return_occlusion=True)
+            res['image_reg'], res['occlusion'] = projector(cloud, [height, width],
+                                                           post_process=post_process_image,
+                                                           image=image_src,
+                                                           return_occlusion=True,
+                                                           numpy=True)
             res['occlusion'].im_name = image_src.im_name + '_occlusion'
         else:
-            res['image_reg'] = project_cloud_to_image(cloud, [height, width],
-                                                                  post_process=post_process_image,
-                                                                  image=image_src)
+            res['image_reg'] = projector(cloud, [height, width],
+                                         post_process=post_process_image,
+                                         image=image_src)
         return res
 
     def find_occlusion(self, cloud, image_size):

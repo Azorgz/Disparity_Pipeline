@@ -1,20 +1,10 @@
 from __future__ import division
 
-import warnings
-
-import kornia
-import torch
+from torch import from_numpy, cat
+from torch.cuda import FloatTensor
 import numpy as np
-import torchvision.transforms.functional as F
-from torch import Tensor
 from torchvision.transforms.functional import hflip
 import torch.nn.functional as F1
-
-import inspect
-from types import FrameType
-from typing import cast, Union
-
-from utils.classes.Image import ImageTensor
 
 
 class Compose(object):
@@ -230,8 +220,8 @@ class DispSide(object):
             sample["left"], sample["right"] = hflip(sample["right"]), hflip(sample["left"])
         elif self.disp_bidir:
             new_left, new_right = hflip(sample["right"]), hflip(sample["left"])
-            sample["left"] = torch.cat((sample["left"], new_left), dim=0)
-            sample["right"] = torch.cat((sample["right"], new_right), dim=0)
+            sample["left"] = cat((sample["left"], new_left), dim=0)
+            sample["right"] = cat((sample["right"], new_right), dim=0)
         return sample
 
 
@@ -246,13 +236,13 @@ class ToTensor(object):
             for key in sample.keys():
                 sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
                 if self.no_normalize:
-                    sample[key] = torch.from_numpy(sample[key])
+                    sample[key] = from_numpy(sample[key])
                 else:
-                    sample[key] = torch.from_numpy(sample[key]) / 255.
+                    sample[key] = from_numpy(sample[key]) / 255.
                 sample[key] = sample[key].to(device).unsqueeze(0)
         else:
             sample = np.transpose(sample, (2, 0, 1))
-            sample = torch.from_numpy(sample) / 255.
+            sample = from_numpy(sample) / 255.
             sample = sample.to(device).unsqueeze(0)
         return sample
 
@@ -266,7 +256,7 @@ class ToFloatTensor(object):
     def __call__(self, sample, device, *args, **kwargs):
         if isinstance(sample, dict):
             for key in sample.keys():
-                sample[key] = sample[key].to(torch.cuda.FloatTensor)
+                sample[key] = sample[key].to(FloatTensor)
                 # sample[key] = np.transpose(sample[key], (2, 0, 1))  # [C, H, W]
                 # if self.no_normalize:
                 #     sample[key] = torch.cuda.FloatTensor(sample[key])
@@ -274,7 +264,7 @@ class ToFloatTensor(object):
                 #     sample[key] = torch.cuda.FloatTensor(sample[key] / 255.)
                 # sample[key] = sample[key].to(device).unsqueeze(0)
         else:
-            sample = sample.to(torch.cuda.FloatTensor)
+            sample = sample.to(FloatTensor)
         return sample
 
 # class PerspectiveTransform:

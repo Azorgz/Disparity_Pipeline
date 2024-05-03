@@ -1,13 +1,13 @@
 from utils.classes import ImageTensor
-from utils.classes.DepthWrapper import DepthWrapper
-from utils.classes.DisparityWrapper import DisparityWrapper
+from utils.classes.Wrappers.DepthWrapper import DepthWrapper
+from utils.classes.Wrappers.DisparityWrapper import DisparityWrapper
 from module.SetupCameras import CameraSetup
 from kornia.geometry import relative_transformation
 import warnings
 
 from config.Config import ConfigPipe
 from module.BaseModule import BaseModule
-from utils.classes.Image import DepthTensor
+from utils.classes.Image.Image import DepthTensor
 from utils.misc import timeit
 
 with warnings.catch_warnings():

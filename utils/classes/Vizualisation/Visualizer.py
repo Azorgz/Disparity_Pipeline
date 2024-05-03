@@ -7,10 +7,10 @@ import oyaml as yaml
 from kornia.utils import get_cuda_device_if_available
 from tqdm import tqdm
 
-from utils.classes import ImageTensor, Metric_nec_tensor, Metric_ssim_tensor
-from utils.classes.Image import DepthTensor
-from utils.classes.VideoGenerator import VideoGenerator
-from utils.gradient_tools import grad_tensor_image, grad_image, grad_tensor
+from utils.classes import ImageTensor, DepthTensor
+from utils.classes.Metrics import Metric_nec_tensor, Metric_ssim_tensor
+from .VideoGenerator import VideoGenerator
+from utils.gradient_tools import grad_image
 
 
 class Visualizer:

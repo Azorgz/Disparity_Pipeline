@@ -1,16 +1,15 @@
 import kornia
 import torch
-from kornia.filters import median_blur, MedianBlur
+from kornia.filters import MedianBlur
 from kornia.geometry import normalize_pixel_coordinates
-from kornia.morphology import closing, dilation, opening, erosion
+from kornia.morphology import closing, dilation
 from torch import Tensor
 import torch.nn.functional as F
 
 from utils.classes import ImageTensor
-from utils.classes.Image import DepthTensor
+from utils.classes.Image.Image import DepthTensor
 from module.SetupCameras import CameraSetup
-from utils.image_processing_tools import project_grid_to_image
-from utils.misc import time_fct
+from utils.image_processing_tools import project_grid_to_image, projector
 
 
 class DisparityWrapper:
@@ -40,6 +39,7 @@ class DisparityWrapper:
         Return:
             the warped tensor in the source frame with shape :math:`(B,3,H,W)`.
         """
+        res = {}
         if not reverse_wrap:
             # selection of the right stereo setup and src image
             setup = self.setup.stereo_pair(cam_src, cam_dst)
@@ -65,9 +65,8 @@ class DisparityWrapper:
             # resampling with disparity
             img_dst = self._grid_sample(img_src_proj, disparity_proj.clone(), padding_mode='zeros')
 
-            sample = {side: img_dst}
-            res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
             if return_occlusion:
+                # sample = {side: projector(disparity_proj, img_dst)}
                 sample = {side: self.find_occlusion(disparity_proj, img_dst)}
                 res['occlusion'] = setup(sample, reverse=True)[cam_dst].to(torch.bool)
                 res['occlusion'].im_name = image_src.im_name + '_occlusion'
@@ -78,6 +77,8 @@ class DisparityWrapper:
                 sample = {opp_side: disparity_src}
                 disparity_src = setup(sample, reverse=True)[cam_src]
                 res['depth_reg'] = setup.disparity_to_depth({cam_src: disparity_src})[cam_src]
+            sample = {side: img_dst}
+            res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
             return res
         else:
             return self._reverse_call(images, depth_tensor, cam_src, cam_dst, *args,
@@ -136,20 +137,21 @@ class DisparityWrapper:
         grid[:, :, :, 0] -= disparity_proj[0, :, :, :]
         grid = torch.concatenate([grid, disparity_proj.permute([0, 2, 3, 1])], dim=-1)
         if return_occlusion:
-            img_dst, occ = project_grid_to_image(grid, size_im, post_process_depth,
-                                                 image=img_src_proj,
-                                                 return_occlusion=return_occlusion)
+            img_dst, occ = projector(grid, size_im, post_process_depth,
+                                     image=img_src_proj,
+                                     return_occlusion=return_occlusion,
+                                     grid=True)
             sample = {opp_side: img_dst}
             res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
-            sample = {opp_side: occ}
+            sample = {opp_side: occ * 1.}
             res['occlusion'] = setup(sample, reverse=True)[cam_dst].to(torch.bool)
             res['occlusion'].im_name = image_src.im_name + '_occlusion'
         else:
-            img_dst = project_grid_to_image(grid, size_im, post_process_depth, image=img_src_proj)
+            img_dst = projector(grid, size_im, post_process_depth, image=img_src_proj, grid=True)
             sample = {opp_side: img_dst}
             res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
         if return_depth_reg:
-            disparity_dst = project_grid_to_image(grid, size_im, post_process_depth)
+            disparity_dst = projector(grid, size_im, post_process_depth)
             disparity_dst.im_name = images[cam_dst].im_name + '_disp'
             sample = {opp_side: disparity_dst}
             disparity_dst = setup(sample, reverse=True)[cam_dst]

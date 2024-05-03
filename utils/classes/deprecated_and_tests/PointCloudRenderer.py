@@ -1,35 +1,25 @@
-import os
 import time
 
 import torch
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
 
 # Util function for loading point clouds|
-import numpy as np
-from kornia.geometry import relative_transformation, depth_to_3d, transform_points, depth_to_3d_v2
-from kornia.morphology import dilation
+from kornia.geometry import relative_transformation, depth_to_3d
 
 # Data structures and functions for rendering
 from pytorch3d.structures import Pointclouds
-from pytorch3d.vis.plotly_vis import AxisArgs, plot_batch_individually, plot_scene
 from pytorch3d.renderer import (
-    look_at_view_transform,
-    FoVPerspectiveCameras,
-    FoVOrthographicCameras,
     PointsRasterizationSettings,
     PointsRenderer,
-    PulsarPointsRenderer,
     PointsRasterizer,
     AlphaCompositor,
-    NormWeightedCompositor, PerspectiveCameras
+    PerspectiveCameras
 )
 from torch import Tensor
 
 from Networks.KenburnDepth.KenburnDepth import KenburnDepth
 from module.SetupCameras import CameraSetup
 from utils.classes import ImageTensor
-from utils.classes.Image import DepthTensor
+from utils.classes.Image.Image import DepthTensor
 
 
 class PointCloudRenderer:

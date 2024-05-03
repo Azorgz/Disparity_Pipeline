@@ -6,8 +6,7 @@ from kornia.color import hsv_to_rgb
 from kornia.filters import median_blur
 from torchmetrics.functional import image_gradients
 from torchvision.transforms.functional import gaussian_blur
-
-from utils.classes import ImageTensor
+from utils.classes.Image import ImageTensor
 
 
 def normalisation_tensor(image):

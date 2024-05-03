@@ -1,10 +1,7 @@
-import warnings
-
 import torch
 from kornia.feature import SIFTFeatureScaleSpace, SIFTFeature, GFTTAffNetHardNet, match_adalam, match_fginn, match_smnn, \
     match_snn, match_mnn, match_nn, get_laf_center
 from torch import Tensor
-
 from utils.classes import ImageTensor
 import cv2 as cv
 import numpy as np
@@ -68,7 +65,7 @@ class KeypointsGenerator:
             if draw_result:
                 self.draw_keypoints(img_src, keypoints_src, img_dst, keypoints_dst, max_drawn=max_drawn)
             if draw_result_inplace:
-                self.draw_keypoints_inplace(img_src, keypoints_src, keypoints_dst, max_drawn=max_drawn)
+                self.draw_keypoints_inplace(img_src, img_dst, keypoints_src, keypoints_dst, max_drawn=max_drawn)
             return keypoints_src, keypoints_dst
 
     def draw_keypoints(self, img_src, keypoints_src, img_dst, keypoints_dst, max_drawn=200):
@@ -96,11 +93,16 @@ class KeypointsGenerator:
         name = f'Detector : {self.detector_name} & Matcher : {self.matcher_name}'
         img_.show(num=name)
 
-    def draw_keypoints_inplace(self, img_src, keypoints_src, keypoints_dst, max_drawn=200):
+    def draw_keypoints_inplace(self, img_src, img_dst, keypoints_src, keypoints_dst, max_drawn=200):
         if img_src.im_type == 'RGB':
             img_src_ = img_src.opencv()
         else:
             img_src_ = img_src.RGB(cmap='gray').opencv()
+        if img_dst.im_type == 'RGB':
+            img_dst_ = img_dst.opencv()
+        else:
+            img_dst_ = img_dst.RGB(cmap='gray').opencv()
+        img = np.uint8(img_dst_ / 2 + img_src_ / 2)
         keypoints_src_ = keypoints_src.squeeze().cpu().numpy()
         keypoints_dst_ = keypoints_dst.squeeze().cpu().numpy()
         max_drawn = min(max_drawn, keypoints_src_.shape[0])
@@ -108,11 +110,11 @@ class KeypointsGenerator:
                       zip(keypoints_src_[:max_drawn], keypoints_dst_[:max_drawn])]
         for kpts in keypoints_:
             color = tuple(np.round(np.random.rand(3, ) * 255, 0).tolist())
-            cv.drawKeypoints(img_src_, kpts, img_src_, color=color)
-            img_src_ = cv.line(img_src_, (int(kpts[0].pt[0]), int(kpts[0].pt[1])),
+            cv.drawKeypoints(img, kpts, img, color=color)
+            img = cv.line(img, (int(kpts[0].pt[0]), int(kpts[0].pt[1])),
                                (int(kpts[1].pt[0]), int(kpts[1].pt[1])), color=color, thickness=2)
         name = f'Detector : {self.detector_name} & Matcher : {self.matcher_name}'
-        ImageTensor(img_src_[..., [2, 1, 0]]).show(num=name)
+        ImageTensor(img[..., [2, 1, 0]]).show(num=name)
 
     @staticmethod
     def manual_keypoints_selection(im_src: ImageTensor, im_dst: ImageTensor, pts_ref=None, nb_point=50) -> tuple:

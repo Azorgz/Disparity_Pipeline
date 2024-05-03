@@ -4,7 +4,7 @@ import timeit
 import numpy as np
 
 from utils.classes import ImageTensor
-from utils.classes.transforms import ToTensor, ToFloatTensor, Resize
+from utils.classes.Geometry.transforms import ToTensor, ToFloatTensor, Resize
 from utils.visualization import vis_disparity
 
 

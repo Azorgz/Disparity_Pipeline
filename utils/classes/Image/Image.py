@@ -192,15 +192,8 @@ class ImageTensor(Tensor):
         return image
 
     # Base Methods
-    # def __add__(self, other):
-    #     if isinstance(other, DepthTensor):
-    #         other_ = other.RGB()
-    #     else:
-    #         other_ = other
-    #     return torch.Tensor.__add__(self, other_)
-    #
-    # def __mul__(self, other):
-    #     return torch.Tensor.__mul__(self, other)
+    # def __s(self, i, j, sequence):
+    #     super().__setslice__(i, j, sequence)
 
     def _attribute_init_(self):
         temp = self.squeeze()
@@ -227,6 +220,7 @@ class ImageTensor(Tensor):
             if isinstance(channel_pos, int):
                 channel_pos += 1
         return temp, im_type, cmap, channel_pos
+
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
@@ -266,6 +260,22 @@ class ImageTensor(Tensor):
         new.pass_attribute(self)
         new.batched = True
         return new
+
+    def interpolate(self, items):
+        """
+        :param items:  List/array or Tensor of shape (N,2) of tuple of coordinate to interpolate
+        :return: Tensor of interpolated values
+        """
+        try:
+            device = items.device
+        except AttributeError:
+            device = 'cpu'
+        h, w = self.put_channel_at(1).shape[-2:]
+        N = len(self) if self.batched else 1
+        grid = items.unsqueeze(1).repeat(N, 1, 1, 1)
+        grid[:, :, :, 0] = grid[:, :, :, 0] * 2 / w - 1
+        grid[:, :, :, 1] = grid[:, :, :, 1] * 2 / h - 1
+        return F.grid_sample(Tensor(self).to(device), grid, align_corners=True).squeeze()
 
     # Image manipulation methods
     def pad(self, im, **kwargs):
