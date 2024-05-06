@@ -36,15 +36,26 @@ class DrawTexture:
                 self.addTexture(name[i], data[i] if is_list(data) else data)
         # Otherwise, create a single texture from data
         else:
-            if n is not None:
-                if is_tuple(n):
-                    for i in range(n[0]):
-                        for j in range(n[1]):
-                            self.textures['%s%d%d' % (name, i, j)] = Texture(data)
-                elif is_int(n):
-                    for i in range(n):
-                        self.textures['%s%d' % (name, i)] = Texture(data)
-            self.textures[name] = Texture(data)
+            if name in self.textures:
+                if n is not None:
+                    if is_tuple(n):
+                        for i in range(n[0]):
+                            for j in range(n[1]):
+                                self.updTexture('%s%d%d' % (name, i, j), data)
+                    elif is_int(n):
+                        for i in range(n):
+                            self.updTexture('%s%d' % (name, i), data)
+                self.updTexture(name, data)
+            else:
+                if n is not None:
+                    if is_tuple(n):
+                        for i in range(n[0]):
+                            for j in range(n[1]):
+                                self.textures['%s%d%d' % (name, i, j)] = Texture(data)
+                    elif is_int(n):
+                        for i in range(n):
+                            self.textures['%s%d' % (name, i)] = Texture(data)
+                self.textures[name] = Texture(data)
 
     def updTexture(self, name, data):
         """Update texture with new data"""

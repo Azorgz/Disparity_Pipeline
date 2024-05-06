@@ -6,12 +6,12 @@ import os
 import sys
 import torch
 from torch import Tensor
-import utils.camviz.camviz as cv
+import utils.classes.Vizualisation.camviz.camviz as cv
 from Networks.Depth_anything.metric_depth.zoedepth.models.builder import build_model
 from Networks.Depth_anything.metric_depth.zoedepth.utils.config import get_config
 from config.Config import configure_parser
 from module.SetupCameras import CameraSetup
-from utils.camviz.camviz.objects.quaternion import pose_from_extrinsics
+from utils.classes.Vizualisation.camviz.camviz.objects.quaternion import pose_from_extrinsics
 from utils.classes import ImageTensor
 
 sys.path.append(os.getcwd() + '/Networks/Depth_anything/metric_depth')
@@ -75,12 +75,12 @@ camera_ir = cv.objects.Camera(K=matrix_ir[0], wh=wh_ir, pose=pose_ir)
 color_mode = 0
 pose_mode = 0
 
-for i in range(1000):
+for i in range(100):
     # Load Data
     start = time.time()
-    im_rgb = R.cameras['RGB'].__getitem__(i)
+    im_rgb, idx = R.cameras['RGB'].random_image()
     im_rgb = im_rgb.RGB('gray')
-    im_ir = R.cameras['IR'].__getitem__(i).RGB('gray')
+    im_ir = R.cameras['IR'].__getitem__(idx).RGB('gray')
     load = time.time() - start
     start = time.time()
     # Parse dictionary information
@@ -113,35 +113,35 @@ for i in range(1000):
     proj_dict = {0: matrix_ir[0], 1: matrix_rgb[0]}
     wh_dict = {0: wh_ir, 1: wh_rgb}
     # Display loop
-    # while draw.input():
-    # If RETURN is pressed, switch color mode
-    if draw.RETURN:
-        color_mode = (color_mode + 1) % len(color_dict)
-        time.sleep(0.1)
-    if draw.SPACE:
-        pose_mode = (pose_mode + 1) % len(pose_dict)
-        draw.scr('wld').viewer.setPose(pose_dict[pose_mode])
-        draw.scr('wld').K = proj_dict[pose_mode]
-        draw.scr('wld').wh = wh_dict[pose_mode]
-        draw.scr('wld').calibrate()
-        time.sleep(0.1)
-    # Clear window
-    draw.clear()
-    # Draw points and colors from buffer
-    draw['wld'].size(1).points('pts', color_dict[color_mode])
-    # Draw image textures on their respective screens
-    proj = ImageTensor(draw.to_image('wld'))
-    im_fus = im_rgb / 2 + (proj.match_shape(im_rgb.shape[:2]).GRAYSCALE().RGB('inferno') / 2).to_numpy(
-        datatype=np.float32)
-    draw.addTexture('fus', im_fus)  # Create texture buffer to store fus image
-    draw['fus'].image('fus')
-    draw['depth'].image('depth')
-    draw_buffers = time.time() - start
-    # Draw camera with texture as image
-    # draw['wld'].object(camera_rgb)
-    # draw['wld'].object(camera_ir)
-    # Update window
-    if time_it:
-        print(
-            f'load data : {round(load, 4)} sec, process depth : {round(depth_pred, 4)} sec, draw buffers : {round(draw_buffers, 4)} sec, ')
-    draw.update(1)
+    while draw.input():
+        # If RETURN is pressed, switch color mode
+        if draw.RETURN:
+            color_mode = (color_mode + 1) % len(color_dict)
+            time.sleep(0.1)
+        if draw.SPACE:
+            pose_mode = (pose_mode + 1) % len(pose_dict)
+            draw.scr('wld').viewer.setPose(pose_dict[pose_mode])
+            draw.scr('wld').K = proj_dict[pose_mode]
+            draw.scr('wld').wh = wh_dict[pose_mode]
+            draw.scr('wld').calibrate()
+            time.sleep(0.1)
+        # Clear window
+        draw.clear()
+        # Draw points and colors from buffer
+        draw['wld'].size(1).points('pts', color_dict[color_mode])
+        # Draw image textures on their respective screens
+        proj = ImageTensor(draw.to_image('wld'))
+        im_fus = im_rgb / 2 + (proj.match_shape(im_rgb.shape[:2]).GRAYSCALE().RGB('inferno') / 2).to_numpy(
+            datatype=np.float32)
+        draw.addTexture('fus', im_fus)  # Create texture buffer to store fus image
+        draw['fus'].image('fus')
+        draw['depth'].image('depth')
+        draw_buffers = time.time() - start
+        # Draw camera with texture as image
+        # draw['wld'].object(camera_rgb)
+        # draw['wld'].object(camera_ir)
+        # Update window
+        if time_it:
+            print(
+                f'load data : {round(load, 4)} sec, process depth : {round(depth_pred, 4)} sec, draw buffers : {round(draw_buffers, 4)} sec, ')
+        draw.update(1)

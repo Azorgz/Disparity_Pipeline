@@ -6,7 +6,7 @@ from types import FrameType
 from typing import cast
 import oyaml as yaml
 import torch
-from module.SetupCameras import CameraSetup
+from utils.classes import CameraSetup
 from utils.misc import path_leaf
 
 
@@ -65,21 +65,26 @@ class Process(OrderedDict):
 
     def init_process(self, pipe) -> None:
         self.isInit = True
-        if len(pipe.setup) > 1:
-            setup = CameraSetup(from_file=pipe.setup[0], device=pipe.device)
-        else:
-            setup = pipe.setup[0]
+        # if len(pipe.setup) > 1:
+        #     setup = CameraSetup(from_file=pipe.setup[0], device=pipe.device)
+        # else:
+        #     [0]
         path_result = pipe.path_output
         if not os.path.exists(path_result):
             os.makedirs(path_result, exist_ok=True)
             os.chmod(path_result, 0o777)
         for Exp, p in self.items():
+            if p[0][0] == 'SETUP':
+                setup = CameraSetup(from_file=p[0][1], device=pipe.device)
+                p.pop(0)
+            else:
+                setup = pipe.setup
+            process = [setup]
             first_save = True
             Exp = pipe.name_experiment if Exp[:3] == 'tbd' else Exp
             path = path_result + f'/{Exp}'
             pred = {}
             res = {'image_reg': [], 'depth_reg': []}
-            process = []
             for idx, instruction in enumerate(p):
                 key, val = instruction[0], instruction[1]
                 if key == 'DISPARITY':
@@ -310,6 +315,12 @@ class Process(OrderedDict):
                         '[pred_depth, image_reg, depth_reg, inputs, occlusion]'
                     option = {'variable_name': p_}
                     proc.append([key, option])
+            elif key == 'SETUP':
+                assert len(p) >= 0, 'The SETUP instruction needs at least 1 positional argument : path to the setup file'
+                assert os.path.exists(os.getcwd() + '/' + p['path']), f'The setup file {p["path"]}'
+                proc.insert(0, [key, os.getcwd() + '/' + p['path']])
+            else:
+                return NotImplemented
         if 'SAVE' not in [k.upper() for k in process.keys()]:
             proc.append(['SAVE', {'variable_name': None}])
         return proc
@@ -444,7 +455,8 @@ class Process(OrderedDict):
 class Experiment(list):
 
     def __init__(self, instructions, path, name=None):
-        super(Experiment, self).__init__(instructions)
+        super(Experiment, self).__init__(instructions[1:])
+        self.setup = instructions[0]
         self.path = path
         if name is None:
             self.name = path_leaf(path)
@@ -473,7 +485,6 @@ class Experiment(list):
             else:
                 summary.update(temp)
         return summary
-
 
 
 if __name__ == '__main__':

@@ -17,31 +17,8 @@ from utils.misc import timeit, count_parameter
 class SuperNetwork(BaseModule):
     Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch'], 'monocular': ['Kenburn', 'DepthAnything']}
     """
-    SuperNetwork class for disparity, depth, and monocular depth estimation.
-
-    This class is designed to handle the preprocessing, network initialization, and inference for disparity, depth, and monocular depth estimation tasks.
-
-    Attributes:
-        - config (Config): The configuration object containing all the necessary parameters for the network initialization and inference.
-        - name_disparity (str): The name of the disparity network.
-        - name_depth (str): The name of the depth network.
-        - name_monocular (str): The name of the monocular depth network.
-        - model_disparity (nn.Module): The initialized disparity network model.
-        - model_depth (nn.Module): The initialized depth network model.
-        - model_monocular (nn.Module): The initialized monocular depth network model.
-        - preprocessing_disparity (Preprocessing): The preprocessing object for disparity inference.
-        - preprocessing_depth (Preprocessing): The preprocessing object for depth inference.
-        - preprocessing_monocular (Preprocessing): The preprocessing object for monocular depth inference.
-
-    Methods:
-        - __init__(self, config: Config): Initializes the SuperNetwork class with the provided configuration object.
-        - __call__(self, sample: dict, task: str = 'depth', intrinsics: dict = None, pose: dict = None, focal: float = 0, **kwargs):
-            Performs the inference for disparity, depth, or monocular depth estimation tasks based on the provided task.
-        - __str__(self): Returns a string representation of the SuperNetwork class, including the names of the initialized networks and their respective checkpoints.
-        - disparity_network_init(self, config: Config): Initializes the disparity network model based on the provided configuration object.
-        - depth_network_init(self, config: Config): Initializes the depth network model based on the provided configuration object.
-        - monocular_network_init(self, config: Config): Initializes the monocular depth network model based on the provided configuration object.
-
+    This class add a layer for the data post-processing & the inputs args according each Network implemented.
+    To Run it, a normal Forward call with 2 images as inputs would do it.
     """
 
     def __init__(self, config: ConfigPipe, *args, **kwargs):  # model, args, name: str, timeit=False):
@@ -199,6 +176,7 @@ class SuperNetwork(BaseModule):
         self.preprocessing_monocular = Preprocessing(config["monocular_network"]["preprocessing"], self.device,
                                                      task='monocular')
 
+
     def __str__(self):
         string = super().__str__()
         string += f'The model "{self.name_disparity}" has been initialized for disparity'
@@ -273,6 +251,10 @@ class SuperNetwork(BaseModule):
                                        pred_bidir_depth=False,
                                        depth_from_argmax=self.args_depth.depth_from_argmax,
                                        task='depth')['flow_preds'][-1]  # [1, H, W]
+            # elif self.name_depth == "KenBurnDepth":
+            #     res = self.model_depth(Tensor(img_ref), Tensor(img_tgt),
+            #                            focal=focal, baseline=torch.abs(pose[0, 0, -1]),
+            #                            pred_bidir=self.pred_bidir)
             else:
                 warnings.warn('This Network is not implemented')
                 return 0

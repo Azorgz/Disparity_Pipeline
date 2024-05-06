@@ -65,13 +65,7 @@ class ConfigPipe(dict):
 
     def config_setup(self, config):
         self["setup"] = {}
-
-        if os.path.isdir(config['path']):
-            self["setup"]['path'] = sorted(glob(config['path'] + '/*.yaml'))
-            self["setup"]['multi'] = True
-        else:
-            self["setup"]['path'] = config['path']
-            self["setup"]['multi'] = False
+        self["setup"]['path'] = config['path']
         self["setup"]['max_depth'] = config['max_depth']
         self["setup"]['min_depth'] = config['min_depth']
 

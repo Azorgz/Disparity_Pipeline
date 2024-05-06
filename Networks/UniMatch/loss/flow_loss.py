@@ -4,8 +4,7 @@ import torch
 def flow_loss_func(flow_preds, flow_gt, valid,
                    gamma=0.9,
                    max_flow=400,
-                   **kwargs,
-                   ):
+                   **kwargs,):
     n_predictions = len(flow_preds)
     flow_loss = 0.0
 

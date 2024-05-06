@@ -24,7 +24,7 @@ def quick_process(idx, script_path):
     else:
         process_dict['Option']["dataset"]["indexes"] = None
     for k in process_dict.keys():
-        if k.upper() != 'OPTION':
+        if k.upper() != 'OPTION' and k.upper() != 'NAME':
             proc = process_dict[k]
             proc['save'] = 'all'
             proc['wrap']['option'].append('return_depth_reg')

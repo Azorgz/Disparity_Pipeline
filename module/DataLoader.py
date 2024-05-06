@@ -4,7 +4,7 @@ from collections import OrderedDict
 import numpy as np
 import yaml
 from torch.utils.data import Dataset, DataLoader
-from module.SetupCameras import CameraSetup
+from utils.classes import CameraSetup
 from utils.classes.Image.Image import ImageTensor
 from utils.manipulation_tools import list_to_dict
 from utils.misc import timeit, name_generator
@@ -155,12 +155,9 @@ class StereoDataSet(Dataset):
 
     def save_conf(self, output_path):
         name = os.path.join(output_path, "dataset.yaml")
-        if self.config['setup']['multi']:
-            files = list_to_dict([s for s in self.samples for _ in range(self.config['setup']['multi'])])
-        else:
-            files = list_to_dict(self.samples)
+        files = list_to_dict(self.samples)
         dataset_conf = OrderedDict({'Number of sample': len(self),
-                                    'Setup': sorted(self.config["setup"]['path']),
+                                    'Setup': self.config["setup"]['path'],
                                     'Files': files})
         with open(name, "w") as file:
             yaml.dump(dataset_conf, file)

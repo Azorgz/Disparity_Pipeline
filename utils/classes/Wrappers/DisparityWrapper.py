@@ -5,10 +5,7 @@ from kornia.geometry import normalize_pixel_coordinates
 from kornia.morphology import closing, dilation
 from torch import Tensor
 import torch.nn.functional as F
-
-from utils.classes import ImageTensor
-from utils.classes.Image.Image import DepthTensor
-from module.SetupCameras import CameraSetup
+from utils.classes import DepthTensor, ImageTensor, CameraSetup
 from utils.image_processing_tools import project_grid_to_image, projector
 
 
@@ -151,7 +148,7 @@ class DisparityWrapper:
             sample = {opp_side: img_dst}
             res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
         if return_depth_reg:
-            disparity_dst = projector(grid, size_im, post_process_depth)
+            disparity_dst = projector(grid, size_im, post_process_depth, grid=True)
             disparity_dst.im_name = images[cam_dst].im_name + '_disp'
             sample = {opp_side: disparity_dst}
             disparity_dst = setup(sample, reverse=True)[cam_dst]

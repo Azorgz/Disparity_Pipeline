@@ -147,7 +147,12 @@ class StereoPairs:
         self._setup = value
 
 
-class CameraSetup():
+class CameraSetup:
+    """
+    A class that manage all the cameras, there relative positions, and the exiting stereo pairs
+    The CameraSetup can be initialized from a yaml file or from a list of cameras. It's used as a collection of all the
+    cameras called by there respective id (that parameter could differ from the camera's name)
+    """
     _cameras = {}
     _cameras_IR = {}
     _cameras_RGB = {}

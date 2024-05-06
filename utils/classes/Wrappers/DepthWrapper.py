@@ -57,10 +57,10 @@ class DepthWrapper:
             if return_depth_reg:
                 depth_reg = projector(cloud, [height, width], post_process=post_process_depth, numpy=True)
                 depth_reg.im_name = image_src.im_name + '_depth'
-                conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
-                conv_upsampling = Sequential(conv_upsampling)
+                # conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
+                # conv_upsampling = Sequential(conv_upsampling)
                 res['depth_reg'] = depth_reg
-                res['depth_reg'][depth_reg == 0] = conv_upsampling(depth_reg)[depth_reg == 0]
+                # res['depth_reg'][depth_reg == 0] = conv_upsampling(depth_reg)[depth_reg == 0]
 
             # normalize points between [-1 / 1]
             points_2d_src_norm: Tensor = normalize_pixel_coordinates(points_2d_src, height, width).to(

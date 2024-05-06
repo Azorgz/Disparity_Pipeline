@@ -117,7 +117,6 @@ class Projector(nn.Module):
         return self._net(x)
 
 
-
 class LinearSplitter(nn.Module):
     def __init__(self, in_features, prev_nbins, split_factor=2, mlp_dim=128, min_depth=1e-3, max_depth=10):
         super().__init__()

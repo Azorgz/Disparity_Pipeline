@@ -35,11 +35,6 @@ x, y, z = 0.127, -0.008, -0.055  # -0.0413
 rx = 0  # math.atan((center_y - y) / d_calib) - math.atan(center_y / d_calib)
 ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
 rz = 0
-# ext = torch.tensor(np.array([[9.99992049e-01, -3.97317796e-03, -3.40122104e-04, 3.14094925e-01],
-#                              [3.97420714e-03, 9.99987357e-01, 3.08070689e-03, -5.06425823e-02],
-#                              [3.27877607e-04, -3.08203411e-03, 9.99995197e-01, 2.15528077e-02],
-#                              [0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00]]))
-# R.update_camera_relative_position('IR', extrinsics=ext)
 R.update_camera_relative_position('IR', x=x, y=y, z=z, ry=ry, rx=rx, rz=rz)
 
 x, y, z = 0.127 + 0.214, 0, 0
@@ -48,7 +43,7 @@ ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
 rz = 0
 R.update_camera_relative_position('RGB2', x=x, y=y, z=z, ry=ry, rx=rx, rz=rz)
 
-x, y, z = 0.127 + 0.214 + 0.127, 0, -0.0413
+x, y, z = 0.127 + 0.214 + 0.127, -0.008, -0.055
 rx = 0  # math.atan((center_y - y) / d_calib) - math.atan(center_y / d_calib)
 ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
 rz = 0

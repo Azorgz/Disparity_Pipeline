@@ -1,3 +1,5 @@
+Name: -- Test Process --
+
 Option:
   name_experiment: Test
   setup: # Paths to the config file of the pre-calibrated camera's setup
@@ -5,6 +7,7 @@ Option:
   dataset:
     number_of_sample: 25
     shuffle: True
+  realtime : True
   monocular_depth_network:
     name: depthanything
   depth_network:

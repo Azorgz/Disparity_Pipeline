@@ -1,7 +1,6 @@
-from utils.classes import ImageTensor
+from utils.classes import ImageTensor, CameraSetup
 from utils.classes.Wrappers.DepthWrapper import DepthWrapper
 from utils.classes.Wrappers.DisparityWrapper import DisparityWrapper
-from module.SetupCameras import CameraSetup
 from kornia.geometry import relative_transformation
 import warnings
 

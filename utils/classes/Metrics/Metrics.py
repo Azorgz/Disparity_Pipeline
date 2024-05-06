@@ -4,6 +4,7 @@ from torchmetrics.image.ssim import MultiScaleStructuralSimilarityIndexMeasure a
 from torchmetrics import PeakSignalNoiseRatio as PSNR
 from torchmetrics.image.ssim import StructuralSimilarityIndexMeasure as SSIM
 import torch.nn.functional as F
+
 ######################### METRIC ##############################################
 from utils.gradient_tools import grad_tensor
 
@@ -43,15 +44,15 @@ class BaseMetric_Tensor:
             self.image_test = im2.GRAYSCALE()
         size = self._determine_size_from_ratio()
         self.image_true = F.interpolate(self.image_true, size=size,
-                                         mode='bilinear',
-                                         align_corners=True)
+                                        mode='bilinear',
+                                        align_corners=True)
         self.image_test = F.interpolate(self.image_test, size=size,
-                                         mode='bilinear',
-                                         align_corners=True)
+                                        mode='bilinear',
+                                        align_corners=True)
         if mask is not None:
             self.mask = F.interpolate(mask.to(torch.float32), size=size,
-                                       mode='bilinear',
-                                       align_corners=True).to(torch.bool)
+                                      mode='bilinear',
+                                      align_corners=True).to(torch.bool)
         self.value = 0
 
     def _determine_size_from_ratio(self):
@@ -104,7 +105,7 @@ class Metric_ssim_tensor(BaseMetric_Tensor):
             self.value = image[:, :, self.mask[0, 0, :, :]].mean()
             self.ssim.reset()
         del temp
-            # self.value = self.ssim(self.image_test * mask, self.image_true * mask)
+        # self.value = self.ssim(self.image_test * mask, self.image_true * mask)
         if return_image:
             return image.GRAYSCALE().RGB('gray')
         else:

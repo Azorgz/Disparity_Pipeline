@@ -31,8 +31,7 @@ from zoedepth.models.base_models.midas import MidasCore
 from zoedepth.models.base_models.depth_anything import DepthAnythingCore
 from zoedepth.models.layers.attractor import AttractorLayer, AttractorLayerUnnormed
 from zoedepth.models.layers.dist_layers import ConditionalLogBinomial
-from zoedepth.models.layers.localbins_layers import (Projector, SeedBinRegressor,
-                                            SeedBinRegressorUnnormed)
+from zoedepth.models.layers.localbins_layers import Projector, SeedBinRegressor, SeedBinRegressorUnnormed
 from zoedepth.models.model_io import load_state_from_resource
 
 

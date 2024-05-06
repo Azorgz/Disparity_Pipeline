@@ -45,15 +45,26 @@ class drawBuffer:
                 self.addBuffer(name[i], data[i] if is_list(data) else data, dtype, gltype)
         # Otherwise, create a single buffer
         else:
-            if n is not None:
-                if is_tuple(n):
-                    for i in range(n[0]):
-                        for j in range(n[1]):
-                            self.buffers['%s%d%d' % (name, i, j)] = Buffer(data, dtype, gltype)
-                elif is_int(n):
-                    for i in range(n):
-                        self.buffers['%s%d' % (name, i)] = Buffer(data, dtype, gltype)
-            self.buffers[name] = Buffer(data, dtype, gltype)
+            if name in self.buffers:
+                if n is not None:
+                    if is_tuple(n):
+                        for i in range(n[0]):
+                            for j in range(n[1]):
+                                self.updBufferf('%s%d%d' % (name, i, j), data)
+                    elif is_int(n):
+                        for i in range(n):
+                            self.updBufferf('%s%d' % (name, i), data)
+                self.updBufferf(name, data)
+            else:
+                if n is not None:
+                    if is_tuple(n):
+                        for i in range(n[0]):
+                            for j in range(n[1]):
+                                self.buffers['%s%d%d' % (name, i, j)] = Buffer(data, dtype, gltype)
+                    elif is_int(n):
+                        for i in range(n):
+                            self.buffers['%s%d' % (name, i)] = Buffer(data, dtype, gltype)
+                self.buffers[name] = Buffer(data, dtype, gltype)
 
     def addBufferf(self, name, data=0):
         """Create a buffer with float32 values (2D or 3D is determined from data)"""

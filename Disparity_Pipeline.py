@@ -5,18 +5,17 @@ import torch
 from tqdm import tqdm
 # Config
 from config.Config import ConfigPipe
+# module
 from module.DataLoader import StereoDataLoader
 from module.ImageSaver import ImageSaver
 from module.ImageWrapper import ImageWrapper
-# from module.Validation import Validation
 from module.Process import Process
-from module.SetupCameras import CameraSetup
-# module
 from module.SuperNetwork import SuperNetwork
 from module.Validation import Validation
 from utils.manipulation_tools import merge_dict
 # Utils
-from utils.misc import time2str, update_name_tree  # , form_cloud_data
+from utils.misc import time2str, update_name_tree
+from utils.classes import CameraSetup
 
 
 # Networks
@@ -49,20 +48,12 @@ class Pipe:
         # The different modules of the Pipe are initialized ###############
         self.modules = {}
         self._init_setup_()
-        if self.config["setup"]['multi'] == 0:
-            setup = self.setup[0]
-        else:
-            setup = CameraSetup(from_file=self.setup[0], device=self.device)
-        self._init_dataloader_(setup)
+        self._init_dataloader_()
         self._init_network_()
-        self._init_wrapper_(setup, verbose=False)
+        self._init_wrapper_(verbose=False)
         self._init_saver_(verbose=False)
         self._init_validation_()
-
-        # self._init_pointsCloud_()
         # self.time_consistency_block = Time_consistency_block(config.time_consistency_block)
-        # self.post_processing = Post_processing(config.Post_processing)
-        # self.reconstruction_module = self._initialize_reconstruction_(config)
 
     @torch.no_grad()
     def run(self, process=None):
@@ -72,31 +63,28 @@ class Pipe:
                 print(process)
             for name_experiment, experiment in process.items():
                 self.save_experiment(experiment)
-                with tqdm(total=len(self.setup) * len(self.dataloader),
+                with tqdm(total=len(self.dataloader),
                           desc=f"Nombre d'itérations for {name_experiment}: ", leave=True, position=0) as bar:
                     name = None
-                    for i, s in enumerate(self.setup):
-                        if self.config["setup"]['multi']:
-                            s = CameraSetup(from_file=s, device=self.device,
-                                            max_depth=self.config["setup"]['max_depth'],
-                                            min_depth=self.config["setup"]['min_depth'])
-                            self._init_dataloader_(s)
-                            self.dataloader.camera_used = process.camera_used
-                            self._init_wrapper_(s, verbose=False)
-                        for idx, sample in enumerate(self.dataloader):
-                            update_name_tree(sample, s.name)
-                            experiment(sample, setup=s, wrapper=self.wrapper)
-                            bar.update(1)
-                        if self.timeit and i == 0:
-                            self.save_timers(experiment, name, replace=True if i > 0 else False)
-                            self.reset_timers()
-                        if self.save_inputs and i == 0:
-                            self.dataloader.dataset.save_conf(experiment.path)
-
-                        if i == len(self.setup) - 1:
-                            self.validation.statistic()
-                            self.validation.save(experiment.path)
-                            self.validation.reset()
+                    if experiment.setup is not self.setup:
+                        self._init_dataloader_(experiment.setup)
+                        self._init_wrapper_(experiment.setup, verbose=False)
+                    self.dataloader.camera_used = process.camera_used
+                    for idx, sample in enumerate(self.dataloader):
+                        update_name_tree(sample, experiment.setup.name)
+                        experiment(sample, setup=experiment.setup, wrapper=self.wrapper)
+                        bar.update(1)
+                if self.timeit:
+                    self.save_timers(experiment, name)
+                    self.reset_timers()
+                if self.save_inputs:
+                    self.dataloader.dataset.save_conf(experiment.path)
+                self.validation.statistic()
+                self.validation.save(experiment.path)
+                self.validation.reset()
+                if experiment.setup is not self.setup:
+                    self._init_dataloader_(self.setup)
+                    self._init_wrapper_(self.setup, verbose=False)
 
         else:
             for idx, sample in tqdm(enumerate(self.dataloader),
@@ -196,20 +184,13 @@ class Pipe:
 
     @torch.no_grad()
     def _init_setup_(self):
-        assert self.config["setup"]['path'] is not None
-        if self.config["setup"]['multi']:
-            self.setup = [p for p in tqdm(sorted(self.config["setup"]['path']),
-                                          total=len(self.config["setup"]['path']),
-                                          desc=f"Configuration of the different Setup")]
-            self.config["setup"]['multi'] = len(self.setup)
-        else:
-            self.setup = [CameraSetup(from_file=self.config["setup"]['path'], device=self.device,
-                                      max_depth=self.config["setup"]['max_depth'],
-                                      min_depth=self.config["setup"]['min_depth'])]
-            self.config["setup"]['multi'] = 0
+        self.setup = CameraSetup(from_file=self.config["setup"]['path'], device=self.device,
+                                 max_depth=self.config["setup"]['max_depth'],
+                                 min_depth=self.config["setup"]['min_depth'])
 
     @torch.no_grad()
-    def _init_dataloader_(self, setup):
+    def _init_dataloader_(self, setup: CameraSetup = None):
+        setup = self.setup if setup is None else setup
         self.dataloader = StereoDataLoader(setup, self.config)
         self.modules['dataloader'] = self.dataloader
 
@@ -219,7 +200,8 @@ class Pipe:
         self.modules['network'] = self.network
 
     @torch.no_grad()
-    def _init_wrapper_(self, setup, *args, **kwargs):
+    def _init_wrapper_(self, *args, setup: CameraSetup = None, **kwargs):
+        setup = self.setup if setup is None else setup
         self.wrapper = ImageWrapper(self.config, setup, *args, **kwargs)
         self.modules['wrapper'] = self.wrapper
 
