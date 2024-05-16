@@ -23,7 +23,7 @@ monocular_depth:
   wrap:
     cameras: [ IR, RGB ]
     method: depth
-    option: [ [ ] ]
+    option: [ ]
   valid: [ IR, RGB ]
   save: [ pred_depth, image_reg ]
   #, depth_reg, occlusion]
@@ -35,7 +35,7 @@ monocular_disp:
   wrap:
     cameras: [ IR, RGB ]
     method: disparity
-    option: [ [ ] ]
+    option: [ ]
   valid: [ IR, RGB ]
   save: [ pred_depth, image_reg ]
 #

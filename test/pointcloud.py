@@ -83,7 +83,7 @@ for i in range(100):
     im_ir = R.cameras['IR'].__getitem__(idx).RGB('gray')
     load = time.time() - start
     start = time.time()
-    # Parse dictionary information
+
     depth = F.interpolate(NN(Tensor(im_ir), focal=matrix_ir[0, 0, 0])['metric_depth'].clip(0, 30),
                           scaled(scale, im=im_ir)).squeeze().detach().cpu().numpy()
     depth_pred = time.time() - start

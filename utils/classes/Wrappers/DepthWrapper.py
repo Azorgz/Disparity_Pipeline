@@ -1,13 +1,10 @@
-import time
-
 import torch
 import torch.nn.functional as F
 from kornia.geometry import transform_points, project_points, normalize_pixel_coordinates, depth_to_3d_v2
 from torch import Tensor
 from torch.nn import MaxPool2d, Sequential
-
 from utils.classes import ImageTensor, DepthTensor
-from utils.image_processing_tools import project_cloud_to_image, project_cloud_to_image_np, projector
+from .utils import projector
 
 
 class DepthWrapper:
@@ -36,7 +33,9 @@ class DepthWrapper:
         Return:
             the warped tensor in the source frame with shape :math:`(B,3,H,W)`.
         """
+
         if not reverse_wrap:
+            upsample = kwargs['upsample'] if 'upsample' in kwargs else 1
             res = {}
             # kernel = torch.ones(3, 3).to(self.device)
             # depth_dst = dilation(depth, kernel)
@@ -55,26 +54,24 @@ class DepthWrapper:
             height, width = image_src.shape[-2:]
 
             if return_depth_reg:
-                depth_reg = projector(cloud, [height, width], post_process=post_process_depth, numpy=True)
+                depth_reg = projector(cloud, [height, width],
+                                      post_process=post_process_depth,
+                                      numpy=True,
+                                      upsample=upsample)
                 depth_reg.im_name = image_src.im_name + '_depth'
-                # conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
-                # conv_upsampling = Sequential(conv_upsampling)
+                conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
+                conv_upsampling = Sequential(conv_upsampling)
                 res['depth_reg'] = depth_reg
-                # res['depth_reg'][depth_reg == 0] = conv_upsampling(depth_reg)[depth_reg == 0]
+                res['depth_reg'][depth_reg == 0] = conv_upsampling(depth_reg)[depth_reg == 0]
 
+            if return_occlusion:
+                res['occlusion'] = self.find_occlusion(cloud, [height, width])
+                res['occlusion'].im_name = image_src.im_name + '_occlusion'
             # normalize points between [-1 / 1]
             points_2d_src_norm: Tensor = normalize_pixel_coordinates(points_2d_src, height, width).to(
                 image_src.dtype)  # BxHxWx2
             grid = Tensor(points_2d_src_norm)
-            if return_occlusion:
-                res['image_reg'], res['occlusion'] = projector(cloud, [height, width],
-                                                               post_process=post_process_depth,
-                                                               numpy=True,
-                                                               return_occlusion=True)
-                res['occlusion'] = self.find_occlusion(cloud, [height, width])
-                res['occlusion'].im_name = image_src.im_name + '_occlusion'
-            else:
-                res['image_reg'] = F.grid_sample(image_src, grid, align_corners=True)
+            res['image_reg'] = F.grid_sample(image_src, grid, align_corners=True)
             return res
         else:
             return self._reverse_call(image_src, image_dst, depth, matrix_src, matrix_dst, torch.inverse(src_trans_dst),
@@ -104,6 +101,7 @@ class DepthWrapper:
         Return:
             the warped tensor in the source frame with shape :math:`(B,3,H,W)`.
         """
+        upsample = kwargs['upsample'] if 'upsample' in kwargs else 1
         res = {}
         # kernel = torch.ones(3, 3).to(self.device)
         # depth_src = dilation(depth, kernel)
@@ -120,7 +118,10 @@ class DepthWrapper:
         height, width = image_dst.shape[-2:]
 
         if return_depth_reg:
-            depth_reg = projector(cloud, [height, width], post_process=3, numpy=True)
+            depth_reg = projector(cloud, [height, width],
+                                  post_process=3,
+                                  numpy=True,
+                                  upsample=1)
             depth_reg.im_name = image_dst.im_name + '_depth'
             conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
             conv_upsampling = Sequential(conv_upsampling)
@@ -132,12 +133,14 @@ class DepthWrapper:
                                                            post_process=post_process_image,
                                                            image=image_src,
                                                            return_occlusion=True,
-                                                           numpy=True)
+                                                           numpy=True,
+                                                           upsample=upsample)
             res['occlusion'].im_name = image_src.im_name + '_occlusion'
         else:
             res['image_reg'] = projector(cloud, [height, width],
                                          post_process=post_process_image,
-                                         image=image_src)
+                                         image=image_src,
+                                         upsample=2)
         return res
 
     def find_occlusion(self, cloud, image_size):

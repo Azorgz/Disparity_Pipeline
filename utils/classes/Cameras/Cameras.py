@@ -4,15 +4,19 @@ import warnings
 from pathlib import Path
 import numpy as np
 import torch
-from kornia.geometry import PinholeCamera, axis_angle_to_rotation_matrix
-from torch import Tensor
+from kornia.geometry import PinholeCamera, axis_angle_to_rotation_matrix, transform_points, depth_to_3d_v2
+from torch import Tensor, nn
 import inspect
 from types import FrameType
 from typing import cast, Union
+
+from torch.nn import MaxPool2d
+
 from utils.misc import print_tuple
-from utils.classes.Image.Image import ImageTensor
+from utils.classes import ImageTensor, DepthTensor
 from glob import glob
 import imagesize
+import torch.nn.functional as F
 
 ext_available = ['/*.png', '/*.jpg', '/*.jpeg', '/*.tif', '/*.tiff']
 
@@ -245,13 +249,9 @@ class BaseCamera(PinholeCamera):
             self.is_positioned = False
 
     def update_setup(self, camera_ref, cameras) -> None:
-        """Only settable by the _add_camera_,the _reset_ and _del_camera_ method"""
-        # Ref: https://stackoverflow.com/a/57712700/
-        name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
-        if name == '_add_camera_' or name == '_del_camera_' or name == '_reset_':
-            self.setup = cameras
-            self.is_ref = self.id == camera_ref
-            self.is_positioned = True if self.is_ref else self.is_positioned
+        self.setup = cameras
+        self.is_ref = self.id == camera_ref
+        self.is_positioned = True if self.is_ref else self.is_positioned
 
     def update_id(self, idx) -> None:
         setattr(self, 'id', f'{self.id}_{idx}')
@@ -296,6 +296,80 @@ class BaseCamera(PinholeCamera):
         index = torch.randint(0, len(self.files), [1])
         im = self.__getitem__(index, autopad=autopad)
         return im, index
+
+    def depth_to_3D(self, depth: DepthTensor, image_texture: Tensor = None, euclidian_depth=False, **kwargs):
+        # Project the points in a 3D space according the camera intrinsics
+        points_3D: Tensor = depth_to_3d_v2(depth[:, 0, :, :], self.camera_matrix[0], normalize_points=euclidian_depth)
+        # Camera frame to world frame
+        points_3D = transform_points(self.extrinsics.inverse()[:, None], points_3D.to(torch.float64))
+        # If texture is given, the final point-cloud will be of shape (b x h x w x 6)
+        if image_texture is not None:
+            assert depth.shape[-2:] == image_texture.shape[-2:]
+            points_3D = torch.stack([points_3D, image_texture.permute([0, 2, 3, 1])], dim=3)
+        return points_3D
+
+    def project_world_to_image(self, pointcloud: Tensor, image=None, level=1,
+                               from_world_frame=True) -> ImageTensor or DepthTensor:
+        """
+        :param from_world_frame: If True, project first the Pointcloud within the Camera frame
+        :param pointcloud: 3D point cloud in the World frame coordinate system
+        :param image: image to texture the cloud with. Has to be the same size as the cloud. If None a depth image is printed
+        :param level: projection gaussian pyramid level
+        :return: ImageTensor
+        """
+        if from_world_frame:
+            pointcloud = transform_points(self.extrinsics[:, None], pointcloud.to(torch.float64))
+        cloud_in_camera_frame = torch.concatenate([self.project(pointcloud), pointcloud[:, :, :, -1:]], dim=3)
+        if image is not None:
+            assert cloud_in_camera_frame.shape[1:3] == image.shape[-2:]
+            b, cha, h, w = image.shape
+            image_flatten = image.reshape([b, cha, w * h])  # shape b x c x H*W
+            projectedImage = ImageTensor(torch.zeros([b, cha, self.sensor_resolution[1],
+                                                      self.sensor_resolution[0]])).to(dtype=pointcloud.dtype)
+            sample = image_flatten.to(pointcloud.dtype)
+        else:
+            cha = 1
+            b = pointcloud.shape[0]
+            projectedImage = DepthTensor(torch.zeros([b, cha, self.sensor_resolution[1],
+                                                      self.sensor_resolution[0]])).to(dtype=pointcloud.dtype)
+        # Put all the point into a H*W x 3 vector
+        c = cloud_in_camera_frame.reshape((cloud_in_camera_frame.shape[0],
+                                           cloud_in_camera_frame.shape[1] *
+                                           cloud_in_camera_frame.shape[2], 3))  # B x H*W x 3
+        # Sort the point by decreasing depth
+        indexes = torch.argsort(c[..., -1], descending=True)
+        c_ = c.clone()
+        c_sorted = c_.clone()
+        for j in range(b):
+            c_sorted[j, ...] = c_[j, indexes[j], :]
+        if image is not None:
+            for j in range(b):
+                sample[j] = sample[j, :, indexes[j]]
+        else:
+            sample = c_sorted[..., 2:]
+        for i in reversed(range(level)):
+            im_size = self.sensor_resolution[1] // (2 ** i), self.sensor_resolution[0] // (2 ** i)
+            c_ = c_sorted.clone()
+            # Normalize the point cloud over the sensor resolution
+            c_[:, :, 0] /= 2 ** i
+            c_[:, :, 1] /= 2 ** i
+
+            # Transform the landing positions in accurate pixels
+            c_x = torch.round(c_[..., 0:1]).to(torch.int32)
+            c_y = torch.round(c_[..., 1:2]).to(torch.int32)
+            # Remove the point landing outside the image
+            mask_out = ((c_x < 0) + (c_x >= im_size[1]) +
+                        (c_y < 0) + (c_y >= im_size[0])) != 0
+            c_x[mask_out] = 0
+            c_y[mask_out] = 0
+            # rays = np.concatenate([c_x, c_y], axis=2)
+            image_at_level = torch.zeros([b, cha, im_size[0], im_size[1]], dtype=pointcloud.dtype).to(pointcloud.device)
+            image_at_level[:, :, c_y.squeeze(), c_x.squeeze()] = sample
+            temp = F.interpolate(image_at_level, projectedImage.shape[-2:])
+            projectedImage[temp > 0] = temp[temp > 0]
+        conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
+        projectedImage[projectedImage == 0] = conv_upsampling(projectedImage)[projectedImage == 0]
+        return projectedImage
 
     @property
     def center(self):
@@ -343,7 +417,7 @@ class BaseCamera(PinholeCamera):
 
     @property
     def pixel_FOV(self):
-        return (self.VFOV / self.sensor_resolution[0], self.HFOV / self.sensor_resolution[1])
+        return self.VFOV / self.sensor_resolution[0], self.HFOV / self.sensor_resolution[1]
 
     @property
     def name(self):

@@ -221,7 +221,6 @@ class ImageTensor(Tensor):
                 channel_pos += 1
         return temp, im_type, cmap, channel_pos
 
-
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
         # print(f"Calling '{func.__name__}' for Subclass")
@@ -257,7 +256,7 @@ class ImageTensor(Tensor):
             if im.shape != self.shape:
                 images[i] = im.match_shape(self)
         new = torch.concatenate([self, *images], dim=0)
-        new.pass_attribute(self)
+        new.pass_attr(self)
         new.batched = True
         return new
 
@@ -673,11 +672,13 @@ class DepthTensor(ImageTensor):
     @staticmethod
     def __new__(cls, im: Union[ImageTensor, Tensor], device: torch.device = None):
         inp = im.squeeze()
-        assert len(inp.shape) == 2
+        assert len(inp.shape) == 2 or len(inp.shape) == 3
         max_value = inp.max()
         min_value = inp.min()
         inp_ = (inp - min_value) / (max_value - min_value)
         inp_ = super().__new__(cls, inp_, device=device)
+        if len(inp.shape) == 3:
+            inp_ = inp_.unsqueeze(1)
         inp_._max_value = max_value
         inp_._min_value = min_value
         inp_._ori_shape = inp_.shape[-2:]
@@ -716,7 +717,7 @@ class DepthTensor(ImageTensor):
                 for center in point.squeeze():
                     center = center.cpu().long().numpy()
                     im_display = cv.circle(im_display.opencv(), center, 5, (0, 255, 0), -1)[..., [2, 1, 0]]
-            ax[0, i].imshow(im_display.cpu().numpy(), cmap=cmap)
+            ax[0, i].imshow(im_display.detach().cpu().numpy(), cmap=cmap)
             if roi is not None:
                 for r, color in zip(roi, ['r', 'g', 'b']):
                     rect = patches.Rectangle((r[1], r[0]), r[3] - r[1], r[2] - r[0]

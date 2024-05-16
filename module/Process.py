@@ -4,6 +4,8 @@ import os
 from collections import OrderedDict
 from types import FrameType
 from typing import cast
+
+import numpy as np
 import oyaml as yaml
 import torch
 from utils.classes import CameraSetup
@@ -34,7 +36,7 @@ class Process(OrderedDict):
 
     def __str__(self):
         if self.isInit:
-            string = f'\n############# Process {self.name} ###########'
+            string = f'\n############### {self.name} #################'
             for experiment in self.values():
                 string += f'{experiment.__str__()}'
         else:
@@ -298,8 +300,11 @@ class Process(OrderedDict):
                           'depth': True if p['method'] == 'depth' else False,
                           'return_depth_reg': False, 'return_occlusion': False}
                 if 'option' in p:
-                    option['return_depth_reg'] = True if 'return_depth_reg' in p['option'] else False
-                    option['return_occlusion'] = True if 'return_occlusion' in p['option'] else False
+                    opt = np.array(p['option'])
+                    option['return_depth_reg'] = True if 'return_depth_reg' in opt else False
+                    option['return_occlusion'] = True if 'return_occlusion' in opt else False
+                    opt_upsample = opt[["upsample" in p_ for p_ in opt]]
+                    option['upsample'] = eval(opt_upsample[0].split('=')[-1]) if len(opt_upsample) >= 1 else 1
                 proc.append([key, option])
             elif key == 'VALID':
                 assert len(p) == 2, 'The VALID instruction needs 2 positional argument : cam_reg, cam_ref'
@@ -395,7 +400,8 @@ class Process(OrderedDict):
                              depth=depth,
                              return_depth_reg=return_depth_reg,
                              return_occlusion=return_occlusion,
-                             reverse_wrap=reverse_wrap)
+                             reverse_wrap=reverse_wrap,
+                             **(kwargs0 | kwargs))
 
             cam_to_cam = f'{cam_src}_to_{cam_dst}'
             if return_depth_reg:

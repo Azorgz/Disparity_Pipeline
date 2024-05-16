@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from utils.classes import ImageTensor, DepthTensor
 from utils.classes.Metrics import Metric_nec_tensor, Metric_ssim_tensor
-from .VideoGenerator import VideoGenerator
+from utils.classes.Vizualisation.VideoGenerator import VideoGenerator
 from utils.gradient_tools import grad_image
 
 
@@ -407,6 +407,6 @@ if __name__ == '__main__':
     pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/results/'
     perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/results/'
     p = pro if 'godeta' in os.getcwd() else perso
-    path = p + "/methods_comparison_night/"
+    path = p + "/Dataset_Lynred/"
     # path = p + "/Test/Disparity-Depth_night"
     Visualizer(path, search_exp=True).run()

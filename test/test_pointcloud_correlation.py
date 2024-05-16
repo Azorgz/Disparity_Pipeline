@@ -1,8 +1,6 @@
 import os
 import sys
 import time
-import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from kornia.geometry import depth_to_3d, depth_to_3d_v2
@@ -13,7 +11,7 @@ from torch import Tensor
 from Networks.Depth_anything.metric_depth.zoedepth.models.builder import build_model
 from Networks.Depth_anything.metric_depth.zoedepth.utils.config import get_config
 from config.Config import configure_parser
-from module.SetupCameras import CameraSetup
+from utils.classes import CameraSetup
 import open3d as o3d
 
 from utils.classes.Image import DepthTensor

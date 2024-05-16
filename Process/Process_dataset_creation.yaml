@@ -1,35 +1,39 @@
+Name: -- Dataset Creation --
+
 Option:
-  name_experiment: DatasetCreation
-  setup: # Paths to the config file of the pre-calibrated camera's setup
-    path: Setup_Camera.yaml
+  name_experiment: Dataset_Lynred
+  setup:
+    path: Setup_Camera/Lynred_day.yaml
   dataset:
-    number_of_sample: 0
-    shuffle: False
+    number_of_sample: 10
+    shuffle: True
+  monocular_depth_network:
+    name: depthanything
   depth_network:
     name: unimatch
   disparity_network:
     name: unimatch
 
+#Lynred_day:
+#  setup:
+#    path: Setup_Camera/Lynred_day.yaml
+#  disparity:
+#    cameras: [RGB, RGB2]
+#    option: [inference_size: [960, 1280]]
+#  wrap:
+#    cameras: [IR, RGB]
+#    method: depth
+#    option: [return_depth_reg, return_occlusion, []]
+#  save: [pred_depth, image_reg, depth_reg, occlusion]
 
-Lynred_vis:
-  disparity:
-    cameras: [RGB, RGB2]
-    option: []
+Lynred_night:
+  setup:
+    path: Setup_Camera/Lynred_night.yaml
+  monocular:
+    cameras: [ IR ]
+    option: [ inference_size: [ 960, 1280 ] ]
   wrap:
     cameras: [IR, RGB]
     method: depth
-    source: pred_disp
-    option: [return_depth_reg, return_occlusion, []]
-  save: [pred_disp, image_reg, disp_reg, occlusion]
-
-
-Lynred_ir:
-  disparity:
-    cameras: [IR, IR2]
-    option: []
-  wrap:
-    cameras: [RGB2, IR]
-    method: depth
-    source: pred_disp
-    option: [return_depth_reg, return_occlusion, []]
-  save: [pred_disp, image_reg, disp_reg, occlusion]
+    option: [ return_depth_reg, return_occlusion, upsample=1 ]
+  save: [ pred_depth, image_reg, depth_reg, occlusion ]
