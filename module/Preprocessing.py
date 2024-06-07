@@ -70,7 +70,7 @@ class Preprocessing:
                                                      post_process=None)
         else:
             for key, im in sample.items():
-                if im.modality == 'IR':
-                    sample[key] = im.GRAYSCALE()
+                if im.modality == 'Any':
+                    sample[key] = im.GRAY()
             sample = self.postprocessing(sample, **kwargs)
         return sample

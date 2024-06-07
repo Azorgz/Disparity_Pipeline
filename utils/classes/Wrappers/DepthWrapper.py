@@ -123,7 +123,6 @@ class DepthWrapper:
                                   post_process=3,
                                   numpy=True,
                                   upsample=1)
-            depth_reg.show()
             depth_reg.name = image_dst.name + '_depth'
             conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
             conv_upsampling = Sequential(conv_upsampling)

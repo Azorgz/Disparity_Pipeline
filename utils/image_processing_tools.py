@@ -1,16 +1,12 @@
 import cv2 as cv
 import kornia
-import numba
 import numpy as np
 import torch
 from kornia.filters import MedianBlur
 from kornia.morphology import dilation, erosion, closing
 import torch.nn.functional as F
 from torch import Tensor
-
 from utils.classes.Image.Image import DepthTensor, ImageTensor
-from numba import njit, jit
-import numba.types as nb_t
 
 
 # from classes.Image import ImageCustom

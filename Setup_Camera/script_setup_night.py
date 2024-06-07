@@ -18,7 +18,6 @@ path_IR2 = p + 'Night/slave/infrared_corrected'
 
 IR = IRCamera(path=path_IR, device=torch.device('cuda'), id='IR', name='SmartIR640', f=14, pixel_size=16.4,
               aperture=1.2)
-
 IR2 = IRCamera(path=path_IR2, device=torch.device('cuda'), id='IR2', name='subIR', f=14, pixel_size=(16.4, 16.4),
                aperture=1.2)
 RGB = RGBCamera(path=path_RGB, device=torch.device('cuda'), id='RGB', name='mainRGB', f=6, pixel_size=3.45,

@@ -1,0 +1,34 @@
+name: RegistrationPipeline
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.11.9
+  - scipy
+  - hdf5
+  - h5py
+  - pillow
+  - pip
+  - pip:
+      - setuptools
+      - matplotlib
+      - numpy
+      - opencv-python
+      - torch
+      - torchaudio
+      - torchvision
+      - torchmetrics
+      - tqdm
+      - tensorboard
+      - tensorboard-plugin-wit
+      - tensorboard-data-server
+      - huggingface-hub
+      - timm
+      - wandb
+      - urllib3
+      - oyaml
+      - kornia
+      - imagesize
+      - ultralytics
+      - git+https://github.com/openai/CLIP.git

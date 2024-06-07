@@ -3,9 +3,9 @@ Name: -- Test Process --
 Option:
   name_experiment: Test
   setup: # Paths to the config file of the pre-calibrated camera's setup
-    path: Setup_Camera/Lynred_local.yaml
+    path: Setup_Camera/Lynred_day.yaml
   dataset:
-    number_of_sample: 5
+    number_of_sample: 50
     shuffle: True
   realtime : True
   monocular_depth_network:
@@ -39,51 +39,40 @@ monocular_disp:
   valid: [ IR, RGB ]
   save: [ pred_depth, image_reg ]
 #
-#Disparity-Disparity:
-#  disparity:
-#    cameras: [RGB, RGB2]
-#    option: [inference_size: [480, 640]]
-#  wrap:
-#    cameras: [IR, RGB]
-#    method: disparity
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [IR, RGB]
-#  save: [pred_disp, image_reg, disp_reg, occlusion]
-#
-#Disparity-Depth:
-#  disparity:
-#    cameras: [ IR, IR2 ]
-#    option: [ ]
-#  wrap:
-#    cameras: [ IR, RGB ]
-#    method: depth
-#    option: [ return_depth_reg, return_occlusion, [ ] ]
-#  valid: [ IR, RGB ]
-#  save: [ pred_depth, image_reg, depth_reg, occlusion ]
-#
+Disparity-Disparity:
+  disparity:
+    cameras: [RGB, RGB2]
+    option: [inference_size: [480, 640]]
+  wrap:
+    cameras: [IR, RGB]
+    method: disparity
+    option: [return_depth_reg, return_occlusion]
+  valid: [IR, RGB]
+  save: [pred_disp, image_reg, disp_reg, occlusion]
 
 
-#Depth-Disparity:
-#  depth:
-#    cameras: [RGB, RGB2]
-#    option: []
-#  wrap:
-#    cameras: [IR, RGB]
-#    method: disparity
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [IR, RGB]
-#  save: [pred_depth, image_reg, depth_reg, occlusion]
-#
+Disparity-Depth:
+  disparity:
+    cameras: [ IR, IR2 ]
+    option: [ ]
+  wrap:
+    cameras: [ IR, RGB ]
+    method: depth
+    option: [ return_depth_reg, return_occlusion]
+  valid: [ IR, RGB ]
+  save: [ pred_depth, image_reg, depth_reg, occlusion ]
 
-#Disparity-Depth:
-#  disparity:
-#    cameras: [RGB, RGB2]
-#    option: [inference_size: [480, 640]]
-#  wrap:
-#    cameras: [IR, RGB]
-#    method: depth
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [IR, RGB]
-#  save: [pred_disp, image_reg, disp_reg, occlusion]
+
+Depth-Disparity:
+  depth:
+    cameras: [RGB, RGB2]
+    option: []
+  wrap:
+    cameras: [IR, RGB]
+    method: disparity
+    option: [return_depth_reg, return_occlusion]
+  valid: [IR, RGB]
+  save: [pred_depth, image_reg, depth_reg, occlusion]
+
 #
 

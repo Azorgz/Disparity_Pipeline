@@ -7,7 +7,6 @@ import numpy as np
 import torchvision.utils as vutils
 import cv2
 import yaml
-from matplotlib.cm import get_cmap
 import matplotlib as mpl
 import matplotlib.cm as cm
 import cv2 as cv

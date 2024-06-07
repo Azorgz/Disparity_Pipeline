@@ -196,9 +196,7 @@ class ResizeDisp(object):
             pass
         elif h != size[0] or w != size[1]:
             # resize back
-            disp = F1.interpolate(disp, size=size,
-                                  mode='bilinear',
-                                  align_corners=True)  # [1, H, W]
+            disp = disp.resize(size)  # [1, H, W]
             return disp * size[1] / float(w)
         else:
             return disp

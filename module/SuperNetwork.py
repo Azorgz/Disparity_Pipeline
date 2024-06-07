@@ -176,7 +176,6 @@ class SuperNetwork(BaseModule):
         self.preprocessing_monocular = Preprocessing(config["monocular_network"]["preprocessing"], self.device,
                                                      task='monocular')
 
-
     def __str__(self):
         string = super().__str__()
         string += f'The model "{self.name_disparity}" has been initialized for disparity'
@@ -197,9 +196,9 @@ class SuperNetwork(BaseModule):
             sample = self.preprocessing_disparity(sample.copy())
             im_left, im_right = sample['left'], sample['right']
             if self.name_disparity == "unimatch":
-                if im_left.im_type == 'IR':
+                if im_left.modality == 'Any':
                     im_left = im_left.RGB('gray')
-                if im_right.im_type == 'IR':
+                if im_right.modality == 'Any':
                     im_right = im_right.RGB('gray')
                 res = self.model_disparity(Tensor(im_left), Tensor(im_right),
                                            attn_type=self.args_disparity.attn_type,
@@ -213,18 +212,18 @@ class SuperNetwork(BaseModule):
             else:
                 warnings.warn('This Network is not implemented')
             if self.pred_bidir:
-                left = DepthTensor(res[0], device=self.device, permute_image=True)
-                left.im_name = im_left.im_name
-                right = DepthTensor(res[1], device=self.device, permute_image=True)
-                right.im_name = im_right.im_name
+                left = DepthTensor(res[0], device=self.device)
+                left.name = im_left.name
+                right = DepthTensor(res[1], device=self.device)
+                right.name = im_right.name
                 res = {'left': left, 'right': right}
             elif self.pred_right:
-                right = DepthTensor(res[1], device=self.device, permute_image=True)
-                right.im_name = im_right.im_name
+                right = DepthTensor(res[1], device=self.device)
+                right.name = im_right.name
                 res = {'right': right}
             else:
-                left = DepthTensor(res[0], device=self.device, permute_image=True)
-                left.im_name = im_left.im_name
+                left = DepthTensor(res[0], device=self.device)
+                left.name = im_left.name
                 res = {'left': left}
             res = self.preprocessing_disparity(res, reverse=True)
             return res
@@ -259,18 +258,18 @@ class SuperNetwork(BaseModule):
                 warnings.warn('This Network is not implemented')
                 return 0
             if self.pred_bidir:
-                ref = DepthTensor(res[0], device=self.device, permute_image=True)
-                ref.im_name = sample['ref'].im_name
-                target = DepthTensor(res[1], device=self.device, permute_image=True)
-                target.im_name = sample['target'].im_name
+                ref = DepthTensor(res[0], device=self.device)
+                ref.name = sample['ref'].name
+                target = DepthTensor(res[1], device=self.device)
+                target.name = sample['target'].name
                 res = {'ref': ref, 'target': target}
             elif self.pred_right:
-                target = DepthTensor(res[1], device=self.device, permute_image=True)
-                target.im_name = sample['target'].im_name
+                target = DepthTensor(res[1], device=self.device)
+                target.name = sample['target'].name
                 res = {'target': target}
             else:
-                ref = DepthTensor(res[0], device=self.device, permute_image=True)
-                ref.im_name = sample['ref'].im_name
+                ref = DepthTensor(res[0], device=self.device)
+                ref.name = sample['ref'].name
                 res = {'ref': ref}
             self.preprocessing_depth(res, reverse=True)
             return res
@@ -286,7 +285,7 @@ class SuperNetwork(BaseModule):
                 warnings.warn('This Network is not implemented')
                 return 0
             for cam, im in res.items():
-                res[cam] = DepthTensor(im, device=self.device, permute_image=True)
+                res[cam] = DepthTensor(im, device=self.device)
                 res[cam].name = sample[cam].name
             self.preprocessing_monocular(res, reverse=True)
             return res

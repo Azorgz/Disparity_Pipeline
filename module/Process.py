@@ -8,7 +8,7 @@ from typing import cast
 import numpy as np
 import oyaml as yaml
 import torch
-from utils.classes import CameraSetup
+from utils.classes import CameraSetup, ImageTensor
 from utils.misc import path_leaf
 
 
@@ -344,10 +344,10 @@ class Process(OrderedDict):
                 pipe.network.update_size(pipe.config['disparity_network']["network_args"].inference_size)
             setup_ = kwargs['setup'] if 'setup' in kwargs.keys() else setup
             setup_ = setup_.stereo_pair(cam1, cam2)
-            new_sample = setup_(sample, cut_roi_min=cut_roi_min, cut_roi_max=cut_roi_max)
+            new_sample = setup_(sample, cut_roi_min=cut_roi_min, cut_roi_max=cut_roi_max, return_image=True)
             output = pipe.network(new_sample, task='disparity')
-            output = setup_(output, reverse=True)
-            res['pred_depth'].update(setup_.disparity_to_depth(output))
+            output_ = setup_(output, reverse=True, return_depth=True)
+            res['pred_depth'].update(setup_.disparity_to_depth(output_, return_depth=True))
 
         return _disparity, descr, summary
 

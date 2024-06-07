@@ -102,7 +102,7 @@ class Metric_ssim_tensor(BaseMetric_Tensor):
         del temp
         # self.value = self.ssim(self.image_test * mask, self.image_true * mask)
         if return_image:
-            return image.GRAY().RGB('gray')
+            return ImageTensor(image, permute_image=True).RGB('gray')
         else:
             return self.value
 
@@ -236,6 +236,6 @@ class Metric_nec_tensor(BaseMetric_Tensor):
                              torch.sum(ref_test[:, 0, :, :] * ref_test[:, 0, :, :]))
         self.value = image_nec.sum() / nec_ref
         if return_image:
-            return ImageTensor(image_nec.unsqueeze(0)).RGB('gray')
+            return ImageTensor(image_nec, permute_image=True).RGB('gray')
         else:
             return self.value

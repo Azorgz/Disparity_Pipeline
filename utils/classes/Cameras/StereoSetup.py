@@ -5,6 +5,8 @@ import torch
 from kornia.geometry import StereoCamera, relative_transformation, get_perspective_transform, warp_perspective
 from torch import Tensor, FloatTensor
 from torch.nn.functional import grid_sample
+
+from utils.classes import ImageTensor, DepthTensor
 from utils.classes.Cameras.Cameras import IRCamera, RGBCamera
 from utils.manipulation_tools import extract_roi_from_map
 
@@ -122,8 +124,8 @@ class StereoSetup(StereoCamera):
         self.current_roi_min, self.current_roi_max = self.roi_min.copy(), self.roi_max.copy()
         self._init_map_inv_()
 
-    def __call__(self, sample, *args, reverse=False, cut_roi_min=False, cut_roi_max=False, **kwargs):
-
+    def __call__(self, sample, *args, reverse=False, cut_roi_min=False, cut_roi_max=False, return_image=False,
+                 return_depth=False, **kwargs):
         if cut_roi_min:
             cut_roi_max = False
         if not reverse:
@@ -138,19 +140,21 @@ class StereoSetup(StereoCamera):
                         temp = self.cut_to_roi(temp, self.roi_min)
                     elif cut_roi_max:
                         temp = self.cut_to_roi(temp, self.roi_max)
-                    new_sample['left'] = temp
+                    new_sample['left'] = self.return_image(temp, im, return_image=return_image,
+                                                           return_depth=return_depth)
                 elif key == right:
                     temp = grid_sample(im, self.map_right, align_corners=True)
                     if cut_roi_min:
                         temp = self.cut_to_roi(temp, self.roi_min)
                     elif cut_roi_max:
                         temp = self.cut_to_roi(temp, self.roi_max)
-                    new_sample['right'] = temp
+                    new_sample['right'] = self.return_image(temp, im, return_image=return_image,
+                                                            return_depth=return_depth)
         else:
-            new_sample = self._reversed_call_(sample, *args)
+            new_sample = self._reversed_call_(sample, *args, return_image=return_image, return_depth=return_depth)
         return new_sample
 
-    def _reversed_call_(self, sample, *args):
+    def _reversed_call_(self, sample, *args, return_image=False, return_depth=False):
         left = self.left.id
         right = self.right.id
         new_sample = {}
@@ -165,7 +169,8 @@ class StereoSetup(StereoCamera):
                 else:
                     temp = im.clone()
                 temp = warp_perspective(temp, self.homography_l, self.new_shape)
-                new_sample[left] = self.cut_to_original(temp)
+                new_sample[left] = self.return_image(self.cut_to_original(temp), im,
+                                                     return_image=return_image, return_depth=return_depth)
             elif key == 'right':
                 if cut_roi_min:
                     temp = self.expand_from_roi(im, self.roi_min, side='right')
@@ -174,14 +179,16 @@ class StereoSetup(StereoCamera):
                 else:
                     temp = im.clone()
                 temp = warp_perspective(temp, self.homography_r, self.new_shape)
-                new_sample[right] = self.cut_to_original(temp, side='right')
+                new_sample[right] = self.return_image(self.cut_to_original(temp, side='right'), im,
+                                                      return_image=return_image, return_depth=return_depth)
         return new_sample
 
-    def disparity_to_depth(self, sample: dict, *args):
+    def disparity_to_depth(self, sample: dict, *args, return_depth=False):
         for key, t in sample.items():
-            t = self.reproject_disparity_to_3D((t + 1e-8).permute([0, 2, 3, 1]))
-            t = t[:, :, :, -1].unsqueeze(1)
-            sample[key] = torch.clip(t, self.depth_min, self.depth_max)
+            t_ = self.reproject_disparity_to_3D((t + 1e-8).permute([0, 2, 3, 1]))
+            t_ = t_[:, :, :, -1].unsqueeze(1)
+            sample[key] = torch.clip(t_, self.depth_min, self.depth_max)
+            sample[key] = self.return_image(sample[key], t, return_depth=True)
         return sample
 
     def depth_to_disparity(self, depth, *args):
@@ -191,6 +198,19 @@ class StereoSetup(StereoCamera):
         disp = self.tx / t_ * self.fx
         disp[mask] = 0
         return disp
+
+    @staticmethod
+    def return_image(tens, im, return_image=False, return_depth=False):
+        if return_image:
+            tens = ImageTensor(tens, permute_image=True)
+            tens.name = im.name
+            return tens
+        elif return_depth:
+            tens = DepthTensor(tens, permute_image=True)
+            tens.name = im.name
+            return tens
+        else:
+            return tens
 
     @staticmethod
     def cut_to_roi(im, roi):
@@ -243,7 +263,6 @@ class StereoSetup(StereoCamera):
         sample_1['right'].show(num='right image', point=self.pts_right)
         sample_1['left'].show(num='left image', point=self.pts_left)
         (sample_1['right'] * 0.5 + sample_1['left'] * 0.5).show(roi=[self.current_roi_max, self.current_roi_min])
-
 
     @property
     def shape_left(self):
@@ -312,7 +331,7 @@ class DepthSetup:
                     'depth': True}
         else:
             res = {}
-            res.update({self.ref.id: self.clip(sample['ref'])}) if 'ref' in sample.keys()\
+            res.update({self.ref.id: self.clip(sample['ref'])}) if 'ref' in sample.keys() \
                 else res.update({self.target.id: self.clip(sample['target'])})
             # res.update({self.target.id: sample['target']}) if 'target' in sample.keys() else res.update({self.ref.id: sample['ref']})
             return res
