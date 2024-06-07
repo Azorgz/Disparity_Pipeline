@@ -219,15 +219,15 @@ def post_process_proj(result, post_process, return_occlusion, image, image_size)
         if return_occlusion:
             occ = closing(occ, kernel)
             occ = blur(occ)
-            occ = ImageTensor(F.interpolate(occ, image_size), device=result.device).to(torch.bool)
+            occ = ImageTensor(F.interpolate(occ, image_size).to(torch.bool), device=result.device, permute_image=True)
         if image is None:
             res_ = dilation(res_, kernel)
         result[mask] = res_[mask]
     result = F.interpolate(result, image_size)
     if image is not None:
-        result = ImageTensor(result, device=result.device)
+        result = ImageTensor(result, device=result.device, permute_image=True)
     else:
-        result = DepthTensor(result, device=result.device).scale()
+        result = DepthTensor(result, device=result.device, permute_image=True)
     if return_occlusion:
         return result, occ
     else:

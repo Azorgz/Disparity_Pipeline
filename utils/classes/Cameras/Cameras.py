@@ -9,11 +9,9 @@ from torch import Tensor, nn
 import inspect
 from types import FrameType
 from typing import cast, Union
-
 from torch.nn import MaxPool2d
-
 from utils.misc import print_tuple
-from utils.classes import ImageTensor, DepthTensor
+from utils.classes.Image import ImageTensor, DepthTensor
 from glob import glob
 import imagesize
 import torch.nn.functional as F
@@ -52,7 +50,7 @@ class BaseCamera(PinholeCamera):
     _setup = None
     _name = 'BaseCam'
     _id = 'BaseCam'
-    _im_type = None
+    _modality = None
     _f = None
     _pixel_size = None
     _VFOV = None
@@ -95,12 +93,12 @@ class BaseCamera(PinholeCamera):
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self._aperture = aperture
         self._init_path(path)
-        h, w, im_type, im_calib = self._init_size_()
+        h, w, modality, im_calib = self._init_size_()
         self._sensor_resolution = sensor_resolution if sensor_resolution is not None else (w, h)
         if self._sensor_resolution[0] != w or self._sensor_resolution[1] != h:
             warnings.warn(
                 f'The specified sensor resolution {sensor_resolution} and the source image resolution {(w, h)} are different')
-        self._im_type = im_type
+        self._modality = modality
         self._im_calib = im_calib
 
         # Intrinsics parameters definition
@@ -156,7 +154,7 @@ class BaseCamera(PinholeCamera):
                 'extrinsics': self.extrinsics.squeeze().cpu().numpy().tolist(),
                 'is_ref': self.is_ref,
                 'is_positioned': self.is_positioned,
-                'im_type': self.im_type,
+                'modality': self.modality,
                 'f': [self.f[0] * 1e3, self.f[1] * 1e3],
                 'sensor_resolution': [self.sensor_resolution[0], self.sensor_resolution[1]],
                 'aperture': self.aperture}
@@ -197,8 +195,8 @@ class BaseCamera(PinholeCamera):
             im_path = self.files[0]
         im_calib = ImageTensor(im_path)
         _, c, h, w = im_calib.shape
-        im_type = im_calib.im_type
-        return h, w, im_type, im_calib
+        modality = im_calib.modality
+        return h, w, modality, im_calib
 
     def _init_intrinsics_(self, **kwargs):
         if kwargs['intrinsics'] is not None:
@@ -476,20 +474,16 @@ class BaseCamera(PinholeCamera):
         warnings.warn("The attribute can't be deleted")
 
     @property
-    def im_type(self):
-        return self._im_type
+    def modality(self):
+        return self._modality
 
-    @im_type.setter
-    def im_type(self, im_type):
+    @modality.setter
+    def modality(self, modality):
         """Only settable by the __init__ method"""
         # Ref: https://stackoverflow.com/a/57712700/
         name = cast(FrameType, cast(FrameType, inspect.currentframe()).f_back).f_code.co_name
         if name == '__init__':
-            self._im_type = im_type
-
-    @im_type.deleter
-    def im_type(self):
-        warnings.warn("The attribute can't be deleted")
+            self._modality = modality
 
     @property
     def im_calib(self):
@@ -618,7 +612,7 @@ class RGBCamera(BaseCamera):
             rz=rz,
             in_degree=in_degree,
             **kwargs)
-        assert self.im_type == 'RGB', 'The Folder does not contain RGB images'
+        assert self.modality == 'Visible', 'The Folder does not contain RGB images'
 
     # def init3d(self):
 
@@ -701,8 +695,7 @@ class IRCamera(BaseCamera):
             rz=rz,
             in_degree=in_degree,
             **kwargs)
-        assert self.im_type == 'IR', 'The Folder does not contain IR images'
-        i = self.__getitem__(0)
+        assert self.modality == 'Any', 'The Folder does not contain IR images'
 
 
 def intrinsics_parameters_from_matrix(sensor_resolution, **kwargs) -> (np.ndarray, dict):

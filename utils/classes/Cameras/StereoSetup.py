@@ -5,7 +5,7 @@ import torch
 from kornia.geometry import StereoCamera, relative_transformation, get_perspective_transform, warp_perspective
 from torch import Tensor, FloatTensor
 from torch.nn.functional import grid_sample
-from utils.classes.Cameras import IRCamera, RGBCamera
+from utils.classes.Cameras.Cameras import IRCamera, RGBCamera
 from utils.manipulation_tools import extract_roi_from_map
 
 
@@ -113,8 +113,8 @@ class StereoSetup(StereoCamera):
 
     def _init_roi_(self):
         pass
-        mask_left = (1 >= self.map_left) * (self.map_left >= -1) * torch.ones_like(self.map_left)
-        mask_right = (1 >= self.map_right) * (self.map_right >= -1) * torch.ones_like(self.map_right)
+        mask_left = (1 >= self.map_left) * (self.map_left >= -1)
+        mask_right = (1 >= self.map_right) * (self.map_right >= -1)
         mask_left = mask_left[:, :, :, 0] * mask_left[:, :, :, 1]
         mask_right = mask_right[:, :, :, 0] * mask_right[:, :, :, 1]
         self.roi_min, self.roi_max, self.pts_left, self.pts_right = extract_roi_from_map(mask_left, mask_right)
@@ -123,6 +123,7 @@ class StereoSetup(StereoCamera):
         self._init_map_inv_()
 
     def __call__(self, sample, *args, reverse=False, cut_roi_min=False, cut_roi_max=False, **kwargs):
+
         if cut_roi_min:
             cut_roi_max = False
         if not reverse:
@@ -133,7 +134,6 @@ class StereoSetup(StereoCamera):
             for key, im in sample.items():
                 if key == left:
                     temp = grid_sample(im, self.map_left, align_corners=True)
-                    # temp[temp==0] = im.min() if im.min() >=0 else im.max()
                     if cut_roi_min:
                         temp = self.cut_to_roi(temp, self.roi_min)
                     elif cut_roi_max:
@@ -141,7 +141,6 @@ class StereoSetup(StereoCamera):
                     new_sample['left'] = temp
                 elif key == right:
                     temp = grid_sample(im, self.map_right, align_corners=True)
-                    # temp[temp == 0] = im.min() if im.min() >=0 else im.max()
                     if cut_roi_min:
                         temp = self.cut_to_roi(temp, self.roi_min)
                     elif cut_roi_max:
@@ -180,14 +179,9 @@ class StereoSetup(StereoCamera):
 
     def disparity_to_depth(self, sample: dict, *args):
         for key, t in sample.items():
-            mask = t == 0
-            t = self.reproject_disparity_to_3D((t + 1e-8).put_channel_at(-1))
+            t = self.reproject_disparity_to_3D((t + 1e-8).permute([0, 2, 3, 1]))
             t = t[:, :, :, -1].unsqueeze(1)
             sample[key] = torch.clip(t, self.depth_min, self.depth_max)
-            sample[key].pass_attr(t)
-            sample[key].max_value = self.depth_max
-            sample[key].min_value = self.depth_min
-            sample[key].scaled = True
         return sample
 
     def depth_to_disparity(self, depth, *args):
@@ -195,10 +189,7 @@ class StereoSetup(StereoCamera):
         t_ = depth.clone()
         t_[mask] = 1
         disp = self.tx / t_ * self.fx
-        disp.max_value = disp.max()
-        disp.min_value = disp.min()
         disp[mask] = 0
-        disp.scaled = True
         return disp
 
     @staticmethod
@@ -230,7 +221,6 @@ class StereoSetup(StereoCamera):
         else:
             n_s = self.new_shape
         temp = im.__class__(torch.zeros(1, im.shape[1], *n_s, device=self.device))
-        temp.pass_attr(im)
         temp[..., roi[0]:roi[2], roi[1]:roi[3]] = im
         return temp
 
@@ -301,7 +291,7 @@ class DepthSetup:
 
     def __init__(self, ref: Union[IRCamera, RGBCamera], target: Union[IRCamera, RGBCamera],
                  device: torch.device, name: str = None, depth_min: float = None, depth_max: float = None):
-        assert ref.im_type == target.im_type
+        assert ref.modality == target.modality
         self.device = device
         self._intrinsics = ref.intrinsics[:, :3, :3].to(torch.float32)
         self._pose = relative_transformation(target.extrinsics.inverse(), ref.extrinsics.inverse()).to(torch.float32)

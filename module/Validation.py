@@ -60,8 +60,8 @@ class Validation(BaseModule):
         for key, n in self.norms.items():
             if key not in self.res[name].keys():
                 self.res[name][key] = {}
-            mask = (new > 0) * 1.
-            mask = erosion(mask, torch.ones(3, 3).to(self.device)) > 0
+            mask = new > 0
+            # mask = erosion(mask, torch.ones(3, 3).to(self.device)) > 0
             res_new = n(ref, new, mask=mask)
             res_old = n(ref, old, mask=mask)
             if occlusion is not None:

@@ -1,9 +1,7 @@
-import inspect
 import os
 import warnings
 from os.path import *
-from types import FrameType
-from typing import Union, cast
+from typing import Union
 
 import PIL.Image
 import cv2 as cv
@@ -15,8 +13,6 @@ from matplotlib import colormaps as cm
 from matplotlib import pyplot as plt, patches
 from torch import Tensor
 from torchvision.transforms.functional import to_pil_image
-
-from utils.misc import time_fct
 
 
 def find_class(args, class_name):

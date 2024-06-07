@@ -57,7 +57,7 @@ class Preprocessing:
     def __call__(self, sample, reverse=False, *args, **kwargs):
         if not reverse:
             for key, im in sample.items():
-                if im.im_type == 'IR':
+                if im.modality == 'Any':
                     sample[key] = im.RGB('gray')
             if self.transforms is not None:
                 sample = self.transforms(sample, **kwargs)
@@ -70,7 +70,7 @@ class Preprocessing:
                                                      post_process=None)
         else:
             for key, im in sample.items():
-                if im.im_type == 'IR':
+                if im.modality == 'IR':
                     sample[key] = im.GRAYSCALE()
             sample = self.postprocessing(sample, **kwargs)
         return sample

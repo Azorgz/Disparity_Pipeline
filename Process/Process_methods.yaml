@@ -1,16 +1,27 @@
+# --------------------------- Name --------------------------- #
+Name: -- Method Process --
 
+# --------------------------------------------------------------- #
+# --------------------------- Options --------------------------- #
+# --------------------------------------------------------------- #
 Option:
   name_experiment: methods_comparison
   setup: # Paths to the config file of the pre-calibrated camera's setup
-    path: Setup_Camera.yaml
+    path: Setup_Camera/Lynred_day.yaml
   dataset:
-    number_of_sample: 1/3
+    number_of_sample: 0
     shuffle: False
+  realtime: True
+  monocular_depth_network:
+    name: depthanything
   depth_network:
     name: unimatch
   disparity_network:
     name: unimatch
 
+# --------------------------------------------------------------- #
+# --------------------------- Process --------------------------- #
+# --------------------------------------------------------------- #
 
 Depth-Depth:
   depth:
@@ -19,10 +30,11 @@ Depth-Depth:
   wrap:
     cameras: [IR, RGB]
     method: depth
-    source: pred_depth
-    option: [return_depth_reg, return_occlusion, []]
+    option: [ return_depth_reg, return_occlusion ]
   valid: [IR, RGB]
   save: [pred_depth, image_reg, depth_reg, occlusion]
+
+# --------------------------------------------------------------- #
 
 Depth-Disparity:
   depth:
@@ -31,10 +43,11 @@ Depth-Disparity:
   wrap:
     cameras: [IR, RGB]
     method: disparity
-    source: pred_depth
-    option: [return_depth_reg, return_occlusion, []]
+    option: [ return_depth_reg, return_occlusion ]
   valid: [IR, RGB]
   save: [pred_depth, image_reg, depth_reg, occlusion]
+
+# --------------------------------------------------------------- #
 
 Disparity-Disparity:
   disparity:
@@ -43,10 +56,11 @@ Disparity-Disparity:
   wrap:
     cameras: [IR, RGB]
     method: disparity
-    source: pred_disp
-    option: [return_depth_reg, return_occlusion, []]
+    option: [ return_depth_reg, return_occlusion ]
   valid: [IR, RGB]
-  save: [pred_disp, image_reg, disp_reg, occlusion]
+  save: [ pred_depth, image_reg, depth_reg, occlusion ]
+
+# --------------------------------------------------------------- #
 
 Disparity-Depth:
   disparity:
@@ -55,10 +69,11 @@ Disparity-Depth:
   wrap:
     cameras: [IR, RGB]
     method: depth
-    source: pred_disp
-    option: [return_depth_reg, return_occlusion, []]
+    option: [ return_depth_reg, return_occlusion ]
   valid: [IR, RGB]
-  save: [pred_disp, image_reg, disp_reg, occlusion]
+  save: [ pred_depth, image_reg, depth_reg, occlusion ]
+
+# --------------------------------------------------------------- #
 
 monocular-Depth:
   monocular:
@@ -67,10 +82,11 @@ monocular-Depth:
   wrap:
     cameras: [ IR, RGB ]
     method: depth
-    source: pred_depth
-    option: [ return_depth_reg, return_occlusion, [ ] ]
+    option: [ return_depth_reg, return_occlusion ]
   valid: [ IR, RGB ]
   save: [ pred_depth, image_reg, depth_reg, occlusion ]
+
+# --------------------------------------------------------------- #
 
 monocular-Disparity:
   monocular:
@@ -79,7 +95,6 @@ monocular-Disparity:
   wrap:
     cameras: [ IR, RGB ]
     method: disparity
-    source: pred_depth
-    option: [ return_depth_reg, return_occlusion, [ ] ]
+    option: [ return_depth_reg, return_occlusion ]
   valid: [ IR, RGB ]
   save: [ pred_depth, image_reg, depth_reg, occlusion ]

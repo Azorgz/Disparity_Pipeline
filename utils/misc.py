@@ -74,7 +74,7 @@ def update_name(path):
 
 def update_name_tree(sample: dict, suffix):
     for im in sample.values():
-        im.im_name += '-' + suffix
+        im.name += '-' + suffix
     return sample
 
 
@@ -139,18 +139,27 @@ def timeit(func):
     return wrapper
 
 
-def time_fct(func):
+def time_fct(func, reps=1, exclude_first=False):
     def wrapper(*args, **kwargs):
+        if exclude_first:
+            start = time.time()
+            res = func(*args, **kwargs)
+            first = time.time() - start
         start = time.time()
-        res = func(*args, **kwargs)
+        for i in range(reps):
+            res = func(*args, **kwargs)
+        timed = time.time() - start
+        print("------------------------------------ TIME FUNCTION ---------------------------------------------")
         try:
-            print(f"\nFunction {func.__name__} executed in : {time.time() - start} seconds"
-                  f"\n--------------------------------------------------------------------------------")
+            print(
+                f"Function {func.__name__} executed  {reps} times in : {timed} seconds, average = {timed / reps} seconds"
+                f"{f', first occurence : {first}' if exclude_first else ''}")
         except AttributeError:
-            print(f"\nFunction {func.__class__.__name__} executed in : {time.time() - start} seconds"
-                  f"\n--------------------------------------------------------------------------------")
+            print(
+                f"\nFunction {func.__class__.__name__} executed  {reps} times in : {timed} seconds, average = {timed / reps} seconds"
+                f"{f', first occurence : {first}' if exclude_first else ''}")
+        print("------------------------------------------------------------------------------------------------")
         return res
-
     return wrapper
 
 

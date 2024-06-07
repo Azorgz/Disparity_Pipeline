@@ -303,9 +303,13 @@ class Visualizer:
             visu = visu.pyrDown()
             h, w = h // 2, w // 2
 
-        visu = visu.opencv()
+        visu = visu.to_opencv(datatype=np.uint8)
         if self.show_idx:
-            visu = cv.putText(visu, f'idx : {self.idx}', self.org_idx, self.font, self.fontScale, self.color,
+            visu = cv.putText(visu, f'idx : {self.idx}',
+                              self.org_idx,
+                              self.font,
+                              self.fontScale,
+                              self.color,
                               self.thickness, cv.LINE_AA)
         if self.multi_setup:
             org = self.org_idx[0], self.org_idx[1] + 15

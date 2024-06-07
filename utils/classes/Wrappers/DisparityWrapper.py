@@ -61,21 +61,21 @@ class DisparityWrapper:
 
             # resampling with disparity
             img_dst = self._grid_sample(img_src_proj, disparity_proj.clone(), padding_mode='zeros')
-
+            res = {}
             if return_occlusion:
                 # sample = {side: projector(disparity_proj, img_dst)}
                 sample = {side: self.find_occlusion(disparity_proj, img_dst)}
-                res['occlusion'] = setup(sample, reverse=True)[cam_dst].to(torch.bool)
-                res['occlusion'].im_name = image_src.im_name + '_occlusion'
+                res['occlusion'] = ImageTensor(setup(sample, reverse=True)[cam_dst].to(torch.bool), permute_image=True)
+                res['occlusion'].name = image_src.name + '_occlusion'
             if return_depth_reg:
                 disparity_src = self.compute_disp_src(disparity_proj, post_process_depth=post_process_depth)
-                disparity_src.pass_attr(disparity)
-                disparity_src.im_name = image_src.im_name + '_disp'
                 sample = {opp_side: disparity_src}
                 disparity_src = setup(sample, reverse=True)[cam_src]
                 res['depth_reg'] = setup.disparity_to_depth({cam_src: disparity_src})[cam_src]
+                res['depth_reg'].name = image_src.name + '_disp'
             sample = {side: img_dst}
-            res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
+            res['image_reg'] = ImageTensor(setup(sample, reverse=True)[cam_dst], permute_image=True)
+            res['image_reg'].name = image_src.name + '_reg'
             return res
         else:
             return self._reverse_call(images, depth_tensor, cam_src, cam_dst, *args,
@@ -127,7 +127,7 @@ class DisparityWrapper:
         opp_side = 'left' if side == 'right' else 'right'
 
         # resampling with disparity
-        size_im = disparity_proj.shape[-2:]
+        size_im = setup.new_shape
         grid = kornia.utils.create_meshgrid(size_im[0], size_im[1], normalized_coordinates=False,
                                             device=self.device).to(disparity_proj.dtype)  # [1 H W 2]
 
@@ -139,20 +139,23 @@ class DisparityWrapper:
                                      return_occlusion=return_occlusion,
                                      grid=True)
             sample = {opp_side: img_dst}
-            res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
+            res = {'image_reg': ImageTensor(setup(sample, reverse=True)[cam_dst], permute_image=True)}
+            res['image_reg'].name = image_src.name + '_reg'
             sample = {opp_side: occ * 1.}
-            res['occlusion'] = setup(sample, reverse=True)[cam_dst].to(torch.bool)
-            res['occlusion'].im_name = image_src.im_name + '_occlusion'
+            res['occlusion'] = ImageTensor(setup(sample, reverse=True)[cam_dst].to(torch.bool), permute_image=True)
+            res['occlusion'].name = image_src.name + '_occlusion'
         else:
             img_dst = projector(grid, size_im, post_process_depth, image=img_src_proj, grid=True)
             sample = {opp_side: img_dst}
-            res = {'image_reg': setup(sample, reverse=True)[cam_dst]}
+            res = {'image_reg': ImageTensor(setup(sample, reverse=True)[cam_dst], permute_image=True)}
+            res['image_reg'].name = image_src.name + '_reg'
         if return_depth_reg:
             disparity_dst = projector(grid, size_im, post_process_depth, grid=True)
-            disparity_dst.im_name = images[cam_dst].im_name + '_disp'
             sample = {opp_side: disparity_dst}
             disparity_dst = setup(sample, reverse=True)[cam_dst]
-            res['depth_reg'] = setup.disparity_to_depth({cam_dst: disparity_dst})[cam_dst]
+            res['depth_reg'] = DepthTensor(setup.disparity_to_depth({cam_dst: disparity_dst})[cam_dst],
+                                           permute_image=True)
+            res['depth_reg'].name = images[cam_dst].name + '_disp'
         return res
 
     def compute_disp_src(self, disparity, post_process_depth=0, **kwargs):

@@ -3,9 +3,9 @@ Name: -- Test Process --
 Option:
   name_experiment: Test
   setup: # Paths to the config file of the pre-calibrated camera's setup
-    path: Setup_Camera/Lynred_day.yaml
+    path: Setup_Camera/Lynred_local.yaml
   dataset:
-    number_of_sample: 25
+    number_of_sample: 5
     shuffle: True
   realtime : True
   monocular_depth_network:
@@ -23,10 +23,10 @@ monocular_depth:
   wrap:
     cameras: [ IR, RGB ]
     method: depth
-    option: [ ]
+    option: [ return_depth_reg, return_occlusion, upsample=1 ]
   valid: [ IR, RGB ]
   save: [ pred_depth, image_reg ]
-  #, depth_reg, occlusion]
+
 
 monocular_disp:
   monocular:

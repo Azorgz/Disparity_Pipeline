@@ -152,12 +152,10 @@ class Resize(object):
 
         else:
             for key in sample.keys():
-                ori_size = sample[key].shape[-2:]
+                ori_size = sample[key].image_size
                 self.ori_size.append(ori_size)
                 if self.inference_size[0] != ori_size[0] or self.inference_size[1] != ori_size[1]:
-                    sample[key] = F1.interpolate(sample[key], size=self.inference_size,
-                                                 mode='bilinear',
-                                                 align_corners=True)
+                    sample[key] = sample[key].resize(self.inference_size)
         return sample
 
 
@@ -171,15 +169,13 @@ class ResizeDepth(object):
             self.size = 0
 
     def __call__(self, depth, device, *args, size=None, **kwargs):
-        h, w = depth.shape[-2:]
+        h, w = depth.image_size
         size = size if size is not None else self.size
         if size == 0:
             pass
         elif h != size[0] or w != size[1]:
             # resize back
-            return F1.interpolate(depth, size=size,
-                                  mode='bilinear',
-                                  align_corners=True)  # [1, H, W]
+            return depth.resize(size)  # [1, H, W]
         else:
             return depth
 

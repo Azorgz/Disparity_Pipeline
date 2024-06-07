@@ -5,6 +5,7 @@ from torchmetrics import PeakSignalNoiseRatio as PSNR
 from torchmetrics.image.ssim import StructuralSimilarityIndexMeasure as SSIM
 import torch.nn.functional as F
 
+from utils.classes import ImageTensor
 ######################### METRIC ##############################################
 from utils.gradient_tools import grad_tensor
 
@@ -30,29 +31,23 @@ class BaseMetric_Tensor:
     def __call__(self, im1, im2, *args, mask=None, **kwargs):
         # Input array is a path to an image OR an already formed ndarray instance
         # assert im1.shape[-2:] == im2.shape[-2:], " The inputs are not the same size"
-        c, h, w = im1.shape[-3:]
-        c1 = im2.shape[1]
 
-        if c == c1:
-            self.image_true = im1.clone()
-            self.image_test = im2.clone()
-        elif c > 1:
-            self.image_true = im1.GRAYSCALE()
-            self.image_test = im2.clone()
+        if im1.channel_num == im2.channel_num:
+            self.image_true = im1
+            self.image_test = im2
+        elif im1.channel_num > 1:
+            self.image_true = im1.GRAY()
+            self.image_test = im2
         else:
-            self.image_true = im1.clone()
-            self.image_test = im2.GRAYSCALE()
+            self.image_true = im1
+            self.image_test = im2.GRAY()
+
         size = self._determine_size_from_ratio()
-        self.image_true = F.interpolate(self.image_true, size=size,
-                                        mode='bilinear',
-                                        align_corners=True)
-        self.image_test = F.interpolate(self.image_test, size=size,
-                                        mode='bilinear',
-                                        align_corners=True)
+        self.image_true = self.image_true.resize(size).to_tensor()
+        self.image_test = self.image_test.resize(size).to_tensor()
         if mask is not None:
-            self.mask = F.interpolate(mask.to(torch.float32), size=size,
-                                      mode='bilinear',
-                                      align_corners=True).to(torch.bool)
+            mask = mask * 1.
+            self.mask = mask.resize(size) > 0
         self.value = 0
 
     def _determine_size_from_ratio(self):
@@ -107,7 +102,7 @@ class Metric_ssim_tensor(BaseMetric_Tensor):
         del temp
         # self.value = self.ssim(self.image_test * mask, self.image_true * mask)
         if return_image:
-            return image.GRAYSCALE().RGB('gray')
+            return image.GRAY().RGB('gray')
         else:
             return self.value
 
@@ -132,9 +127,9 @@ class MultiScaleSSIM_tensor(BaseMetric_Tensor):
     def __call__(self, im1, im2, *args, mask=None, **kwargs):
         super().__call__(im1, im2, *args, mask=mask, **kwargs)
         if mask is None:
-            self.value = self.ms_ssim(self.image_test.to_tensor(), self.image_true.to_tensor())
+            self.value = self.ms_ssim(self.image_test, self.image_true)
         else:
-            self.value = self.ms_ssim(self.image_test.to_tensor() * self.mask, self.image_true.to_tensor() * self.mask)
+            self.value = self.ms_ssim(self.image_test * self.mask, self.image_true * self.mask)
             nb_pixel_im = self.image_test.shape[-2] * self.image_test.shape[-1]
             nb_pixel_mask = (~self.mask).to(torch.float32).sum()
             # Remove the perfect SSIM given by the mask
@@ -229,8 +224,8 @@ class Metric_nec_tensor(BaseMetric_Tensor):
 
     def __call__(self, im1, im2, *args, mask=None, return_image=False, **kwargs):
         super().__call__(im1, im2, *args, mask=mask, **kwargs)
-        ref_true = grad_tensor(self.image_true)
-        ref_test = grad_tensor(self.image_test)
+        ref_true = grad_tensor(ImageTensor(self.image_true, permute_image=True))
+        ref_test = grad_tensor(ImageTensor(self.image_test, permute_image=True))
         if mask is not None:
             ref_true = ref_true * self.mask
             ref_test = ref_test * self.mask
@@ -241,6 +236,6 @@ class Metric_nec_tensor(BaseMetric_Tensor):
                              torch.sum(ref_test[:, 0, :, :] * ref_test[:, 0, :, :]))
         self.value = image_nec.sum() / nec_ref
         if return_image:
-            return image_nec.unsqueeze(0).RGB('gray')
+            return ImageTensor(image_nec.unsqueeze(0)).RGB('gray')
         else:
             return self.value

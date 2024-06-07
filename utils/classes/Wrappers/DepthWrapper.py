@@ -66,12 +66,13 @@ class DepthWrapper:
 
             if return_occlusion:
                 res['occlusion'] = self.find_occlusion(cloud, [height, width])
-                res['occlusion'].im_name = image_src.im_name + '_occlusion'
+                res['occlusion'].name = image_src.name + '_occlusion'
             # normalize points between [-1 / 1]
             points_2d_src_norm: Tensor = normalize_pixel_coordinates(points_2d_src, height, width).to(
                 image_src.dtype)  # BxHxWx2
             grid = Tensor(points_2d_src_norm)
-            res['image_reg'] = F.grid_sample(image_src, grid, align_corners=True)
+            image_src.data = F.grid_sample(image_src.to_tensor(), grid, align_corners=True)
+            res['image_reg'] = image_src
             return res
         else:
             return self._reverse_call(image_src, image_dst, depth, matrix_src, matrix_dst, torch.inverse(src_trans_dst),
@@ -115,14 +116,15 @@ class DepthWrapper:
         camera_matrix_tmp: Tensor = matrix_dst[:, None, None]  # Bx1x1x3x3
         points_2d_dst: Tensor = project_points(points_3d_dst, camera_matrix_tmp)  # BxHxWx2
         cloud = torch.concatenate([points_2d_dst, points_3d_dst[:, :, :, -1:]], dim=-1)
-        height, width = image_dst.shape[-2:]
+        height, width = image_dst.image_size
 
         if return_depth_reg:
             depth_reg = projector(cloud, [height, width],
                                   post_process=3,
                                   numpy=True,
                                   upsample=1)
-            depth_reg.im_name = image_dst.im_name + '_depth'
+            depth_reg.show()
+            depth_reg.name = image_dst.name + '_depth'
             conv_upsampling = MaxPool2d((3, 5), stride=1, padding=(1, 2), dilation=1)
             conv_upsampling = Sequential(conv_upsampling)
             res['depth_reg'] = depth_reg
@@ -135,12 +137,15 @@ class DepthWrapper:
                                                            return_occlusion=True,
                                                            numpy=True,
                                                            upsample=upsample)
-            res['occlusion'].im_name = image_src.im_name + '_occlusion'
+            res['occlusion'].name = image_src.name + '_occlusion'
+            res['image_reg'].name = image_src.name + '_reg'
         else:
             res['image_reg'] = projector(cloud, [height, width],
                                          post_process=post_process_image,
                                          image=image_src,
                                          upsample=2)
+            res['image_reg'].name = image_src.name + '_reg'
+
         return res
 
     def find_occlusion(self, cloud, image_size):

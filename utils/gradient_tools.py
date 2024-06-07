@@ -66,7 +66,7 @@ def grad_tensor_image(image_tensor: ImageTensor, device=None) -> ImageTensor:
 def grad_tensor(image_tensor) -> ImageTensor:
     im_t = image_tensor.put_channel_at(1)
     c = image_tensor.shape[1]
-    ratio = torch.sum(image_tensor > 0)/(image_tensor.shape[3]*image_tensor.shape[2])
+    ratio = torch.sum(image_tensor > 0) / torch.mul(*image_tensor.image_size)
     im_t = median_blur(im_t, (5, 5))
     dy, dx = image_gradients(im_t)
     if c > 1:

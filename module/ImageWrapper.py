@@ -85,5 +85,4 @@ class ImageWrapper(BaseModule):
                                          post_process_depth=self.post_process_depth,
                                          reverse_wrap=reverse_wrap,
                                          **kwargs)
-        res['image_reg'].pass_attr(sample[cam_src])
         return res

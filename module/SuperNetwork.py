@@ -213,17 +213,17 @@ class SuperNetwork(BaseModule):
             else:
                 warnings.warn('This Network is not implemented')
             if self.pred_bidir:
-                left = DepthTensor(res[0], device=self.device).scale()
+                left = DepthTensor(res[0], device=self.device, permute_image=True)
                 left.im_name = im_left.im_name
-                right = DepthTensor(res[1], device=self.device).scale()
+                right = DepthTensor(res[1], device=self.device, permute_image=True)
                 right.im_name = im_right.im_name
                 res = {'left': left, 'right': right}
             elif self.pred_right:
-                right = DepthTensor(res[1], device=self.device).scale()
+                right = DepthTensor(res[1], device=self.device, permute_image=True)
                 right.im_name = im_right.im_name
                 res = {'right': right}
             else:
-                left = DepthTensor(res[0], device=self.device).scale()
+                left = DepthTensor(res[0], device=self.device, permute_image=True)
                 left.im_name = im_left.im_name
                 res = {'left': left}
             res = self.preprocessing_disparity(res, reverse=True)
@@ -259,17 +259,17 @@ class SuperNetwork(BaseModule):
                 warnings.warn('This Network is not implemented')
                 return 0
             if self.pred_bidir:
-                ref = DepthTensor(res[0], device=self.device).scale()
+                ref = DepthTensor(res[0], device=self.device, permute_image=True)
                 ref.im_name = sample['ref'].im_name
-                target = DepthTensor(res[1], device=self.device).scale()
+                target = DepthTensor(res[1], device=self.device, permute_image=True)
                 target.im_name = sample['target'].im_name
                 res = {'ref': ref, 'target': target}
             elif self.pred_right:
-                target = DepthTensor(res[1], device=self.device).scale()
+                target = DepthTensor(res[1], device=self.device, permute_image=True)
                 target.im_name = sample['target'].im_name
                 res = {'target': target}
             else:
-                ref = DepthTensor(res[0], device=self.device).scale()
+                ref = DepthTensor(res[0], device=self.device, permute_image=True)
                 ref.im_name = sample['ref'].im_name
                 res = {'ref': ref}
             self.preprocessing_depth(res, reverse=True)
@@ -286,7 +286,7 @@ class SuperNetwork(BaseModule):
                 warnings.warn('This Network is not implemented')
                 return 0
             for cam, im in res.items():
-                res[cam] = DepthTensor(im, device=self.device).scale()
-                res[cam].im_name = sample[cam].im_name
+                res[cam] = DepthTensor(im, device=self.device, permute_image=True)
+                res[cam].name = sample[cam].name
             self.preprocessing_monocular(res, reverse=True)
             return res

@@ -5,7 +5,7 @@ from kornia import create_meshgrid
 from kornia.utils import get_cuda_device_if_available
 from torch import Tensor, FloatTensor, cat
 from kornia.feature.responses import harris_response
-from utils.classes.Image.Image import ImageTensor
+from utils.classes import ImageTensor
 
 
 def prepare_points_depth(depth):
@@ -20,11 +20,12 @@ def extract_roi_from_map(mask_left: Tensor, mask_right: Tensor):
     roi = []
     pts = []
 
-    m_roi = [ImageTensor((mask_right + mask_left > 0) * torch.ones_like(mask_right)).pad([1, 1, 1, 1]),
-             ImageTensor((mask_right * mask_left > 0) * torch.ones_like(mask_right)).pad([1, 1, 1, 1])]
+    m_roi = [ImageTensor(mask_right + mask_left > 0).pad([1, 1, 1, 1]),
+             ImageTensor(mask_right * mask_left > 0).pad([1, 1, 1, 1])]
     m_transfo = [ImageTensor(mask_left).pad([1, 1, 1, 1]), ImageTensor(mask_right).pad([1, 1, 1, 1])]
 
     for m_ in m_roi:
+        m_ = m_.to_tensor().to(torch.float)
         corner_map = Tensor(harris_response(m_)).squeeze()
         center = int(corner_map.shape[0] / 2), int(corner_map.shape[1] / 2)
         top_l = corner_map[:center[0], : center[1]]
@@ -43,6 +44,7 @@ def extract_roi_from_map(mask_left: Tensor, mask_right: Tensor):
                     int(min(bot_left[0], bot_right[0])), int(min(bot_right[1], top_right[1]))])
 
     for m_ in m_transfo:
+        m_ = m_.to_tensor().to(torch.float)
         corner_map = Tensor(harris_response(m_)).squeeze()
         center = int(corner_map.shape[0] / 2), int(corner_map.shape[1] / 2)
         top_l = corner_map[:center[0], : center[1]]

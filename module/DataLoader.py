@@ -14,12 +14,26 @@ class StereoDataLoader(DataLoader):
     """
     This class implement a DataLoader instance from the StereoDataset class implemented from the camera setup
     """
+
     def __init__(self, setup: CameraSetup, config, batch_size=1):
         self.config = config
         stereoDataSet = StereoDataSet(setup, config)
         super(StereoDataLoader, self).__init__(stereoDataSet,
                                                batch_size=batch_size,
-                                               shuffle=stereoDataSet.shuffle)
+                                               shuffle=stereoDataSet.shuffle,
+                                               collate_fn=self.collate_fn)
+
+    @staticmethod
+    def collate_fn(data):
+        """
+        data is a list of dictionary containing ImageTensor
+        :param data: list of dict
+        :return: dictionary containing ImageTensor batched
+        """
+        data = list_to_dict(data)
+        for k, v in data.items():
+            data[k] = ImageTensor.stack(v)
+        return data
 
     @property
     def camera_used(self):
@@ -71,7 +85,7 @@ class StereoDataSet(Dataset):
         if config["dataset"]["number_of_sample"] <= 0:
             self.nb = len(self.files[setup.camera_ref])
         elif config["dataset"]["number_of_sample"] < 1:
-            self.nb = int(len(self.files[setup.camera_ref])*config["dataset"]["number_of_sample"])
+            self.nb = int(len(self.files[setup.camera_ref]) * config["dataset"]["number_of_sample"])
         else:
             self.nb = int(config["dataset"]["number_of_sample"])
         # If the data needs to be shuffled
@@ -88,9 +102,11 @@ class StereoDataSet(Dataset):
         else:
             for key, f in self.files.items():
                 if self.nb < len(self.files[setup.camera_ref]) and config["dataset"]["number_of_sample"] >= 1:
-                    self.files[key] = self.files[key][:self.nb] if idx is None else np.array(self.files[key])[idx].tolist()
+                    self.files[key] = self.files[key][:self.nb] if idx is None else np.array(self.files[key])[
+                        idx].tolist()
                 elif self.nb < len(self.files[setup.camera_ref]):
-                    idx = np.arange(0, len(self.files[setup.camera_ref])-1, int(len(self.files[setup.camera_ref])/self.nb)) if idx is None else idx
+                    idx = np.arange(0, len(self.files[setup.camera_ref]) - 1,
+                                    int(len(self.files[setup.camera_ref]) / self.nb)) if idx is None else idx
                     self.files[key] = np.array(self.files[key])[idx].tolist()
                 else:
                     self.files[key] = self.files[key] if idx is None else np.array(self.files[key])[idx].tolist()
@@ -104,7 +120,7 @@ class StereoDataSet(Dataset):
         if batched:
             sample = {key: ImageTensor(p, device=self.device) for key, p in self.samples[index].items()}
         else:
-            sample = {key: ImageTensor(p, device=self.device).squeeze(0) for key, p in self.samples[index].items()}
+            sample = {key: ImageTensor(p, device=self.device) for key, p in self.samples[index].items()}
         if self.reset_images_name:
             for key in sample.keys():
                 sample[key].im_name = f'{key}_{name_generator(index, max_number=len(self))}'

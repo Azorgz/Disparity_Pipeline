@@ -172,9 +172,9 @@ def post_process_proj(result, post_process, return_occlusion, image, image_size)
         result[mask] = res_[mask]
     result = F.interpolate(result, image_size)
     if image is not None:
-        result = ImageTensor(result, device=result.device)
+        result = ImageTensor(result, device=result.device, permute_image=True)
     else:
-        result = DepthTensor(result, device=result.device).scale()
+        result = DepthTensor(result, device=result.device, permute_image=True)
     if return_occlusion:
         return result, occ
     else:

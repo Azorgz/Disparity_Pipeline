@@ -230,7 +230,7 @@ class CameraSetup:
             v['intrinsics'] = np.array(v['intrinsics'])
             v['extrinsics'] = np.array(v['extrinsics'])
             v['device'] = device
-            if v['im_type'] == 'IR':
+            if v['modality'] == 'Any':
                 cameras[cam] = IRCamera(**v)
             else:
                 cameras[cam] = RGBCamera(**v)
@@ -273,7 +273,7 @@ class CameraSetup:
             cam.update_setup(self.camera_ref, [k for k in self.cameras.keys() if k != cam.id])
         # self.cameras_calibration[camera.id] = {'matrix': torch.eye(3), 'crop': Tensor([0, 0, 0, 0])}
         if print_info:
-            print(f'The {camera.im_type} Camera {camera.name} has been added to the Rig as {camera.id}')
+            print(f'The {camera.modality} Camera {camera.name} has been added to the Rig as {camera.id}')
         return camera
 
     def _del_camera_(self, camera: Union[IRCamera, RGBCamera, str], print_info) -> IRCamera or RGBCamera:
@@ -302,7 +302,7 @@ class CameraSetup:
         for cam in self.cameras.values():
             cam.update_setup(self.camera_ref, [k for k in self.cameras.keys() if k != cam.id])
         if print_info:
-            print(f'The {camera.im_type} Camera {camera.name} has been removed from the Rig')
+            print(f'The {camera.modality} Camera {camera.name} has been removed from the Rig')
         return camera
 
     def _set_default_new_ref_(self, name):
@@ -351,7 +351,7 @@ class CameraSetup:
                 im_src = self.cameras[cam_ref].im_calib
 
                 calib_method = 'auto'
-                # calib_method = 'manual' if im_src.im_type != im_dst.im_type else 'auto'
+                # calib_method = 'manual' if im_src.modality != im_dst.modality else 'auto'
                 pts_src, pts_dst = Kpts_gen(im_src, im_dst, pts_ref=ref, method=calib_method, min_kpt=20, th=0.85,
                                             draw_result=True)
                 pts_src, pts_dst = pts_src.to(self.device), pts_dst.to(self.device)
@@ -488,9 +488,9 @@ class CameraSetup:
                 return 0
             left = self.cameras[left]
             right = self.cameras[right]
-            if left.im_type != right.im_type:
+            if left.modality != right.modality:
                 warnings.warn(f"The chosen Cameras are not using the same modality. "
-                              f"left Camera is {left.im_type} and right Camera is {right.im_type}")
+                              f"left Camera is {left.modality} and right Camera is {right.modality}")
             if left.extrinsics[0, 0, -1] < right.extrinsics[0, 0, -1]:
                 left, right = right, left
             elif left.extrinsics[0, 0, -1] == right.extrinsics[0, 0, -1]:
@@ -517,7 +517,7 @@ class CameraSetup:
                 warnings.warn("The chosen Cameras are not Positioned")
                 return 0
             try:
-                assert ref.im_type == target.im_type
+                assert ref.modality == target.modality
             except AssertionError:
                 warnings.warn("The chosen Cameras are not using the same modality")
                 return 0
