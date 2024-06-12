@@ -8,7 +8,7 @@ from typing import cast
 import numpy as np
 import oyaml as yaml
 import torch
-from utils.classes import CameraSetup, ImageTensor
+from utils.ImagesCameras import CameraSetup, ImageTensor
 from utils.misc import path_leaf
 
 

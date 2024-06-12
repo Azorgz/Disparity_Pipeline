@@ -6,7 +6,7 @@ import yaml
 from kornia.morphology import erosion
 
 from module.BaseModule import BaseModule
-from utils.classes.Metrics import stats_dict, norms_dict
+from utils.ImagesCameras.Metrics import stats_dict, norms_dict
 import numpy as np
 
 from utils.manipulation_tools import merge_dict

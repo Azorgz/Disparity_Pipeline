@@ -1,0 +1,6 @@
+[submodule "utils/Images-Cameras"]
+	path = utils/Images-Cameras
+	url = https://github.com/Azorgz/Images-Cameras.git
+[submodule "utils/ImagesCameras"]
+	path = utils/ImagesCameras
+	url = https://github.com/Azorgz/ImagesCameras.git

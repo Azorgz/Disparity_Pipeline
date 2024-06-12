@@ -4,8 +4,8 @@ from collections import OrderedDict
 import numpy as np
 import yaml
 from torch.utils.data import Dataset, DataLoader
-from utils.classes import CameraSetup
-from utils.classes.Image.Image import ImageTensor
+from utils.ImagesCameras import CameraSetup
+from utils.ImagesCameras import ImageTensor
 from utils.manipulation_tools import list_to_dict
 from utils.misc import timeit, name_generator
 
@@ -77,9 +77,6 @@ class StereoDataSet(Dataset):
             raise FileNotFoundError("We need paths for the data")
         self.files = {}
         for key, path in self.cameras_paths.items():
-            # self.files[key] = sorted([glob(p + '/*.png') +
-            #                          glob(p + '/*.jpg') +
-            #                          glob(p + '/*.jpeg') for p in path])
             self.files[key] = self.camera_setup.cameras[key].files
 
         if config["dataset"]["number_of_sample"] <= 0:

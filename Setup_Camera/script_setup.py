@@ -2,8 +2,8 @@ import math
 import os
 
 import torch
-from utils.classes.Cameras import RGBCamera, IRCamera
-from utils.classes import CameraSetup
+from utils.ImagesCameras import Camera
+from utils.ImagesCameras import CameraSetup
 
 name_path = '/'
 perso = '/home/aurelien/Images/Images_LYNRED/'
@@ -16,15 +16,11 @@ path_RGB2 = p + 'Day/slave/visible'
 path_IR = p + 'Day/master/infrared_corrected'
 path_IR2 = p + 'Day/slave/infrared_corrected'
 
-IR = IRCamera(path=path_IR, device=torch.device('cuda'), id='IR', name='SmartIR640', f=14, pixel_size=16.4,
-              aperture=1.2)
+IR = Camera(path=path_IR, device=torch.device('cuda'), id='IR', f=14, name='SmartIR640', sensor_name='SmartIR640')
+IR2 = Camera(path=path_IR2, device=torch.device('cuda'), id='IR2', f=14, name='subIR', sensor_name='SmartIR640')
+RGB = Camera(path=path_RGB, device=torch.device('cuda'), id='RGB', f=6, name='mainRGB', sensor_name='RGBLynred')
+RGB2 = Camera(path=path_RGB2, device=torch.device('cuda'), id='RGB2', f=6, name='subRGB', sensor_name='RGBLynred')
 
-IR2 = IRCamera(path=path_IR2, device=torch.device('cuda'), id='IR2', name='subIR', f=14, pixel_size=(16.4, 16.4),
-               aperture=1.2)
-RGB = RGBCamera(path=path_RGB, device=torch.device('cuda'), id='RGB', name='mainRGB', f=6, pixel_size=3.45,
-                aperture=1.4)
-RGB2 = RGBCamera(path=path_RGB2, device=torch.device('cuda'), id='RGB2', name='subRGB', f=6, pixel_size=(3.45, 3.45),
-                 aperture=1.4)
 R = CameraSetup(RGB, IR, IR2, RGB2, print_info=True)
 
 d_calib = 5

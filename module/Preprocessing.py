@@ -1,5 +1,5 @@
 from module.PostProcessing import PostProcessing
-from utils.classes.Geometry.transforms import Resize, Pad, DispSide, Compose
+from utils.ImagesCameras.Geometry.transforms import Resize, Pad, DispSide, Compose
 
 
 class Preprocessing:

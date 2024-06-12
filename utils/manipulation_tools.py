@@ -5,7 +5,7 @@ from kornia import create_meshgrid
 from kornia.utils import get_cuda_device_if_available
 from torch import Tensor, FloatTensor, cat
 from kornia.feature.responses import harris_response
-from utils.classes import ImageTensor
+from utils.ImagesCameras import ImageTensor
 
 
 def prepare_points_depth(depth):

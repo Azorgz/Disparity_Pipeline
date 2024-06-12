@@ -8,7 +8,7 @@ from torch import nn, tensor, Tensor
 from torchvision.models.detection import MaskRCNN_ResNet50_FPN_Weights, maskrcnn_resnet50_fpn
 from ultralytics import YOLO
 
-from utils.classes import ImageTensor
+from utils.ImagesCameras import ImageTensor
 from .estimation import Semantics, Disparity
 from .refinement import Refine
 

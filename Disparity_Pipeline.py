@@ -15,7 +15,7 @@ from module.Validation import Validation
 from utils.manipulation_tools import merge_dict
 # Utils
 from utils.misc import time2str, update_name_tree
-from utils.classes import CameraSetup
+from utils.ImagesCameras import CameraSetup
 
 
 # Networks

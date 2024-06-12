@@ -6,7 +6,7 @@ import oyaml as yaml
 from Disparity_Pipeline import Pipe
 from config.Config import ConfigPipe
 from module.Process import Process
-from utils.classes.Vizualisation.Visualizer import Visualizer
+from utils.ImagesCameras import Visualizer
 
 
 def quick_process(idx, script_path):

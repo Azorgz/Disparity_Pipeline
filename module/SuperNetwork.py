@@ -10,7 +10,7 @@ from Networks.UniMatch.unimatch.unimatch import UniMatch
 from config.Config import ConfigPipe
 from module.BaseModule import BaseModule
 from module.Preprocessing import Preprocessing
-from utils.classes.Image.Image import DepthTensor
+from utils.ImagesCameras.Image.Image import DepthTensor
 from utils.misc import timeit, count_parameter
 
 
