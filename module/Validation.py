@@ -9,7 +9,7 @@ from module.BaseModule import BaseModule
 from utils.ImagesCameras.Metrics import stats_dict, norms_dict
 import numpy as np
 
-from utils.manipulation_tools import merge_dict
+from utils.misc import merge_dict
 from utils.misc import timeit, deactivated
 
 
@@ -60,8 +60,7 @@ class Validation(BaseModule):
         for key, n in self.norms.items():
             if key not in self.res[name].keys():
                 self.res[name][key] = {}
-            mask = new > 0
-            # mask = erosion(mask, torch.ones(3, 3).to(self.device)) > 0
+            mask = new.BINARY(threshold=0, method='gt', keepchannel=False)
             res_new = n(ref, new, mask=mask)
             res_old = n(ref, old, mask=mask)
             if occlusion is not None:

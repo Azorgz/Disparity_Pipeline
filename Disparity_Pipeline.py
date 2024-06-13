@@ -12,7 +12,7 @@ from module.ImageWrapper import ImageWrapper
 from module.Process import Process
 from module.SuperNetwork import SuperNetwork
 from module.Validation import Validation
-from utils.manipulation_tools import merge_dict
+from utils.misc import merge_dict
 # Utils
 from utils.misc import time2str, update_name_tree
 from utils.ImagesCameras import CameraSetup

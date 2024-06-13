@@ -6,7 +6,7 @@ import yaml
 from torch.utils.data import Dataset, DataLoader
 from utils.ImagesCameras import CameraSetup
 from utils.ImagesCameras import ImageTensor
-from utils.manipulation_tools import list_to_dict
+from utils.misc import list_to_dict
 from utils.misc import timeit, name_generator
 
 

@@ -5,7 +5,7 @@ Option:
   setup: # Paths to the config file of the pre-calibrated camera's setup
     path: Setup_Camera/Lynred_day.yaml
   dataset:
-    number_of_sample: 50
+    number_of_sample: 5
     shuffle: True
   realtime : True
   monocular_depth_network:

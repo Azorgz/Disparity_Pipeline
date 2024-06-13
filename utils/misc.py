@@ -12,15 +12,7 @@ import os
 import struct
 
 
-def print_tuple(t, link=' '):
-    t = [*t]
-    string = ''
-    for el in t:
-        string += str(el)
-        string += link
-    return string
-
-
+# Names managing functions ##################################
 def name_generator(idx, max_number=10e4):
     k_str = str(idx)
     digits = 1 if max_number < 10 else int(math.log10(max_number)) + 1
@@ -140,6 +132,8 @@ def timeit(func):
 
 
 def time_fct(func, reps=1, exclude_first=False):
+    reps = max(1, reps)
+
     def wrapper(*args, **kwargs):
         if exclude_first:
             start = time.time()
@@ -160,7 +154,86 @@ def time_fct(func, reps=1, exclude_first=False):
                 f"{f', first occurence : {first}' if exclude_first else ''}")
         print("------------------------------------------------------------------------------------------------")
         return res
+
     return wrapper
+
+
+# Dict manipulation ##################################
+def list_to_dict(list_of_dict):
+    res = {}
+    for d in list_of_dict:
+        if d.keys() == res.keys():
+            for key in d.keys():
+                res[key].append(d[key])
+        else:
+            for key in d.keys():
+                res[key] = [d[key]]
+    return res
+
+
+def merge_dict(dict1: dict, dict2: dict, *args):
+    if not dict1.keys() == dict2.keys():
+        res = dict1 | dict2
+        if args:
+            res = merge_dict(res, *args)
+    else:
+        res = dict1.copy()
+        for k in res.keys():
+            if isinstance(res[k], dict) and isinstance(dict2[k], dict):
+                res[k] = merge_dict(res[k], dict2[k])
+            elif isinstance(res[k], list) and isinstance(dict2[k], list):
+                if isinstance(res[k][0], list):
+                    res[k] = [*res[k], dict2[k]]
+                else:
+                    res[k] = [res[k], dict2[k]]
+                # for idx, (r1, r2) in enumerate(zip(res[k], dict2[k])):
+                #     if isinstance(r1, dict) and isinstance(r2, dict):
+                #         res[k][idx] = merge_dict(r1, r2)
+                #     elif isinstance(r1, list) and isinstance(r2, float):
+                #         res[k][idx] = [*r1, r2]
+                #     elif isinstance(r1, float) and isinstance(r2, list):
+                #         res[k][idx] = [r1, *r2]
+                #     else:
+                #         res[k][idx] = [r1, r2]
+            elif (isinstance(res[k], list) and
+                  (isinstance(dict2[k], float) or isinstance(dict2[k], int) or isinstance(dict2[k], str))):
+                res[k] = [*res[k], dict2[k]]
+            elif ((isinstance(res[k], float) or isinstance(res[k], int) or isinstance(res[k], str)) and
+                  isinstance(dict2[k], list)):
+                res[k] = [res[k], *dict2[k]]
+            else:
+                res[k] = [res[k], dict2[k]]
+        if args:
+            res = merge_dict(res, *args)
+    return res
+
+
+def flatten_dict(x):
+    result = []
+    if isinstance(x, dict):
+        x = x.values()
+    for el in x:
+        if isinstance(el, dict) and not isinstance(el, str):
+            result.extend(flatten_dict(el))
+        else:
+            result.append(el)
+    return result
+
+
+def map_dict_level(d: dict, level=0, map_of_dict=[], map_of_keys=[]):
+    if len(map_of_dict) <= level:
+        map_of_dict.append([len(d)])
+        map_of_keys.append(list(d.keys()))
+    else:
+        map_of_dict[level].append(len(d))
+    for idx, res in d.items():
+        if isinstance(res, dict):
+            map_of_dict, map_of_keys = map_dict_level(res, level + 1, map_of_dict, map_of_keys)
+        else:
+            return map_of_dict, map_of_keys
+    if level == 0:
+        map_of_dict.pop(0)
+    return map_of_dict, map_of_keys
 
 
 def deactivated(func):
@@ -198,32 +271,6 @@ class ClassAnalyzer:
             return self.cum_time / self.c
         else:
             return 0
-
-
-def form_cloud_data(sample, pred_disp, image_reg, new_disp, config):
-    if config['pointsCloud']['disparity']:
-        if config['dataset']['pred_bidir_disp']:
-            if config['dataset']['proj_right']:
-                cloud_disp = pred_disp[1].copy()
-            else:
-                cloud_disp = pred_disp[0].copy()
-        else:
-            cloud_disp = pred_disp.copy()
-        cloud_sample = {key: im.copy() for key, im in sample.items()}
-        cloud_sample['other'] = image_reg
-    else:
-        cloud_disp = {}
-        if config['pointsCloud']['mode'] == 'stereo' or config['pointsCloud']['mode'] == 'both':
-            if config['dataset']['pred_bidir_disp']:
-                cloud_disp = {'left': pred_disp[0], 'right': pred_disp[1]}
-            elif config['dataset']['pred_right_disp']:
-                cloud_disp = {'right': pred_disp.copy()}
-            else:
-                cloud_disp = {'left': pred_disp.copy()}
-        if config['pointsCloud']['mode'] == 'other' or config['pointsCloud']['mode'] == 'both':
-            cloud_disp['other'] = new_disp.copy()
-        cloud_sample = {key: im.copy() for key, im in sample.items()}
-    return cloud_sample, cloud_disp
 
 # def save_command(save_path, filename='command_train.txt'):
 #     check_path(save_path)
