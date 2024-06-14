@@ -140,9 +140,8 @@ class Pipe:
         if path is None:
             path = self.path_output
         name = os.path.join(path, f"Summary_experiment.yaml")
-        summary = experiment.summary()
         with open(name, "w") as file:
-            yaml.dump(summary, file)
+            yaml.dump(experiment.summary(), file)
 
     def save_timers(self, experiment=None, filename=None, replace=False):
         path = experiment.path

@@ -85,6 +85,7 @@ reconstruction:
 # Validation of the result #######
 validation:
   activated: True
+  post_validation: False
   indices:
     # value based errors:
     rmse: True      # Root Mean Square Error

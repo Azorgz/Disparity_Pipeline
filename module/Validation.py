@@ -6,9 +6,11 @@ import yaml
 from kornia.morphology import erosion
 
 from module.BaseModule import BaseModule
+from utils.ImagesCameras import ImageTensor
 from utils.ImagesCameras.Metrics import stats_dict, norms_dict
 import numpy as np
 
+from utils.ImagesCameras.tools.drawing import extract_roi_from_images
 from utils.misc import merge_dict
 from utils.misc import timeit, deactivated
 
@@ -31,10 +33,12 @@ class Validation(BaseModule):
     def _update_conf(self, config, *args, **kwargs):
         self.activated = config["validation"]['activated']
         if self.activated:
+            self.mask_cum = None
             self.norms = {}
             self.res = {}
             self.stats = {}
             self.res_stats = {}
+            self.post_validation = config["validation"]['post_validation']
             self.exp_name = None
             norms = config["validation"]['indices']
             for key, value in norms.items():
@@ -53,67 +57,84 @@ class Validation(BaseModule):
 
     @deactivated
     @timeit
-    def __call__(self, new, ref, old, name, exp_name, *args, occlusion=None, **kwargs):
+    def __call__(self, new, ref, old, name, exp_name, *args, occlusion=None, roi=None, **kwargs):
         self.exp_name = exp_name
-        if name not in self.res.keys():
-            self.res[name] = {}
-        for key, n in self.norms.items():
-            if key not in self.res[name].keys():
-                self.res[name][key] = {}
-            mask = new.BINARY(threshold=0, method='gt', keepchannel=False)
-            res_new = n(ref, new, mask=mask)
-            res_old = n(ref, old, mask=mask)
-            if occlusion is not None:
-                res_occlusion = n(ref, new, mask=~occlusion)
+        if self.post_validation:
+            if self.mask_cum is None:
+                self.mask_cum = new.BINARY(threshold=0, method='gt', keepchannel=False)
             else:
-                res_occlusion = -1
-            res = {'ref': round(float(res_old), 3),
-                   'new': round(float(res_new), 4),
-                   'new_occ': round(float(res_occlusion), 4)}
-            if self.res[name][key] == {}:
-                self.res[name][key] = res
-            else:
-                self.res[name][key] = merge_dict(self.res[name][key], res)
+                self.mask_cum *= new.BINARY(threshold=0, method='gt', keepchannel=False)
+        else:
+            if name not in self.res.keys():
+                self.res[name] = {}
+            for key, n in self.norms.items():
+                if key not in self.res[name].keys():
+                    self.res[name][key] = {}
+                if roi is not None:
+                    new = ImageTensor(new[:, :, roi[0]:roi[2], roi[1]:roi[3]])
+                    ref = ImageTensor(ref[:, :, roi[0]:roi[2], roi[1]:roi[3]])
+                    old = ImageTensor(old[:, :, roi[0]:roi[2], roi[1]:roi[3]])
+                    occlusion = None
+                mask = new.BINARY(threshold=0, method='gt', keepchannel=False)
+                res_new = n(ref, new, mask=mask)
+                res_old = n(ref, old, mask=mask)
+                if occlusion is not None:
+                    res_occlusion = n(ref, new, mask=~occlusion)
+                else:
+                    res_occlusion = -1
+                res = {'ref': round(float(res_old), 3),
+                       'new': round(float(res_new), 4),
+                       'new_occ': round(float(res_occlusion), 4)}
+                if self.res[name][key] == {}:
+                    self.res[name][key] = res
+                else:
+                    self.res[name][key] = merge_dict(self.res[name][key], res)
 
     @deactivated
     def statistic(self):
-        for key, norms in self.res.items():
-            self.res_stats[key] = {}
-            for key_norms, n in norms.items():
-                self.res_stats[key][key_norms] = {}
-                for key_stat, stat in self.stats.items():
-                    sample = self.res[key][key_norms]
-                    if isinstance(sample['new'], list):
-                        res_stat = stat(np.array(sample['new']), 0).round(3)
-                        ref_stat = stat(np.array(sample['ref']), 0).round(3)
-                        occlusion_stat = stat(np.array(sample['new_occ']), 0).round(3)
-                        self.res_stats[key][key_norms][key_stat] = {'ref': float(ref_stat),
-                                                                    'new': float(res_stat),
-                                                                    'new_occ': float(occlusion_stat)}
-                    else:
-                        self.res_stats[key][key_norms][key_stat] = {'ref': float(np.array(sample['new']).round(3)),
-                                                                    'new': float(np.array(sample['ref']).round(3)),
-                                                                    'new_occ': float(
-                                                                        np.array(sample['new_occ']).round(3))}
+        if self.mask_cum is not None:
+            self.mask_cum, _ = extract_roi_from_images(self.mask_cum)
+        else:
+            for key, norms in self.res.items():
+                self.res_stats[key] = {}
+                for key_norms, n in norms.items():
+                    self.res_stats[key][key_norms] = {}
+                    for key_stat, stat in self.stats.items():
+                        sample = self.res[key][key_norms]
+                        if isinstance(sample['new'], list):
+                            res_stat = stat(np.array(sample['new']), 0).round(3)
+                            ref_stat = stat(np.array(sample['ref']), 0).round(3)
+                            occlusion_stat = stat(np.array(sample['new_occ']), 0).round(3)
+                            self.res_stats[key][key_norms][key_stat] = {'ref': float(ref_stat),
+                                                                        'new': float(res_stat),
+                                                                        'new_occ': float(occlusion_stat)}
+                        else:
+                            self.res_stats[key][key_norms][key_stat] = {'ref': float(np.array(sample['new']).round(3)),
+                                                                        'new': float(np.array(sample['ref']).round(3)),
+                                                                        'new_occ': float(
+                                                                            np.array(sample['new_occ']).round(3))}
 
     def reset(self):
         self._update_conf(self.config)
 
     @deactivated
     def save(self, path, name=None):
-        stat_dict = {key: np.array(item).tolist() for key, item in self.res_stats.items()}
-        res_dict = {key: np.array(item).tolist() for key, item in self.res.items()}
-        res = {"1. stats": stat_dict, "2. results": res_dict}
-        if name is None:
-            name = os.path.join(path, "Validation.yaml")
+        if self.mask_cum is not None:
+            res = {"Cumulative Mask": self.mask_cum}
+            name = os.path.join(path, "CumMask.yaml")
         else:
-            name = os.path.join(path, name)
-            with open(name, 'r') as file:
-                validation = yaml.safe_load(file)
-            res = merge_dict(validation, res)
+            stat_dict = {key: np.array(item).tolist() for key, item in self.res_stats.items()}
+            res_dict = {key: np.array(item).tolist() for key, item in self.res.items()}
+            res = {"1. stats": stat_dict, "2. results": res_dict}
+            if name is None:
+                name = os.path.join(path, "Validation.yaml")
+            else:
+                name = os.path.join(path, name)
+                with open(name, 'r') as file:
+                    validation = yaml.safe_load(file)
+                res = merge_dict(validation, res)
         with open(name, "w") as file:
             yaml.dump(res, file)
-        self.activated = False
 
 #
 # def calculate_fft(im):

@@ -191,6 +191,7 @@ class ConfigPipe(dict):
         self['validation']['stats'] = {'mean': config['stats']['mean'],
                                        'std': config['stats']['std']}
         self['validation']['activated'] = config['activated']
+        self['validation']['post_validation'] = config['activated']
 
 
 def configure_parser(parser, config, path_config=None, dict_vars=None):

@@ -8,6 +8,8 @@ Option:
     number_of_sample: 5
     shuffle: True
   realtime : True
+  validation:
+    post_validation: True
   monocular_depth_network:
     name: depthanything
   depth_network:
@@ -48,7 +50,7 @@ Disparity-Disparity:
     method: disparity
     option: [return_depth_reg, return_occlusion]
   valid: [IR, RGB]
-  save: [pred_disp, image_reg, disp_reg, occlusion]
+  save: [ pred_depth, image_reg ]
 
 
 Disparity-Depth:
@@ -60,7 +62,7 @@ Disparity-Depth:
     method: depth
     option: [ return_depth_reg, return_occlusion]
   valid: [ IR, RGB ]
-  save: [ pred_depth, image_reg, depth_reg, occlusion ]
+  save: [ pred_depth, image_reg ]
 
 
 Depth-Disparity:
@@ -72,7 +74,7 @@ Depth-Disparity:
     method: disparity
     option: [return_depth_reg, return_occlusion]
   valid: [IR, RGB]
-  save: [pred_depth, image_reg, depth_reg, occlusion]
+  save: [ pred_depth, image_reg ]
 
 #
 
