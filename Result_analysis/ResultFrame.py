@@ -5,7 +5,7 @@ import oyaml as yaml
 from matplotlib import pyplot as plt
 from pandas import DataFrame
 from pandas._typing import ArrayLike
-from utils.manipulation_tools import merge_dict
+from utils.misc import merge_dict
 
 
 # from utils.classes.Image import ImageTensor
