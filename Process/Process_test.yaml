@@ -5,7 +5,7 @@ Option:
   setup: # Paths to the config file of the pre-calibrated camera's setup
     path: Setup_Camera/Lynred_day.yaml
   dataset:
-    number_of_sample: 5
+    number_of_sample: 20
     shuffle: True
   realtime : True
   validation:
@@ -25,7 +25,7 @@ monocular_depth:
   wrap:
     cameras: [ IR, RGB ]
     method: depth
-    option: [ return_depth_reg, return_occlusion, upsample=1 ]
+    option: [ return_depth_reg, return_occlusion ]
   valid: [ IR, RGB ]
   save: [ pred_depth, image_reg ]
 
@@ -41,40 +41,40 @@ monocular_disp:
   valid: [ IR, RGB ]
   save: [ pred_depth, image_reg ]
 #
-Disparity-Disparity:
-  disparity:
-    cameras: [RGB, RGB2]
-    option: [inference_size: [480, 640]]
-  wrap:
-    cameras: [IR, RGB]
-    method: disparity
-    option: [return_depth_reg, return_occlusion]
-  valid: [IR, RGB]
-  save: [ pred_depth, image_reg ]
-
-
-Disparity-Depth:
-  disparity:
-    cameras: [ IR, IR2 ]
-    option: [ ]
-  wrap:
-    cameras: [ IR, RGB ]
-    method: depth
-    option: [ return_depth_reg, return_occlusion]
-  valid: [ IR, RGB ]
-  save: [ pred_depth, image_reg ]
-
-
-Depth-Disparity:
-  depth:
-    cameras: [RGB, RGB2]
-    option: []
-  wrap:
-    cameras: [IR, RGB]
-    method: disparity
-    option: [return_depth_reg, return_occlusion]
-  valid: [IR, RGB]
-  save: [ pred_depth, image_reg ]
+#Disparity-Disparity:
+#  disparity:
+#    cameras: [RGB, RGB2]
+#    option: [inference_size: [480, 640]]
+#  wrap:
+#    cameras: [IR, RGB]
+#    method: disparity
+#    option: [return_depth_reg, return_occlusion]
+#  valid: [IR, RGB]
+#  save: [ pred_depth, image_reg ]
+#
+#
+#Disparity-Depth:
+#  disparity:
+#    cameras: [ IR, IR2 ]
+#    option: [ ]
+#  wrap:
+#    cameras: [ IR, RGB ]
+#    method: depth
+#    option: [ return_depth_reg, return_occlusion]
+#  valid: [ IR, RGB ]
+#  save: [ pred_depth, image_reg ]
+#
+#
+#Depth-Disparity:
+#  depth:
+#    cameras: [RGB, RGB2]
+#    option: []
+#  wrap:
+#    cameras: [IR, RGB]
+#    method: disparity
+#    option: [return_depth_reg, return_occlusion]
+#  valid: [IR, RGB]
+#  save: [ pred_depth, image_reg ]
 
 #
 

@@ -115,9 +115,9 @@ class StereoDataSet(Dataset):
     @timeit
     def __getitem__(self, index, batched=True):
         if batched:
-            sample = {key: ImageTensor(p, device=self.device) for key, p in self.samples[index].items()}
+            sample = {key: ImageTensor(p, device=self.device).clamp(0.004, 1) for key, p in self.samples[index].items()}
         else:
-            sample = {key: ImageTensor(p, device=self.device) for key, p in self.samples[index].items()}
+            sample = {key: ImageTensor(p, device=self.device).clamp(0.004, 1) for key, p in self.samples[index].items()}
         if self.reset_images_name:
             for key in sample.keys():
                 sample[key].im_name = f'{key}_{name_generator(index, max_number=len(self))}'
