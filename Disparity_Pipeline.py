@@ -74,12 +74,12 @@ class Pipe:
                         update_name_tree(sample, experiment.setup.name)
                         experiment(sample, setup=experiment.setup, wrapper=self.wrapper)
                         bar.update(1)
-                if self.timeit:
-                    self.save_timers(experiment, name)
-                    self.reset_timers()
                 if self.save_inputs or config["validation"]['post_validation']:
                     self.dataloader.dataset.save_conf(experiment.path)
                 self.validation.statistic(path=experiment.path)
+                if self.timeit:
+                    self.save_timers(experiment, name)
+                    self.reset_timers()
                 self.validation.save(path=experiment.path)
                 self.validation.reset()
                 if experiment.setup is not self.setup:

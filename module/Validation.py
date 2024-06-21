@@ -89,6 +89,7 @@ class Validation(BaseModule):
                     new_cumroi = ImageTensor(new[:, :, cum_roi[0]:cum_roi[1], cum_roi[2]:cum_roi[3]])
                     ref_cumroi = ImageTensor(ref[:, :, cum_roi[0]:cum_roi[1], cum_roi[2]:cum_roi[3]])
                     old_cumroi = ImageTensor(old[:, :, cum_roi[0]:cum_roi[1], cum_roi[2]:cum_roi[3]])
+                    mask = None
                     res_new = n(ref_cumroi, new_cumroi, mask=mask)
                     res_old = n(ref_cumroi, old_cumroi, mask=mask)
                     res.update({'ref_cumroi': round(float(res_old), 4),
@@ -109,7 +110,6 @@ class Validation(BaseModule):
                     self.res[name][key] = merge_dict(self.res[name][key], res)
 
     @deactivated
-    @timeit
     def statistic(self, path=None):
         if self.post_validation:
             roi = np.array(self.roi)
@@ -185,19 +185,24 @@ class Validation(BaseModule):
             im_ref = s[cam_dst]
             image_reg = s['image_reg'].match_shape(im_ref)
             im_old = s[cam_src].match_shape(im_ref)
+            occlusion = sample['occ'] if 'occ' in s.keys() else None
             index = s['idx']
-            self(image_reg, im_ref, im_old, name, path.split('/')[-1], roi=self.roi[index], cum_roi=self.total_roi)
+            self(image_reg, im_ref, im_old, name, path.split('/')[-1],
+                 roi=self.roi[index], cum_roi=self.total_roi, occlusion=occlusion)
 
         with tqdm(total=nb_sample,
                   desc=f"Nombre d'itérations for {path.split('/')[-1]} - Validation : ", leave=True, position=0) as bar:
-            for idx, (im_src, im_dst, im_reg) in enumerate(zip(input_src,
-                                                               input_dst,
-                                                               sorted(glob.glob(
-                                                                   path + f'/image_reg/{cam_src}_to_{cam_dst}/*')))):
-                sample = {cam_dst: ImageTensor(im_dst, device=self.device),
-                          cam_src: ImageTensor(im_src, device=self.device),
-                          'image_reg': ImageTensor(im_reg, device=self.device),
-                          'idx': idx}
+            source = [input_src, input_dst]
+            keys = [cam_src, cam_dst]
+            if os.path.exists(path + f'/image_reg/{cam_src}_to_{cam_dst}/*'):
+                source.append(sorted(glob.glob(path + f'/image_reg/{cam_src}_to_{cam_dst}/*')))
+                keys.append('image_reg')
+            if os.path.exists(path + f'/occlusion/{cam_src}_to_{cam_dst}/*'):
+                source.append(sorted(glob.glob(path + f'/image_reg/{cam_src}_to_{cam_dst}/*')))
+                keys.append('occ')
+            for idx, src in enumerate(zip(*source)):
+                sample = {key: ImageTensor(s, device=self.device) for (key, s) in zip(keys, src)}
+                sample["idx"] = idx
                 valid(sample)
                 bar.update(1)
             self.statistic(path)
