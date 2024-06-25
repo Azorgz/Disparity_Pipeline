@@ -15,6 +15,7 @@ name_experiment: methods_comparison
 save_inputs: True # Save the input images paths
 save_disp: True # Save all the disparity images computed
 save_reg_images: True # Save the final Registered image
+save_depth: 8  # Depth of the Image value
 
 
 # Cameras Setup #########

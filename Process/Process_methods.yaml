@@ -1,5 +1,5 @@
 # --------------------------- Name --------------------------- #
-Name: -- Method Process --
+Name: ---|| Method Process ||---
 
 # --------------------------------------------------------------- #
 # --------------------------- Options --------------------------- #
@@ -9,7 +9,7 @@ Option:
   setup: # Paths to the config file of the pre-calibrated camera's setup
     path: Setup_Camera/Lynred_day.yaml
   dataset:
-    number_of_sample: 10
+    number_of_sample: 3
     shuffle: False
   realtime: True
   validation:

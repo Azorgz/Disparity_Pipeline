@@ -103,7 +103,9 @@ class Validation(BaseModule):
                 # Compute the indices of each images without cut to ROI  but with a mask of pixel > 0  + occlusion
                 if occlusion is not None:
                     res_occlusion = n(ref, new, mask=~occlusion)
+                    ref_occlusion = n(ref, old, mask=~occlusion)
                     res.update({'new_occ': round(float(res_occlusion), 4)})
+                    res.update({'ref_occ': round(float(ref_occlusion), 4)})
                 if self.res[name][key] == {}:
                     self.res[name][key] = res
                 else:

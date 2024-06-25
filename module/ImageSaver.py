@@ -9,6 +9,9 @@ class ImageSaver(BaseModule):
     def __init__(self, config, *args, **kwargs):
         super(ImageSaver, self).__init__(config, *args, **kwargs)
 
+    def _update_conf(self, config, *args, **kwargs):
+        self.device = config["device"]["device"]
+
     def __str__(self):
         return ''
 
