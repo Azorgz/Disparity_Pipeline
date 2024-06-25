@@ -41,5 +41,5 @@ def quick_process(idx, script_path):
 
 
 if __name__ == '__main__':
-    quick_process(None, 'Process/Process_test.yaml')
+    quick_process(None, 'Process/Process_methods.yaml')
     #[1324, 2159, 2543, 3493]

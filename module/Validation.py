@@ -185,19 +185,20 @@ class Validation(BaseModule):
             im_ref = s[cam_dst]
             image_reg = s['image_reg'].match_shape(im_ref)
             im_old = s[cam_src].match_shape(im_ref)
-            occlusion = sample['occ'] if 'occ' in s.keys() else None
+            occlusion = sample['occ'].BINARY(keepchannel=False) if 'occ' in s.keys() else None
             index = s['idx']
             self(image_reg, im_ref, im_old, name, path.split('/')[-1],
                  roi=self.roi[index], cum_roi=self.total_roi, occlusion=occlusion)
 
         with tqdm(total=nb_sample,
-                  desc=f"Nombre d'itérations for {path.split('/')[-1]} - Validation : ", leave=True, position=0) as bar:
+                  desc=f"Nombre d'itérations for {path.split('/')[-1]} - Validation : ",
+                  leave=True, position=0) as bar:
             source = [input_src, input_dst]
             keys = [cam_src, cam_dst]
-            if os.path.exists(path + f'/image_reg/{cam_src}_to_{cam_dst}/*'):
+            if os.path.exists(path + f'/image_reg/{cam_src}_to_{cam_dst}'):
                 source.append(sorted(glob.glob(path + f'/image_reg/{cam_src}_to_{cam_dst}/*')))
                 keys.append('image_reg')
-            if os.path.exists(path + f'/occlusion/{cam_src}_to_{cam_dst}/*'):
+            if os.path.exists(path + f'/occlusion/{cam_src}_to_{cam_dst}'):
                 source.append(sorted(glob.glob(path + f'/image_reg/{cam_src}_to_{cam_dst}/*')))
                 keys.append('occ')
             for idx, src in enumerate(zip(*source)):

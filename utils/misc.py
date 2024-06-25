@@ -83,6 +83,37 @@ def path_leaf(path):
     return res
 
 
+def add_ext(word, ext):
+    if ext != '':
+        return f'{word}_{ext}'
+    else:
+        return word
+
+
+def create_function_from_string(func_name, function_code, prop=False, **kwargs):
+    # Define the function code as a string
+    var_name = list(kwargs.keys())
+    for k in var_name:
+        exec(f'{k} = kwargs["{k}"]')
+    func_code = f"""
+{'@property' if prop else ''}
+def {func_name}({', '.join(var_name)}):
+    {function_code}
+    """
+    exec(func_code)
+    print(func_code)
+
+
+def extract_key_pairs(data: dict) -> list[tuple]:
+    """
+    Function that extracts key pairs from a dictionary and return it as a list of tuples
+    :param data: dict to process
+    :return: tuples of (ext, new, ref)
+    """
+    keys_list = [k.replace('new', '').replace('_', '') for k in data.keys() if 'new' in k]
+    return [(k, add_ext('new', k), add_ext('ref', k)) for k in keys_list]
+
+
 def update(d, u):
     for k, v in u.items():
         if isinstance(v, collections.abc.Mapping):

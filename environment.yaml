@@ -33,3 +33,5 @@ dependencies:
       - ultralytics
       - git+https://github.com/openai/CLIP.git
       - scikit-image
+      - gspread_dataframe
+      - oauth2client
