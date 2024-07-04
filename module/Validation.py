@@ -208,7 +208,7 @@ class Validation(BaseModule):
                 sample["idx"] = idx
                 valid(sample)
                 bar.update(1)
-            self.statistic(path)
+        self.statistic(path)
 
 #
 # def calculate_fft(im):

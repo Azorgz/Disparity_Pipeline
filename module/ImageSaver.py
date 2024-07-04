@@ -19,4 +19,4 @@ class ImageSaver(BaseModule):
     def __call__(self, var: dict, path: Union[str, Path], *args, **kwargs):
         for key, im in var.items():
             # name = f'{im.im_name}.png'
-            im.save(path + f'/{key}')
+            im.save(path + f'/{key}', depth=8)

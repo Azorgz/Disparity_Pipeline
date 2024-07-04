@@ -1,15 +1,15 @@
 # --------------------------- Name --------------------------- #
-Name: ---|| Method Process ||---
+Name: ---|| Method Day ||---
 
 # --------------------------------------------------------------- #
 # --------------------------- Options --------------------------- #
 # --------------------------------------------------------------- #
 Option:
-  name_experiment: methods_comparison
+  name_experiment: methods_comparison_day
   setup: # Paths to the config file of the pre-calibrated camera's setup
     path: Setup_Camera/Lynred_day.yaml
   dataset:
-    number_of_sample: 3
+    number_of_sample: 0
     shuffle: False
   realtime: True
   validation:

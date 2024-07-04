@@ -29,8 +29,8 @@ from pprint import pprint
 
 import torch
 
-from utils.classes import ImageTensor
-from utils.misc import time_fct
+from utils.ImagesCameras import ImageTensor
+from utils.ImagesCameras.tools.misc import time_fct
 from zoedepth.utils.easydict import EasyDict as edict
 from tqdm import tqdm
 

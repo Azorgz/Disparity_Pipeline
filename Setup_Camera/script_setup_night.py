@@ -2,12 +2,12 @@ import math
 import os
 
 import torch
-from utils.classes.Cameras import RGBCamera, IRCamera
-from module.SetupCameras import CameraSetup
+from utils.ImagesCameras import Camera
+from utils.ImagesCameras import CameraSetup
 
 name_path = '/'
 perso = '/home/aurelien/Images/Images_LYNRED/'
-pro = '/home/godeta/PycharmProjects/Datasets/Lynred/'
+pro = '/media/godeta/T5 EVO/Datasets/Lynred/'
 
 p = pro if 'godeta' in os.getcwd() else perso
 
@@ -16,20 +16,17 @@ path_RGB2 = p + 'Night/slave/visible'
 path_IR = p + 'Night/master/infrared_corrected'
 path_IR2 = p + 'Night/slave/infrared_corrected'
 
-IR = IRCamera(path=path_IR, device=torch.device('cuda'), id='IR', name='SmartIR640', f=14, pixel_size=16.4,
-              aperture=1.2)
-IR2 = IRCamera(path=path_IR2, device=torch.device('cuda'), id='IR2', name='subIR', f=14, pixel_size=(16.4, 16.4),
-               aperture=1.2)
-RGB = RGBCamera(path=path_RGB, device=torch.device('cuda'), id='RGB', name='mainRGB', f=6, pixel_size=3.45,
-                aperture=1.4)
-RGB2 = RGBCamera(path=path_RGB2, device=torch.device('cuda'), id='RGB2', name='subRGB', f=6, pixel_size=(3.45, 3.45),
-                 aperture=1.4)
+IR = Camera(path=path_IR, device=torch.device('cuda'), id='IR', f=14, name='SmartIR640', sensor_name='SmartIR640')
+IR2 = Camera(path=path_IR2, device=torch.device('cuda'), id='IR2', f=14, name='subIR', sensor_name='SmartIR640')
+RGB = Camera(path=path_RGB, device=torch.device('cuda'), id='RGB', f=6, name='mainRGB', sensor_name='RGBLynred')
+RGB2 = Camera(path=path_RGB2, device=torch.device('cuda'), id='RGB2', f=6, name='subRGB', sensor_name='RGBLynred')
+
 R = CameraSetup(RGB, IR, IR2, RGB2, print_info=True)
 
 d_calib = 5
 center_x, center_y, center_z = 341 * 1e-03, 1, 0
 
-x, y, z = 0.127, 0, -0.0413
+x, y, z = 0.127, -0.008, -0.055  # -0.0413
 rx = 0  # math.atan((center_y - y) / d_calib) - math.atan(center_y / d_calib)
 ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
 rz = 0
@@ -41,7 +38,7 @@ ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
 rz = 0
 R.update_camera_relative_position('RGB2', x=x, y=y, z=z, ry=ry, rx=rx, rz=rz)
 
-x, y, z = 0.127 + 0.214 + 0.127, 0, -0.0413
+x, y, z = 0.127 + 0.214 + 0.127, -0.008, -0.055
 rx = 0  # math.atan((center_y - y) / d_calib) - math.atan(center_y / d_calib)
 ry = math.atan((center_x - x) / d_calib) - math.atan(center_x / d_calib)
 rz = 0

@@ -15,7 +15,7 @@ def create_directory(directory):
 
 
 metrics = ['rmse', 'psnr', 'ssim', 'ms_ssim', 'nec']
-folder = "methods_comparison"
+folder = "methods_comparison_night"
 base_path = os.getcwd() + "/../results/"
 
 for f in reversed(os.listdir(base_path + folder)):
