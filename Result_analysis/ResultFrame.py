@@ -34,7 +34,7 @@ class ResultFrame:
                     for ext, new, ref in extract_key_pairs(data[key]):
                         data[key][add_ext('delta', ext)] = np.array(data[key][new]) / (
                                     np.array(data[key][ref]) + 1e-6) - 1
-                        data[key][add_ext('delta', ext)][np.array(data[key][ref]) == 0] = 0.
+                        data[key][add_ext('delta', ext)][np.abs(np.array(data[key][ref])) < 0.01] = 0.
                         self.available_res.append(add_ext('delta', ext))
                         if self.mask_outlier is None:
                             lim = np.array(data[key][ref]).std() / 2

@@ -16,7 +16,7 @@ def quick_process(idx, script_path):
         assert os.path.exists(script_path)
     with open(script_path, 'r') as file:
         process_dict = yaml.safe_load(file)
-
+    path = os.getcwd() + "/temp"
     process_dict['Option']["output_path"] = '/'
     process_dict['Option']["name_experiment"] = 'temp'
     if idx is not None:
@@ -35,11 +35,10 @@ def quick_process(idx, script_path):
     config['validation']['stats']['std'] = False
     pipe = Pipe(config)
     pipe.run(process=process)
-    path = os.getcwd() + "/temp"
     Visualizer(path, search_exp=True).run()
     shutil.rmtree(path)
 
 
 if __name__ == '__main__':
-    quick_process(None, 'Process/Process_methods_night.yaml')
+    quick_process(None, 'Process/Process_test.yaml')
     #[1324, 2159, 2543, 3493]

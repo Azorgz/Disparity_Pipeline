@@ -41,8 +41,6 @@ class Pipe:
         # The Data information is stored here ###############
         self.save_inputs = config["save_inputs"]
         self.path_output = config["output_path"]
-        self.save_disp = config["save_disp"]
-        self.save_reg_images = config["save_reg_images"]
         self.name_experiment = config['name_experiment']
 
         # The different modules of the Pipe are initialized ###############

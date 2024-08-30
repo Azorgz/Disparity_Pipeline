@@ -26,7 +26,6 @@ class ImageWrapper(BaseModule):
 
     def _update_conf(self, config, *args, **kwargs):
         self.device = config["device"]["device"]
-        self.save_disp = config["save_disp"]
         self.remove_occlusion = config['reconstruction']['remove_occlusion']
         if self.remove_occlusion:
             self.post_process_image = config['reconstruction']['post_process_image']

@@ -218,7 +218,7 @@ class SuperNetwork(BaseModule):
                 right.name = im_right.name
                 res = {'left': left, 'right': right}
             elif self.pred_right:
-                right = DepthTensor(res[1], device=self.device)
+                right = DepthTensor(res[0], device=self.device)
                 right.name = im_right.name
                 res = {'right': right}
             else:

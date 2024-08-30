@@ -11,10 +11,24 @@ pro = '/media/godeta/T5 EVO/Datasets/Lynred/'
 
 p = pro if 'godeta' in os.getcwd() else perso
 
-path_RGB = p + 'Day/master/visible'
-path_RGB2 = p + 'Day/slave/visible'
-path_IR = p + 'Day/master/infrared_corrected'
-path_IR2 = p + 'Day/slave/infrared_corrected'
+dataset = "sequence"
+
+if dataset == "original":
+    # Original dataset
+    path_RGB = p + 'Day/master/visible'
+    path_RGB2 = p + 'Day/slave/visible'
+    path_IR = p + 'Day/master/infrared_corrected'
+    path_IR2 = p + 'Day/slave/infrared_corrected'
+    file_name = "Lynred_day"
+
+if dataset == "sequence":
+    # New dataset sequence
+    seq_num = 1
+    path_RGB = p + f'/sequence_{seq_num}/visible_1/'
+    path_RGB2 = p + f'/sequence_{seq_num}/visible_2/'
+    path_IR = p + f'/sequence_{seq_num}/infrared_1/'
+    path_IR2 = p + f'/sequence_{seq_num}/infrared_2/'
+    file_name = f"Lynred_seq_{seq_num}"
 
 IR = Camera(path=path_IR, device=torch.device('cuda'), id='IR', f=14, name='SmartIR640', sensor_name='SmartIR640')
 IR2 = Camera(path=path_IR2, device=torch.device('cuda'), id='IR2', f=14, name='subIR', sensor_name='SmartIR640')
@@ -63,4 +77,4 @@ perso = '/home/aurelien/PycharmProjects/Disparity_Pipeline/Setup_Camera/'
 pro = '/home/godeta/PycharmProjects/Disparity_Pipeline/Setup_Camera/'
 p = pro if 'godeta' in os.getcwd() else perso
 path_result = p + name_path
-R.save(path_result, 'Lynred_day.yaml')
+R.save(path_result, f'{file_name}.yaml')

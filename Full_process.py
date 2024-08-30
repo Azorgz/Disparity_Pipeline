@@ -14,5 +14,5 @@ def full_process(script_path):
 
 
 if __name__ == '__main__':
-    full_process('Process/Process_methods_night.yaml')
+    full_process('Process/demo_CSI.yaml')
     # full_process('Process/Process_dataset_creation.yaml')

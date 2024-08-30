@@ -24,15 +24,32 @@
 #    option:
 #  valid:
 #  save:
+# --------------------------- Name --------------------------- #
+Name: ---|| Process ||---
 
+# --------------------------------------------------------------- #
+# --------------------------- Options --------------------------- #
+# --------------------------------------------------------------- #
 Option:
-  name_experiment: Test
+  name_experiment: Example
   setup: # Paths to the config file of the pre-calibrated camera's setup
-    path: Setup_Camera.yaml
+    path: Setup_Camera/example.yaml
   dataset:
     number_of_sample: 10
     shuffle: False
+  realtime: True
+  validation:
+    post_validation: True
+  monocular_depth_network:
+    name: depthanything
+  depth_network:
+    name: unimatch
+  disparity_network:
+    name: unimatch
 
+# --------------------------------------------------------------- #
+# --------------------------- Process --------------------------- #
+# --------------------------------------------------------------- #
 
 Depth-Depth:
   depth:
@@ -41,10 +58,11 @@ Depth-Depth:
   wrap:
     cameras: [IR, RGB]
     method: depth
-    source: pred_depth
-    option: [return_depth_reg, return_occlusion, []]
+    option: [ return_occlusion ]
   valid: [IR, RGB]
-  save: [pred_depth, image_reg, depth_reg, occlusion]
+  save: [ pred_depth, image_reg, occlusion ]
+
+# --------------------------------------------------------------- #
 
 Depth-Disparity:
   depth:
@@ -53,10 +71,11 @@ Depth-Disparity:
   wrap:
     cameras: [IR, RGB]
     method: disparity
-    source: pred_depth
-    option: [return_depth_reg, return_occlusion, []]
+    option: [ return_occlusion ]
   valid: [IR, RGB]
-  save: [pred_depth, image_reg, depth_reg, occlusion]
+  save: [ pred_depth, image_reg, occlusion ]
+
+# --------------------------------------------------------------- #
 
 Disparity-Disparity:
   disparity:
@@ -65,10 +84,11 @@ Disparity-Disparity:
   wrap:
     cameras: [IR, RGB]
     method: disparity
-    source: pred_disp
-    option: [return_depth_reg, return_occlusion, []]
+    option: [ return_occlusion ]
   valid: [IR, RGB]
-  save: [pred_disp, image_reg, disp_reg, occlusion]
+  save: [ pred_depth, image_reg, occlusion ]
+
+# --------------------------------------------------------------- #
 
 Disparity-Depth:
   disparity:
@@ -77,55 +97,32 @@ Disparity-Depth:
   wrap:
     cameras: [IR, RGB]
     method: depth
-    source: pred_disp
-    option: [return_depth_reg, return_occlusion, []]
-  valid: [IR, RGB]
-  save: [pred_disp, image_reg, disp_reg, occlusion]
-#Depth:
-#  depth:
-#    cameras: [RGB, RGB2]
-#    option: [inference_size: [960, 1280]]
-#  wrap:
-#    cameras: [RGB2, RGB]
-#    method: depth
-#    source: pred_depth
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [RGB2, RGB]
-##  save: [pred_depth, image_reg, depth_reg, occlusion]
+    option: [ return_occlusion ]
+  valid: [ IR, RGB ]
+  save: [ pred_depth, image_reg, occlusion ]
 
-#Disparity:
-#  disparity:
-#    cameras: [RGB, RGB2]
-#    option: [inference_size: [640, 960]]
-#  wrap:
-#    cameras: [RGB2, RGB]
-#    method: disparity
-#    source: pred_disp
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [RGB2, RGB]
-##  save: [pred_disp, image_reg, disp_reg, occlusion]
+# --------------------------------------------------------------- #
 
-#Disparity-Disparity LD:
-#  disparity:
-#    cameras: [RGB, RGB2]
-#    option: [inference_size: [320, 480]]
-#  wrap:
-#    cameras: [RGB2, RGB]
-#    method: disparity
-#    source: pred_disp
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [RGB2, RGB]
-##  save: [pred_disp, image_reg, disp_reg, occlusion]
-#
-#
-#Depth-Depth LD:
-#  depth:
-#    cameras: [RGB, RGB2]
-#    option: [inference_size: [480, 640]]
-#  wrap:
-#    cameras: [RGB2, RGB]
-#    method: depth
-#    source: pred_depth
-#    option: [return_depth_reg, return_occlusion, []]
-#  valid: [RGB2, RGB]
-##  save: [pred_depth, image_reg, depth_reg, inputs, occlusion]
+monocular-Depth:
+  monocular:
+    cameras: [ RGB ]
+    option: [ inference_size: [ 480, 640 ] ]
+  wrap:
+    cameras: [ IR, RGB ]
+    method: depth
+    option: [ return_occlusion ]
+  valid: [ IR, RGB ]
+  save: [ pred_depth, image_reg, occlusion ]
+
+# --------------------------------------------------------------- #
+
+monocular-Disparity:
+  monocular:
+    cameras: [ RGB ]
+    option: [ inference_size: [ 480, 640 ] ]
+  wrap:
+    cameras: [ IR, RGB ]
+    method: disparity
+    option: [ return_occlusion ]
+  valid: [ IR, RGB ]
+  save: [ pred_depth, image_reg, occlusion ]

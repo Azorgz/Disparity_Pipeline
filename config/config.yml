@@ -13,8 +13,8 @@ reset_images_name: True # Change the images original name for an incremental nam
 # General option if there is no Process specified
 name_experiment: methods_comparison
 save_inputs: True # Save the input images paths
-save_disp: True # Save all the disparity images computed
-save_reg_images: True # Save the final Registered image
+#save_disp: True # Save all the disparity images computed
+#save_reg_images: True # Save the final Registered image
 save_depth: 8  # Depth of the Image value
 
 

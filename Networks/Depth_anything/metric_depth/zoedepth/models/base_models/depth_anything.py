@@ -1,4 +1,5 @@
 # MIT License
+import os
 
 # Copyright (c) 2022 Intelligent Systems Lab Org
 
@@ -337,8 +338,9 @@ class DepthAnythingCore(nn.Module):
         img_size = kwargs.pop("img_size", [384, 384])
         
         depth_anything = DPT_DINOv2(out_channels=[256, 512, 1024, 1024], use_clstoken=False)
-        
-        state_dict = torch.load('Networks/Depth_anything/checkpoints/depth_anything_vitl14.pth', map_location='cpu')
+
+        state_dict = torch.load(os.getcwd() + '/Networks/Depth_anything/checkpoints/depth_anything_vitl14.pth',
+                                map_location='cpu')
         depth_anything.load_state_dict(state_dict)
         
         kwargs.update({'keep_aspect_ratio': force_keep_ar})

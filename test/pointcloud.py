@@ -6,21 +6,21 @@ import os
 import sys
 import torch
 from torch import Tensor
-import utils.classes.Vizualisation.camviz.camviz as cv
+import utils.camviz.camviz as cv
 from Networks.Depth_anything.metric_depth.zoedepth.models.builder import build_model
 from Networks.Depth_anything.metric_depth.zoedepth.utils.config import get_config
 from config.Config import configure_parser
-from module.SetupCameras import CameraSetup
-from utils.classes.Vizualisation.camviz.camviz.objects.quaternion import pose_from_extrinsics
-from utils.classes import ImageTensor
+from utils.ImagesCameras import CameraSetup
+from utils.camviz.camviz.objects.quaternion import pose_from_extrinsics
+from utils.ImagesCameras import ImageTensor
 
 sys.path.append(os.getcwd() + '/Networks/Depth_anything/metric_depth')
-device = torch.device('cuda:0')
+device = torch.device('cpu')
 time_it = False
 # cmap = cv.utils.cmaps.depth_clr
 cmap = cv.utils.cmaps.jet
 
-R = CameraSetup(from_file=os.getcwd() + "/Setup_Camera/Lynred_day&night.yaml")
+R = CameraSetup(from_file=os.getcwd() + "/Setup_Camera/Lynred_day.yaml", device=device)
 parser = get_config('zoedepth', "infer")
 config = configure_parser(parser,
                           None,

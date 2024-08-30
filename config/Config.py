@@ -21,8 +21,8 @@ class ConfigPipe(dict):
             update(config, config_file)
         self["save_inputs"] = config["save_inputs"]
         self["print_info"] = config["print_info"]
-        self["save_disp"] = config["save_disp"]
-        self["save_reg_images"] = config["save_reg_images"]
+        # self["save_disp"] = config["save_disp"]
+        # self["save_reg_images"] = config["save_reg_images"]
         self["reset_images_name"] = config["reset_images_name"]
         self["timeit"] = config["timeit"]
 

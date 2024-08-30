@@ -76,9 +76,9 @@ class Validation(BaseModule):
                     self.res[name][key] = {}
                 # Compute the indices of each images cut to ROI
                 if roi is not None:
-                    new_roi = ImageTensor(new[:, :, roi[0]:roi[1], roi[2]:roi[3]])
-                    ref_roi = ImageTensor(ref[:, :, roi[0]:roi[1], roi[2]:roi[3]])
-                    old_roi = ImageTensor(old[:, :, roi[0]:roi[1], roi[2]:roi[3]])
+                    new_roi = ImageTensor(new[:, :, roi[2]:roi[3], roi[0]:roi[1]])
+                    ref_roi = ImageTensor(ref[:, :, roi[2]:roi[3], roi[0]:roi[1]])
+                    old_roi = ImageTensor(old[:, :, roi[2]:roi[3], roi[0]:roi[1]])
                     mask = None
                     res_new = n(ref_roi, new_roi, mask=mask)
                     res_old = n(ref_roi, old_roi, mask=mask)
@@ -86,9 +86,9 @@ class Validation(BaseModule):
                                 'new_roi': round(float(res_new), 4)})
                 # Compute the indices of each images cut to the GLOBAL ROI
                 if cum_roi is not None:
-                    new_cumroi = ImageTensor(new[:, :, cum_roi[0]:cum_roi[1], cum_roi[2]:cum_roi[3]])
-                    ref_cumroi = ImageTensor(ref[:, :, cum_roi[0]:cum_roi[1], cum_roi[2]:cum_roi[3]])
-                    old_cumroi = ImageTensor(old[:, :, cum_roi[0]:cum_roi[1], cum_roi[2]:cum_roi[3]])
+                    new_cumroi = ImageTensor(new[:, :, cum_roi[2]:cum_roi[3], cum_roi[0]:cum_roi[1]])
+                    ref_cumroi = ImageTensor(ref[:, :, cum_roi[2]:cum_roi[3], cum_roi[0]:cum_roi[1]])
+                    old_cumroi = ImageTensor(old[:, :, cum_roi[2]:cum_roi[3], cum_roi[0]:cum_roi[1]])
                     mask = None
                     res_new = n(ref_cumroi, new_cumroi, mask=mask)
                     res_old = n(ref_cumroi, old_cumroi, mask=mask)
@@ -130,19 +130,9 @@ class Validation(BaseModule):
                         if isinstance(sample[list(sample.keys())[0]], list):
                             self.res_stats[key][key_norms][key_stat] = {
                                 key: float(stat(np.array(sample[key]), 0).round(3)) for key in sample.keys()}
-                            # res_stat = stat(np.array(sample['new']), 0).round(3)
-                            # ref_stat = stat(np.array(sample['ref']), 0).round(3)
-                            # occlusion_stat = stat(np.array(sample['new_occ']), 0).round(3)
-                            # self.res_stats[key][key_norms][key_stat] = {'ref': float(ref_stat),
-                            #                                             'new': float(res_stat),
-                            #                                             'new_occ': float(occlusion_stat)}
                         else:
                             self.res_stats[key][key_norms][key_stat] = {key: float(np.array(sample[key]).round(3)) for
                                                                         key in sample.keys()}
-                            # self.res_stats[key][key_norms][key_stat] = {'ref': float(np.array(sample['new']).round(3)),
-                            #                                             'new': float(np.array(sample['ref']).round(3)),
-                            #                                             'new_occ': float(
-                            #                                                 np.array(sample['new_occ']).round(3))}
 
     def reset(self):
         self._update_conf(self.config)
