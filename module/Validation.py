@@ -55,10 +55,11 @@ class Validation(BaseModule):
                     self.stats[key] = stats_dict[key]
 
     def __str__(self):
-        string = super().__str__()
-        string += f'The validation of the results will compute the following indexes : {list(self.norms.keys())}'
-        string += f'\nThe Statistic selected for those indexes are the following : {list(self.stats.keys())}'
-        return string
+        if self.activated:
+            string = super().__str__()
+            string += f'The validation of the results will compute the following indexes : {list(self.norms.keys())}'
+            string += f'\nThe Statistic selected for those indexes are the following : {list(self.stats.keys())}'
+            return string
 
     @deactivated
     @timeit

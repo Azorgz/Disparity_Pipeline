@@ -6,12 +6,13 @@ class BaseModule:
     """
 
     def __init__(self, config, *args, verbose=True, **kwargs):
+        self.activated = True
         if config["timeit"]:
             self.timeit = []
         self.config = config
         self.device = config['device']['device']
         self._update_conf(config, *args, **kwargs)
-        if self.config['print_info'] and verbose:
+        if self.config['print_info'] and verbose and self.activated:
             print(self)
 
     def __call__(self, *args, **kwargs):

@@ -3,18 +3,16 @@ import sys
 import time
 import numpy as np
 import torch
+
 from kornia.geometry import depth_to_3d, depth_to_3d_v2
 from kornia.morphology import dilation
 from open3d.examples.pipelines.robust_icp import draw_registration_result
 from torch import Tensor
-
 from Networks.Depth_anything.metric_depth.zoedepth.models.builder import build_model
 from Networks.Depth_anything.metric_depth.zoedepth.utils.config import get_config
 from config.Config import configure_parser
-from utils.classes import CameraSetup
+from utils.ImagesCameras import CameraSetup, DepthTensor
 import open3d as o3d
-
-from utils.classes.Image import DepthTensor
 import torch.nn.functional as F
 
 # from utils.classes.KeypointsGenerator import KeypointsGenerator
@@ -44,10 +42,8 @@ for i in range(1):
     dist_corr_max = 20
     # keypointDetector = KeypointsGenerator(device, detector='sift_scale', matcher='snn', num_feature=10000)
     # kpts = keypointDetector(im_dst, im_src, draw_result_inplace=False)
-    depth_dst = F.interpolate(NN(Tensor(im_dst), focal=matrix_dst[0, 0, 0])['metric_depth'].clip(0, dist_corr_max),
-                              im_dst.shape[-2:])
-    depth_src = F.interpolate(NN(Tensor(im_src), focal=matrix_src[0, 0, 0])['metric_depth'].clip(0, dist_corr_max),
-                              im_src.shape[-2:])
+    depth_dst = F.interpolate(NN(Tensor(im_dst), focal=matrix_dst[0, 0, 0])['metric_depth'], im_dst.shape[-2:])
+    depth_src = F.interpolate(NN(Tensor(im_src), focal=matrix_src[0, 0, 0])['metric_depth'], im_src.shape[-2:])
     # depth_dist = DepthTensor(depth_src - depth_dst)
     # (im_dst.hstack(im_src)).show()
     # print(f'{torch.median(depth_dist) * 30 * 3.6} km/h')
@@ -55,8 +51,8 @@ for i in range(1):
     # cv2.imshow('depth dist', depth_dist.opencv())
     # cv2.waitKey(1)
     kernel = torch.ones(3, 3).to(device)
-    depth_dst = DepthTensor(dilation(depth_dst, kernel)).scale()
-    depth_src = DepthTensor(dilation(depth_src, kernel)).scale()
+    depth_dst = DepthTensor(dilation(depth_dst, kernel))
+    depth_src = DepthTensor(dilation(depth_src, kernel))
     # depth_dst.show()
     # depth_src.show()
     # Camera Matrix
@@ -68,7 +64,7 @@ for i in range(1):
     pcd_dst = o3d.t.geometry.PointCloud()
     cloud_flat = torch.flatten(points_3d_dst.put_channel_at(-1).squeeze(), start_dim=0,
                                end_dim=1).squeeze().cpu().detach().numpy()
-    cloud_flat = cloud_flat[cloud_flat[:, -1] > -dist_corr_max]
+    cloud_flat = cloud_flat[cloud_flat[:, -1] > dist_corr_max]
     pcd_dst.point.positions = o3d.core.Tensor(cloud_flat, o3d.core.Dtype.Float32)
     pcd_dst.estimate_normals()
 
@@ -78,7 +74,7 @@ for i in range(1):
     pcd_src = o3d.t.geometry.PointCloud()
     cloud_flat = torch.flatten(points_3d_src.put_channel_at(-1).squeeze(), start_dim=0,
                                end_dim=1).squeeze().cpu().detach().numpy()
-    cloud_flat = cloud_flat[cloud_flat[:, -1] > -dist_corr_max]
+    cloud_flat = cloud_flat[cloud_flat[:, -1] > dist_corr_max]
     pcd_src.point.positions = o3d.core.Tensor(cloud_flat, o3d.core.Dtype.Float32)
 
     voxel_sizes = o3d.utility.DoubleVector([0.1, 0.05, 0.025])

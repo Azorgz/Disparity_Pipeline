@@ -11,7 +11,7 @@ pro = '/media/godeta/T5 EVO/Datasets/Lynred/'
 
 p = pro if 'godeta' in os.getcwd() else perso
 
-dataset = "sequence"
+dataset = "original"
 
 if dataset == "original":
     # Original dataset
@@ -19,7 +19,7 @@ if dataset == "original":
     path_RGB2 = p + 'Day/slave/visible'
     path_IR = p + 'Day/master/infrared_corrected'
     path_IR2 = p + 'Day/slave/infrared_corrected'
-    file_name = "Lynred_day"
+    file_name = "Lynred_test"
 
 if dataset == "sequence":
     # New dataset sequence

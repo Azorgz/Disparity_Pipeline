@@ -35,3 +35,4 @@ dependencies:
       - scikit-image
       - gspread_dataframe
       - oauth2client
+      - open3d
