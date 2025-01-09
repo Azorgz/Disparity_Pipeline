@@ -140,6 +140,13 @@ class ConfigPipe(dict):
                                     path_config='Networks/Depth_anything/config_Depth_anything.yml',
                                     dict_vars=self["dataset"])
             self["monocular_network"]["network_args"] = args
+        elif self["monocular_network"]["name"] == "DEPTHANYTHINGV2":
+            from Networks.UniMatch.parser import get_args_parser_disparity
+            args = configure_parser(None,
+                                    config["preprocessing"],
+                                    path_config='Networks/Depth_anythingV2/config_Depth_anythingV2.yml',
+                                    dict_vars=self["dataset"])
+            self["monocular_network"]["network_args"] = args
         else:
             pass
         if args.path_checkpoint:
@@ -150,9 +157,9 @@ class ConfigPipe(dict):
 
     def config_preprocessing(self, config, target='disparity_network'):
         transform = []
+        IMAGENET_MEAN = [0.485, 0.456, 0.406]
+        IMAGENET_STD = [0.229, 0.224, 0.225]
         if config['name'].upper() == 'UNIMATCH':
-            IMAGENET_MEAN = [0.485, 0.456, 0.406]
-            IMAGENET_STD = [0.229, 0.224, 0.225]
             transform = [transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                          transforms.Resize(self[target]["network_args"].inference_size,
                                            self[target]["network_args"].padding_factor)]
@@ -162,6 +169,9 @@ class ConfigPipe(dict):
             transform = [transforms.Resize(self[target]["network_args"].inference_size, 0)]
         elif config['name'].upper() == 'DEPTHANYTHING':
             transform = [transforms.Resize(self[target]["network_args"].img_size, 0)]
+        elif config['name'].upper() == 'DEPTHANYTHINGV2':
+            transform = [transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+                         transforms.Resize(self[target]["network_args"].inference_size, 0)]
         # else:
         #     if isinstance(config["preprocessing"]["normalize"], tuple or list):
         #         m, std = config["preprocessing"]["normalize"]
@@ -180,6 +190,7 @@ class ConfigPipe(dict):
         self["reconstruction"]["remove_occlusion"] = config["remove_occlusion"]
         self["reconstruction"]["post_process_image"] = config["post_process_image"]
         self["reconstruction"]["post_process_depth"] = config["post_process_depth"]
+        self["reconstruction"]["random_projection"] = config["random_projection"]
 
     def config_validation(self, config):
         self['validation'] = {}
@@ -213,7 +224,7 @@ def configure_parser(parser, config, path_config=None, dict_vars=None):
     if not config:
         config = {}
     config_vars = config_vars | dict_vars
-    config_vars = config_vars | config
+    config_vars = config | config_vars
     for key, value in config_vars.items():
         try:
             dict_pars[key] = value

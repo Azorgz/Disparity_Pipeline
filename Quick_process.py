@@ -33,6 +33,8 @@ def quick_process(idx, script_path):
     config = ConfigPipe(process.option)
     config['validation']['stats']['mean'] = False
     config['validation']['stats']['std'] = False
+    config['validation']['activated'] = True
+    config['reconstruction']['random_projection'] = None
     pipe = Pipe(config)
     pipe.run(process=process)
     Visualizer(path, search_exp=True).run()

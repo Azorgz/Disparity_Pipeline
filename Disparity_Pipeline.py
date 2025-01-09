@@ -1,5 +1,7 @@
 import os
 import warnings
+
+import oyaml
 import oyaml as yaml
 import torch
 from tqdm import tqdm
@@ -74,7 +76,8 @@ class Pipe:
                         bar.update(1)
                 if self.save_inputs or config["validation"]['post_validation']:
                     self.dataloader.dataset.save_conf(experiment.path)
-                self.validation.statistic(path=experiment.path)
+                if self.validation.activated:
+                    self.validation.statistic(path=experiment.path)
                 if self.timeit:
                     self.save_timers(experiment, name)
                     self.reset_timers()
@@ -83,7 +86,10 @@ class Pipe:
                 if experiment.setup is not self.setup:
                     self._init_dataloader_(self.setup)
                     self._init_wrapper_(self.setup, verbose=False)
-
+                if self.wrapper.relative_poses is not None:
+                    data = {'relative_poses': self.wrapper.relative_poses, 'scales': self.wrapper.scales}
+                    with open(experiment.path + '/relative_poses.yaml', 'w') as file:
+                        oyaml.dump(data, file)
         else:
             for idx, sample in tqdm(enumerate(self.dataloader),
                                     total=len(self.dataloader),

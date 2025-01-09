@@ -5,6 +5,7 @@ import warnings
 import torch
 from torch import Tensor
 from Networks.ACVNet.models import ACVNet
+from Networks.Depth_anythingV2.metric_depth.depth_anything_v2.dpt import DepthAnythingV2
 from Networks.KenburnDepth.KenburnDepth import KenburnDepth
 from Networks.UniMatch.unimatch.unimatch import UniMatch
 from config.Config import ConfigPipe
@@ -15,7 +16,8 @@ from utils.misc import timeit, count_parameter
 
 
 class SuperNetwork(BaseModule):
-    Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch'], 'monocular': ['Kenburn', 'DepthAnything']}
+    Network = {'disparity': ['ACVNet', 'UniMatch'], 'depth': ['UniMatch'],
+               'monocular': ['Kenburn', 'DepthAnything', 'DepthAnythingV2']}
     """
     This class add a layer for the data post-processing & the inputs args according each Network implemented.
     To Run it, a normal Forward call with 2 images as inputs would do it.
@@ -166,6 +168,21 @@ class SuperNetwork(BaseModule):
             from Networks.Depth_anything.metric_depth.zoedepth.models.builder import build_model
             sys.path.append(os.getcwd() + '/Networks/Depth_anything/metric_depth')
             model = build_model(self.args_monocular).eval()
+        elif self.name_monocular == "DEPTHANYTHINGV2":
+            self.name_monocular = "DepthAnythingV2"
+            checkpoint = self.args_monocular.path_checkpoint
+            model_configs = {
+                'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
+                'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
+                'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
+                'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
+            }
+            path = os.getcwd() + str(
+                self.args_monocular.path_checkpoint) + f'/depth_anything_v2_metric_{"hypersim" if self.args_monocular.stage == "indoor" else "vkitti"}_{self.args_monocular.encoder}.pth'
+            model = DepthAnythingV2(
+                **{**model_configs[self.args_monocular.encoder], 'max_depth': self.args_monocular.max_depth})
+            model.load_state_dict(torch.load(path, map_location='cpu'))
+            model = model.eval()
         elif config['depth_network']["name"] == "to_be_implemented":
             self.name_monocular = "custom"
             model = None
@@ -281,6 +298,10 @@ class SuperNetwork(BaseModule):
                 for key, im in sample.items():
                     res = {}
                     res[key] = self.model_monocular(im, focal=focal)['metric_depth']
+            elif self.name_monocular == "DepthAnythingV2":
+                for key, im in sample.items():
+                    res = {}
+                    res[key] = self.model_monocular(im)
             else:
                 warnings.warn('This Network is not implemented')
                 return 0

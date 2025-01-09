@@ -65,7 +65,7 @@ depth_network:
 
 # Monocular Depth Network #########
 monocular_depth_network:
-  name: kenburn # Possibilities : kenburn
+  name: kenburn # Possibilities : kenburn, depthanything, depthanythingV2
   backbone: null # Possibilities : null for now (to be set in case of custom Network)
   transformer: null # Possibilities : null for now (to be set in case of custom Network)
   detection_head: null # Possibilities : null for now (to be set in case of custom Network)
@@ -81,6 +81,7 @@ reconstruction:
   remove_occlusion: True # If True the occluded pixels will be suppressed of the resampled image
   post_process_depth: 3 # median blurring and a dilation for disparity will be done
   post_process_image: 3
+  random_projection: null #[0.2, 0.2, 0.2, 0.2, 3, 7, 1] # null or list of [delta_scale, dx, dy, dz, drw, dry, drz]
 
 
 # Validation of the result #######
@@ -89,9 +90,9 @@ validation:
   post_validation: true
   indices:
     # value based errors:
-    rmse: False      # Root Mean Square Error
-    nmi: False       # Normalized Mutual Information // available only on CPU with the "opencv" and "algo" reconstruction
-    psnr: False      # Peak Signal Noise Ratio
+    rmse: True      # Root Mean Square Error
+    nmi: True       # Normalized Mutual Information // available only on CPU with the "opencv" and "algo" reconstruction
+    psnr: True      # Peak Signal Noise Ratio
     # Structure based errors:
     ssim: True      # Structural Similarity
     ms_ssim: True   # SSIM multi-scale // available only on GPU following the "torch" reconstruction

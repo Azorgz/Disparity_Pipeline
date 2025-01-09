@@ -65,10 +65,9 @@ class Validation(BaseModule):
     @timeit
     def __call__(self, new, ref, old, name, exp_name, *args, occlusion=None, roi=None, cum_roi=None, **kwargs):
         self.exp_name = exp_name
-        if self.post_validation:
-            mask = new.BINARY(threshold=0, method='gt', keepchannel=False)
-            self.roi.append(extract_roi_from_images(mask)[0])
-        else:
+        mask = new.BINARY(threshold=0, method='gt', keepchannel=False)
+        self.roi.append(extract_roi_from_images(mask)[0])
+        if not self.post_validation:
             if name not in self.res.keys():
                 self.res[name] = {}
             for key, n in self.norms.items():

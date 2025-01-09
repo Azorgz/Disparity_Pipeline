@@ -4,10 +4,10 @@ Option:
   name_experiment: Test
   setup: # Paths to the config file of the pre-calibrated camera's setup
     #    path: Setup_Camera/Lynred_test.yaml
-    path: Setup_Camera/CameraRig.yaml
+    path: Setup_Camera/FLIR_video0.yaml
   dataset:
-    number_of_sample: 1/200
-    shuffle: True
+    number_of_sample: 1/10
+    shuffle: False
   realtime : True
   validation:
     post_validation: False
@@ -21,14 +21,59 @@ Option:
 
 monocular_depth:
   monocular:
-    cameras: [ RGB2 ]
+    cameras: [ IR ]
     option: []
   wrap:
-    cameras: [ IR, RGB2 ]
+    cameras: [ IR, RGB ]
     method: depth
     option: [ return_depth_reg, return_occlusion ]
-  valid: [ IR, RGB2 ]
+  valid: [ IR, RGB ]
   save: [ pred_depth, image_reg ]
+
+#monocular_depth:
+#  monocular:
+#    cameras: [ RGB ]
+#    option: []
+#  wrap:
+#    cameras: [ IR, RGB ]
+#    method: depth
+#    option: [ return_depth_reg, return_occlusion ]
+#  valid: [ IR, RGB ]
+#  save: [ pred_depth, image_reg ]
+
+#monocular_depth2:
+#  monocular:
+#    cameras: [ RGB ]
+#    option: []
+#  wrap:
+#    cameras: [ RGB2, RGB ]
+#    method: depth
+#    option: [ return_depth_reg, return_occlusion ]
+#  valid: [ RGB2, RGB ]
+#  save: [ pred_depth, image_reg ]
+#
+#monocular_depth3:
+#  monocular:
+#    cameras: [ RGB ]
+#    option: []
+#  wrap:
+#    cameras: [ IR2, RGB ]
+#    method: depth
+#    option: [ return_depth_reg, return_occlusion ]
+#  valid: [ IR2, RGB ]
+#  save: [ pred_depth, image_reg ]
+#
+#monocular_depth4:
+#  monocular:
+#    cameras: [ RGB2 ]
+#    option: []
+#  wrap:
+#    cameras: [ IR, RGB2 ]
+#    method: depth
+#    option: [ return_depth_reg, return_occlusion ]
+#  valid: [ IR, RGB2 ]
+#  save: [ pred_depth, image_reg ]
+
 
 #Disparity-Depth:
 #  disparity:

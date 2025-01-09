@@ -17,6 +17,7 @@ class Process(OrderedDict):
     This class is the backbone of any pipeline of processing you want to make.
     It's an Ordered Dict which contain all the experiments the Pipe will process
     """
+
     def __init__(self, path: str = None, process_dict: dict = None):
         super(Process, self).__init__()
         self.isInit = False
@@ -295,8 +296,9 @@ class Process(OrderedDict):
                 proc.append(['MONOCULAR', option])
             elif key == 'WRAP':
                 assert len(p['cameras']) == 2, \
-                    'The WRAP instruction needs 2 cameras : cam_src, cam_dst'
-                option = {'cam_src': p['cameras'][0], 'cam_dst': p['cameras'][1],
+                    'The WRAP instruction needs 2 cameras : cam_src, cam_dst or random'
+                option = {'cam_src': p['cameras'][0],
+                          'cam_dst': p['cameras'][0] if p['cameras'][1] == 'random' else p['cameras'][1],
                           'depth': True if p['method'] == 'depth' else False,
                           'return_depth_reg': False, 'return_occlusion': False}
                 if 'option' in p:
@@ -321,7 +323,8 @@ class Process(OrderedDict):
                     option = {'variable_name': p_}
                     proc.append([key, option])
             elif key == 'SETUP':
-                assert len(p) >= 0, 'The SETUP instruction needs at least 1 positional argument : path to the setup file'
+                assert len(
+                    p) >= 0, 'The SETUP instruction needs at least 1 positional argument : path to the setup file'
                 assert os.path.exists(os.getcwd() + '/' + p['path']), f'The setup file {p["path"]}'
                 proc.insert(0, [key, os.getcwd() + '/' + p['path']])
             else:

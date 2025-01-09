@@ -1,0 +1,6 @@
+inference_size: [ 420, 560 ]  # Must be // by 14
+max_depth: 200
+encoder: vitl  # ['vits', 'vitb', 'vitl', 'vitg']
+stage: outdoor
+path_checkpoint: /Networks/Depth_anythingV2/checkpoints/
+normalize:

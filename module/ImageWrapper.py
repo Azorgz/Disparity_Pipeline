@@ -1,7 +1,11 @@
+import torch
+
 from utils.ImagesCameras import ImageTensor, CameraSetup, DepthTensor
+from kornia.geometry.epipolar import scale_intrinsics
 from utils.ImagesCameras.Wrappers.DepthWrapper import DepthWrapper
 from utils.ImagesCameras.Wrappers.DisparityWrapper import DisparityWrapper
-from kornia.geometry import relative_transformation
+from kornia.geometry import relative_transformation, axis_angle_to_quaternion, quaternion_to_rotation_matrix, \
+    Rt_to_matrix4x4
 import warnings
 
 from config.Config import ConfigPipe
@@ -27,6 +31,9 @@ class ImageWrapper(BaseModule):
     def _update_conf(self, config, *args, **kwargs):
         self.device = config["device"]["device"]
         self.remove_occlusion = config['reconstruction']['remove_occlusion']
+        self.random_projection = config['reconstruction']['random_projection']
+        self.relative_poses = None
+        self.scales = None
         if self.remove_occlusion:
             self.post_process_image = config['reconstruction']['post_process_image']
             self.post_process_depth = config['reconstruction']['post_process_depth']
@@ -55,15 +62,34 @@ class ImageWrapper(BaseModule):
         :param kwargs: Further implementation?
         :return: ImageTensor of the projected image
         """
+        if self.random_projection is not None:
+            scale, tx, ty, tz, *r = (torch.rand([7], device=self.device) - 0.5) * torch.tensor(self.random_projection,
+                                                                                               device=self.device)
+            quaternion = axis_angle_to_quaternion(torch.deg2rad(torch.stack(r, dim=-1)))
+            rotations = quaternion_to_rotation_matrix(quaternion)[None]
+            translations = torch.stack([tx, ty, tz], dim=0)[None, :, None]  # N 3 1
+            relative_pose = Rt_to_matrix4x4(rotations, translations)
+            cam_src_intrinsic = self.setup.cameras[cam_src].intrinsics[:, :3, :3]
+            cam_dst_intrinsic = scale_intrinsics(self.setup.cameras[cam_dst].intrinsics[:, :3, :3], 1 - scale)
+            if self.relative_poses is None:
+                self.relative_poses = [relative_pose.cpu().numpy().tolist()]
+                self.scales = [float(scale.cpu())]
+            else:
+                self.relative_poses.append(relative_pose.cpu().numpy().tolist())
+                self.scales.append(float(scale.cpu()))
+        else:
+            cam_src_intrinsic = self.setup.cameras[cam_src].intrinsics[:, :3, :3]
+            cam_dst_intrinsic = self.setup.cameras[cam_dst].intrinsics[:, :3, :3]
+            relative_pose = relative_transformation(
+                self.setup.cameras[cam_src].extrinsics.inverse(),
+                self.setup.cameras[cam_dst].extrinsics.inverse())
         if depth:
             res = self.depth_wrapper(sample[cam_src].clone(),
                                      sample[cam_dst].clone(),
                                      depth_tensors[cam_dst].clone() if not reverse_wrap else depth_tensors[cam_src].clone(),
-                                     self.setup.cameras[cam_src].intrinsics[:, :3, :3],
-                                     self.setup.cameras[cam_dst].intrinsics[:, :3, :3],
-                                     relative_transformation(
-                                         self.setup.cameras[cam_src].extrinsics.inverse(),
-                                         self.setup.cameras[cam_dst].extrinsics.inverse()),
+                                     cam_src_intrinsic,
+                                     cam_dst_intrinsic,
+                                     relative_pose,
                                      *args,
                                      return_depth_reg=return_depth_reg,
                                      return_occlusion=return_occlusion,
